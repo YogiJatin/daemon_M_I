@@ -52,6 +52,9 @@ export interface ExportDataPayload {
     audit_events: any[];
     task_proposals: any[];
     audit_chain: any[];
+    memory_objects: any[];
+    memory_relationships: any[];
+    memory_tags: any[];
   };
 }
 
@@ -249,6 +252,23 @@ export async function getExportData(
     auditChainRecords = [];
   }
 
+  // 14. Memory OS (Block 8)
+  let memoryObjects: any[] = [];
+  let memoryRelationships: any[] = [];
+  let memoryTags: any[] = [];
+  try {
+    const memRes = await db.prepare("SELECT * FROM memory_objects ORDER BY created_at ASC").all<any>();
+    memoryObjects = memRes.results || [];
+    const relRes = await db.prepare("SELECT * FROM memory_relationships ORDER BY created_at ASC").all<any>();
+    memoryRelationships = relRes.results || [];
+    const tagRes = await db.prepare("SELECT * FROM memory_tags ORDER BY created_at ASC").all<any>();
+    memoryTags = tagRes.results || [];
+  } catch {
+    memoryObjects = [];
+    memoryRelationships = [];
+    memoryTags = [];
+  }
+
   return {
     export_version: "1.0",
     exported_at: nowIso,
@@ -267,6 +287,9 @@ export async function getExportData(
       audit_events: auditEvents.length,
       task_proposals: proposals.length,
       audit_chain: auditChainRecords.length,
+      memory_objects: memoryObjects.length,
+      memory_relationships: memoryRelationships.length,
+      memory_tags: memoryTags.length,
     },
     data: {
       tasks,
@@ -282,6 +305,9 @@ export async function getExportData(
       audit_events: auditEvents,
       task_proposals: proposals,
       audit_chain: auditChainRecords,
+      memory_objects: memoryObjects,
+      memory_relationships: memoryRelationships,
+      memory_tags: memoryTags,
     },
   };
 }

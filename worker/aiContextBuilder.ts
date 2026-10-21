@@ -63,7 +63,7 @@ export class AIContextBuilder {
    */
   public addEntity(
     id: string,
-    type: "task" | "class" | "material" | "history" | "attachment" | "other",
+    type: "task" | "class" | "material" | "history" | "attachment" | "knowledge" | "memory" | "other",
     payload: any,
     priority: "mandatory" | "high" | "normal" | "low" = "normal"
   ): this {
@@ -107,6 +107,9 @@ export class AIContextBuilder {
         return `    <history_event id="${safeId}" event="${escapeXml(payload.event_type || "")}">\n      <details>${escapeXml(JSON.stringify(payload))}</details>\n    </history_event>`;
       case "attachment":
         return `    <attachment id="${safeId}" filename="${escapeXml(payload.filename || "")}" mime="${escapeXml(payload.mime_type || "")}">\n      <content>${escapeXml(payload.extracted_text || payload.content || "")}</content>\n    </attachment>`;
+      case "knowledge":
+      case "memory":
+        return `    <memory id="${safeId}" type="${escapeXml(payload.type || "note")}">\n      <title>${escapeXml(payload.title || "")}</title>\n      <summary>${escapeXml(payload.summary || payload.excerpt || "")}</summary>\n    </memory>`;
       default:
         return `    <entity id="${safeId}" type="${escapeXml(type)}">\n      <content>${escapeXml(JSON.stringify(payload))}</content>\n    </entity>`;
     }
@@ -123,13 +126,14 @@ export class AIContextBuilder {
       timetable: [],
       tasks: [],
       materials: [],
+      memory: [],
       attachments: [],
       history: [],
       other: [],
     };
 
     for (const ent of budgetRes.entities) {
-      const typeKey = ent.type === "class" ? "timetable" : ent.type === "task" ? "tasks" : ent.type === "material" ? "materials" : ent.type === "attachment" ? "attachments" : ent.type === "history" ? "history" : "other";
+      const typeKey = ent.type === "class" ? "timetable" : ent.type === "task" ? "tasks" : ent.type === "material" ? "materials" : (ent.type === "knowledge" || ent.type === "memory") ? "memory" : ent.type === "attachment" ? "attachments" : ent.type === "history" ? "history" : "other";
       if (ent.xmlRepresentation) {
         byType[typeKey].push(ent.xmlRepresentation);
       }
@@ -149,6 +153,9 @@ export class AIContextBuilder {
     }
     if (byType.tasks.length > 0) {
       contextLines.push(`  <tasks>\n${byType.tasks.sort().join("\n")}\n  </tasks>`);
+    }
+    if (byType.memory.length > 0) {
+      contextLines.push(`  <memory>\n${byType.memory.sort().join("\n")}\n  </memory>`);
     }
     if (byType.materials.length > 0) {
       contextLines.push(`  <materials>\n${byType.materials.sort().join("\n")}\n  </materials>`);

@@ -68,12 +68,18 @@ export type AuditEventType =
   | "DOCUMENT_PARSED"
   | "INTERPRETATION_COMPLETED"
   | "OWNER_APPROVED"
-  | "OWNER_REJECTED";
+  | "OWNER_REJECTED"
+  // Block 8 Memory OS Events
+  | "MEMORY_CREATED"
+  | "MEMORY_UPDATED"
+  | "SUMMARY_GENERATED"
+  | "RELATIONSHIP_CREATED"
+  | "MEMORY_LINKED";
 
 export interface AuditEventInput {
   eventType: AuditEventType;
   eventVersion?: string; // Default: '1.0.0'
-  entityType: "task" | "proposal" | "timetable" | "recurrence" | "auth" | "export" | "ai" | "desktop" | "system" | "attachment" | "input_session";
+  entityType: "task" | "proposal" | "timetable" | "recurrence" | "auth" | "export" | "ai" | "desktop" | "system" | "attachment" | "input_session" | "memory_object" | "memory_relationship";
   entityId: string;
   actor?: string; // Default: 'system'
   payload: Record<string, any>;

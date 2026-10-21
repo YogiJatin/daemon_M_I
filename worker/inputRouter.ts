@@ -15,6 +15,7 @@ import { VoiceIngress } from './voiceIngress';
 import { OCRIngress } from './ocrIngress';
 import { DocumentIngress } from './documentIngress';
 import { InputInterpreter } from './inputInterpreter';
+import { MemoryIndexer } from './memoryIndexer';
 import { AuditService } from './auditService';
 
 export class InputRouter {
@@ -31,6 +32,7 @@ export class InputRouter {
     extraction?: ExtractionResult;
     interpretation: InterpretationResult;
     proposalId?: string;
+    memoryObjectId?: string;
   }> {
     const sessionId = `inp_${crypto.randomUUID()}`;
     const nowIso = now.toISOString();
@@ -208,6 +210,39 @@ export class InputRouter {
         env
       );
 
+      // 3B. Memory OS Canonical Indexing (Block 8)
+      let memoryObjectId: string | undefined;
+      try {
+        const memType = input.rawType === 'audio' ? 'voice_note'
+          : input.rawType === 'image' ? 'screenshot'
+          : input.rawType === 'document' ? 'document'
+          : interpretation.category === 'question' ? 'question'
+          : interpretation.category === 'study_material' ? 'lecture'
+          : interpretation.category === 'bookmark' ? 'bookmark'
+          : 'note';
+
+        const indexRes = await MemoryIndexer.indexFromIngress(
+          db,
+          {
+            type: memType,
+            title: interpretation.candidateTitle,
+            text: extractedText,
+            attachmentId,
+            source: input.source,
+            metadata: {
+              ...(input.metadata || {}),
+              session_id: sessionId,
+              category: interpretation.category,
+            },
+          },
+          env,
+          now
+        );
+        memoryObjectId = indexRes.memoryObjectId;
+      } catch (err: any) {
+        console.warn('[MemoryIndexer] Failed to index observation into Memory OS:', err.message);
+      }
+
       // 4. Draft Proposal Creation (if not ignored noise)
       let proposalId: string | undefined;
 
@@ -253,6 +288,7 @@ export class InputRouter {
         extraction: extractionResult,
         interpretation,
         proposalId,
+        memoryObjectId,
       };
     } catch (err: any) {
       // Mark session as failed with error details

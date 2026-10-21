@@ -56,6 +56,7 @@ import {
   rejectProposal,
 } from "./inboxService";
 import { InputRouter } from "./inputRouter";
+import { handleMemoryApi } from "./memoryApi";
 
 // ---------------------------------------------------------------------------
 // Standard Envelopes & Error Helpers
@@ -1672,6 +1673,14 @@ export async function handleApiRequest(
         attachment,
         proposal,
       });
+    }
+
+    // =======================================================================
+    // 14C. MEMORY OS ENDPOINTS (Block 8)
+    // =======================================================================
+    const memoryResponse = await handleMemoryApi(request, env, now);
+    if (memoryResponse) {
+      return memoryResponse;
     }
 
     // GET /api/v1/assistant

@@ -248,4 +248,56 @@ export const api = {
       body: JSON.stringify({ reason }),
     });
   },
+
+  // Memory OS (Block 8)
+  async getMemory(params: { type?: string; source?: string; tag?: string; limit?: number; offset?: number } = {}): Promise<{ objects: any[]; total: number }> {
+    const sp = new URLSearchParams();
+    if (params.type) sp.set('type', params.type);
+    if (params.source) sp.set('source', params.source);
+    if (params.tag) sp.set('tag', params.tag);
+    if (params.limit) sp.set('limit', String(params.limit));
+    if (params.offset) sp.set('offset', String(params.offset));
+    return request(`/api/v1/memory?${sp.toString()}`);
+  },
+
+  async getMemoryById(id: string): Promise<{ object: any; tags: string[]; relationships_count: number }> {
+    return request(`/api/v1/memory/${encodeURIComponent(id)}`);
+  },
+
+  async searchMemory(params: { q?: string; tag?: string; type?: string; from?: string; to?: string; limit?: number } = {}): Promise<{ results: any[]; count: number }> {
+    const sp = new URLSearchParams();
+    if (params.q) sp.set('q', params.q);
+    if (params.tag) sp.set('tag', params.tag);
+    if (params.type) sp.set('type', params.type);
+    if (params.from) sp.set('from', params.from);
+    if (params.to) sp.set('to', params.to);
+    if (params.limit) sp.set('limit', String(params.limit));
+    return request(`/api/v1/memory/search?${sp.toString()}`);
+  },
+
+  async getMemoryRelationships(id: string, direction: 'outgoing' | 'incoming' | 'both' = 'both'): Promise<{ relationships: any[]; count: number }> {
+    return request(`/api/v1/memory/${encodeURIComponent(id)}/relationships?direction=${encodeURIComponent(direction)}`);
+  },
+
+  async getMemoryTimeline(id: string): Promise<{ timeline: any[]; count: number }> {
+    return request(`/api/v1/memory/${encodeURIComponent(id)}/timeline`);
+  },
+
+  async getMemoryGraph(id: string, depth: number = 2): Promise<{ graph: any }> {
+    return request(`/api/v1/memory/${encodeURIComponent(id)}/graph?depth=${depth}`);
+  },
+
+  async summarizeMemory(id: string, force: boolean = false): Promise<{ summary: string; wasCached: boolean }> {
+    return request(`/api/v1/memory/${encodeURIComponent(id)}/summarize`, {
+      method: 'POST',
+      body: JSON.stringify({ force }),
+    });
+  },
+
+  async linkMemory(fromObject: string, toObject: string, relationshipType: string, confidence: number = 1.0): Promise<any> {
+    return request('/api/v1/memory/link', {
+      method: 'POST',
+      body: JSON.stringify({ from_object: fromObject, to_object: toObject, relationship_type: relationshipType, confidence }),
+    });
+  },
 };

@@ -5,26 +5,26 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-001 — Block 3A: Dedicated `recurrence_rules` table
+## ADR-001 â€” Block 3A: Dedicated `recurrence_rules` table
 
 **Date**: 2026-10-20  
 **Context**: Recurring tasks need a scheduling template separate from live task state.  
 **Decision**: Created `recurrence_rules` as a first-class table with pattern, interval, weekday, month/year fields, and lease-based generation claims.  
 **Alternatives rejected**: Storing recurrence metadata directly on `tasks` rows (couples scheduling to mutable state, fragile on edits).  
-**Trade-off**: Extra join for "is this task recurring?" queries — acceptable for correctness.
+**Trade-off**: Extra join for "is this task recurring?" queries â€” acceptable for correctness.
 
 ---
 
-## ADR-002 — Block 3A: Lease-based generation claim
+## ADR-002 â€” Block 3A: Lease-based generation claim
 
 **Date**: 2026-10-20  
 **Context**: Cron triggers could overlap, generating duplicate occurrences.  
-**Decision**: `generation_claimed_at` + `generation_lease_until` columns with `UPDATE … WHERE lease expired` pattern.  
+**Decision**: `generation_claimed_at` + `generation_lease_until` columns with `UPDATE â€¦ WHERE lease expired` pattern.  
 **Trade-off**: D1 single-writer makes true contention unlikely on Free plan, but the pattern is correct for future scale.
 
 ---
 
-## ADR-003 — Block 3B: `class_occurrences` as immutable record
+## ADR-003 â€” Block 3B: `class_occurrences` as immutable record
 
 **Date**: 2026-10-21  
 **Context**: Attendance analytics and schedule tracking need a per-day-per-slot record.  
@@ -33,7 +33,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-004 — Block 3B: Extended exception types
+## ADR-004 â€” Block 3B: Extended exception types
 
 **Date**: 2026-10-21  
 **Context**: Timetable exceptions need to cover holidays, cancellations, moves, exams, and special events.  
@@ -42,7 +42,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-005 — Block 3B: Preparation materials schema
+## ADR-005 â€” Block 3B: Preparation materials schema
 
 **Date**: 2026-10-21  
 **Context**: Lab and class preparation items need structured metadata beyond a simple label.  
@@ -51,7 +51,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-006 — Block 3B: Holiday scoping
+## ADR-006 â€” Block 3B: Holiday scoping
 
 **Date**: 2026-10-21  
 **Context**: Holidays may apply at different scopes (national, college, semester, department).  
@@ -60,7 +60,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-007 — Block 4: OS Services Architecture
+## ADR-007 â€” Block 4: OS Services Architecture
 
 **Date**: 2026-10-21  
 **Context**: Block 4 introduces the API layer. The owner's design principle: "treat this as an Operating System, not a task manager."  
@@ -69,7 +69,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-008 — Block 4: Telegram-based owner pairing for auth
+## ADR-008 â€” Block 4: Telegram-based owner pairing for auth
 
 **Date**: 2026-10-21  
 **Context**: The system is single-owner. Traditional username/password doesn't fit. OAuth is over-engineered for V0.  
@@ -78,16 +78,16 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-009 — Block 4: Generic Inbox abstraction
+## ADR-009 â€” Block 4: Generic Inbox abstraction
 
 **Date**: 2026-10-21  
-**Context**: Capture will come from share targets, voice, clipboard, screenshots, email — not just Telegram.  
+**Context**: Capture will come from share targets, voice, clipboard, screenshots, email â€” not just Telegram.  
 **Decision**: `inbox_items` table with `content_type` enum (`text`, `url`, `image`, `voice`, `clipboard`, `file`, `email`, `screenshot`, `other`). Preview-then-confirm flow: `POST /capture?action=preview` parses without persisting; `action=confirm` creates both inbox item and task atomically.  
 **Trade-off**: Slightly more complex than direct task creation, but eliminates accidental capture and supports future multi-modal ingress.
 
 ---
 
-## ADR-010 — Block 4: Reserved future API contracts
+## ADR-010 â€” Block 4: Reserved future API contracts
 
 **Date**: 2026-10-21  
 **Context**: AI assistant, device management, and integrations are planned for future blocks. Changing API paths later would break clients.  
@@ -96,16 +96,16 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-011 — Block 4: Webhook secret fallback in auth middleware
+## ADR-011 â€” Block 4: Webhook secret fallback in auth middleware
 
 **Date**: 2026-10-21  
 **Context**: Existing Block 3A/3B test suites authenticate via `X-Telegram-Bot-Api-Secret-Token` header, not session tokens. The auth middleware must not break them.  
-**Decision**: `authenticateRequest()` checks Bearer token → Cookie → webhook secret header (in that order). Webhook secret creates a synthetic admin session for the request duration.  
+**Decision**: `authenticateRequest()` checks Bearer token â†’ Cookie â†’ webhook secret header (in that order). Webhook secret creates a synthetic admin session for the request duration.  
 **Trade-off**: Slightly broader attack surface if webhook secret leaks, but it's already the production Telegram verification mechanism.
 
 ---
 
-## ADR-012 — Block 4: Optimistic concurrency on task mutations
+## ADR-012 â€” Block 4: Optimistic concurrency on task mutations
 
 **Date**: 2026-10-21  
 **Context**: Future multi-client scenarios (PWA + Telegram) could race on task updates.  
@@ -114,7 +114,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-013 — Block 4: Focus read model (Command Center)
+## ADR-013 â€” Block 4: Focus read model (Command Center)
 
 **Date**: 2026-10-21  
 **Context**: Mobile/PWA clients need a single-request "what should I focus on now?" payload.  
@@ -123,7 +123,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-014 — Block 5: Deterministic suggestions engine & context-version hashing
+## ADR-014 â€” Block 5: Deterministic suggestions engine & context-version hashing
 
 **Date**: 2026-10-21  
 **Context**: The owner needs proactive assistance and reminders without introducing LLM dependencies or hallucinated tasks in the operational loop (SRS FR-AI-002, TEST-5.1).  
@@ -133,7 +133,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-015 — Block 5: Data portability, zero-secret export & CSV injection mitigation
+## ADR-015 â€” Block 5: Data portability, zero-secret export & CSV injection mitigation
 
 **Date**: 2026-10-21  
 **Context**: SRS NFR-012 requires complete JSON and CSV export without proprietary UI lock-in. Security demands that tokens, credentials, and update ledgers are never exposed (TEST-5.2).  
@@ -142,26 +142,26 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-016 — Block 5: Encrypted external backup via Worker export & `age`
+## ADR-016 â€” Block 5: Encrypted external backup via Worker export & `age`
 
 **Date**: 2026-10-21  
-**Context**: SRS NFR-013 and §14.3 require weekly encrypted external backups outside Cloudflare into Google Drive, with an offline decryption key.  
+**Context**: SRS NFR-013 and Â§14.3 require weekly encrypted external backups outside Cloudflare into Google Drive, with an offline decryption key.  
 **Decision**: Orchestrated weekly backup via GitHub Actions workflow using the Worker's authenticated `/api/v1/export?format=json` endpoint as the source of truth. Encrypted immediately with `age` using the owner's public recipient key before upload. Plaintext is wiped immediately on runner. Google Drive OAuth uses narrow `drive.file` scope. Private decryption key stays strictly offline on the owner's PC.  
 **Alternatives rejected**: Storing backup blobs in D1 (violates SRS Appendix A) or using unverified Cloudflare D1 HTTP export API directly.  
 **Trade-off**: Backup runner requires authenticated API access to Worker, secured via secret tokens in GitHub Secrets.
 
 ### ADR-017: Multi-Provider AI Architecture & Configurable Failover Order
 
-**Context**: SRS §§7.8, 10.1–10.4 and BLOCK_6.md require resilient AI assistance across primary, fallback, and testing providers.  
+**Context**: SRS Â§Â§7.8, 10.1â€“10.4 and BLOCK_6.md require resilient AI assistance across primary, fallback, and testing providers.  
 **Decision**: Single central AI adapter boundary (`worker/aiAdapter.ts`). Provider order is fully configurable via `AI_PROVIDER_ORDER` env variable (default: `groq,workers_ai,mock`). Primary model is Groq (`llama-3.3-70b-versatile`), primary fallback is Cloudflare Workers AI (`@cf/meta/llama-3.1-8b-instruct`), optional Gemini (`gemini-2.0-flash`), with an in-memory deterministic mock provider for CI and tests. Automatic failover triggers on 429, 503, timeout, or schema failure with circuit-breaker tracking and cooldowns.  
-**Alternatives rejected**: Hardcoding a single LLM provider (violates SRS §10.3 failover rule) or making direct provider SDK calls inside individual features.  
-**Trade-off**: Requires keeping provider schemas synchronized and bounded latency timeouts (6–8s).
+**Alternatives rejected**: Hardcoding a single LLM provider (violates SRS Â§10.3 failover rule) or making direct provider SDK calls inside individual features.  
+**Trade-off**: Requires keeping provider schemas synchronized and bounded latency timeouts (6â€“8s).
 
 ---
 
 ### ADR-018: Human-in-the-Loop Task Proposal Pattern
 
-**Context**: SRS §§3, 7.8, 8.4 (Rule 11) dictate that AI outputs are untrusted proposals and can never authorize autonomous side effects on the tasks table or notification loop.  
+**Context**: SRS Â§Â§3, 7.8, 8.4 (Rule 11) dictate that AI outputs are untrusted proposals and can never authorize autonomous side effects on the tasks table or notification loop.  
 **Decision**: Dedicated `task_proposals` table buffers all candidate tasks in `pending` status. Proposals only become active tasks when the owner explicitly confirms them via REST API (`POST /api/v1/inbox/:id/confirm`) or Telegram inline buttons (`p_conf:<id>`). Upon confirmation, durable task rows are committed, notifications planned, and an audit trail is created. Rejections (`POST /api/v1/inbox/:id/reject` or `p_rej:<id>`) preserve reasoning and log to `ai_evaluations`.  
 **Alternatives rejected**: Auto-inserting AI tasks directly into the `tasks` table with a flag (violates Rule 1 and Rule 11).  
 **Trade-off**: Requires an extra owner confirmation step before AI subtasks enter the reminder pipeline.
@@ -170,7 +170,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ### ADR-019: Privacy Classification & Prompt Injection Defense
 
-**Context**: SRS §§10.6, 13.5 (TEST-6.3, TEST-6.4) mandate privacy boundaries and protection against prompt injection attacks.  
+**Context**: SRS Â§Â§10.6, 13.5 (TEST-6.3, TEST-6.4) mandate privacy boundaries and protection against prompt injection attacks.  
 **Decision**: Every AI request carries an explicit `PrivacyClass` (`synthetic_test`, `low_sensitivity`, `personal`, `restricted`). External providers whose terms allow training on free tiers or log retention are blocked from receiving `restricted` data, returning a graceful 403 `privacy_blocked` envelope. Untrusted user content is quarantined inside `<user_data>...</user_data>` delimiters with control-tag escaping to neutralize prompt injection. The cron scheduler remains 100% deterministic with zero AI calls (Rule 5).  
 **Alternatives rejected**: Unchecked raw string interpolation into LLM prompts.  
 **Trade-off**: Restricted context cannot be processed by third-party cloud LLMs unless local/private models are active.
@@ -178,7 +178,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-020 — Block 6.1: Dynamic Capability Registry & Facade Architecture
+## ADR-020 â€” Block 6.1: Dynamic Capability Registry & Facade Architecture
 
 **Date**: 2026-10-21  
 **Context**: Block 6.1 architecture hardening pass to support future extensions (Desktop Agent, Email, Browser Automation, Voice) without modifying the central adapter or leaking domain logic into routing.  
@@ -188,7 +188,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-021 — Block 6.1: Canonical XML Context Construction & Dedicated Token Budgeting
+## ADR-021 â€” Block 6.1: Canonical XML Context Construction & Dedicated Token Budgeting
 
 **Date**: 2026-10-21  
 **Context**: Complex prompts across multiple entities (tasks, timetable occurrences, materials, history) need structured demarcation, deterministic serialization, anti-hallucination citation indexing, and token budget enforcement before LLM dispatch.  
@@ -198,7 +198,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-022 — Block 6.1: Memory-First LRU Prompt Cache with SHA-256 XML Hashing
+## ADR-022 â€” Block 6.1: Memory-First LRU Prompt Cache with SHA-256 XML Hashing
 
 **Date**: 2026-10-21  
 **Context**: Repeated analytical AI queries within short timeframes (e.g. rapid dashboard refreshes, identical suggestions) cause unnecessary latency and external provider rate-limit pressure.  
@@ -208,7 +208,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-023 — Block 6.1: Two-Stage Verification, Bounded Self-Repair & Owner Primacy Scoring
+## ADR-023 â€” Block 6.1: Two-Stage Verification, Bounded Self-Repair & Owner Primacy Scoring
 
 **Date**: 2026-10-21  
 **Context**: Grounding safety requires verifying LLM outputs against context facts before proposal creation. Provider selection must respect owner preference without allowing degraded providers to stall execution.  
@@ -222,17 +222,17 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-025 — Block 6.2: Append-Only Cryptographic Audit Ledger & Monotonic Sequence
+## ADR-025 â€” Block 6.2: Append-Only Cryptographic Audit Ledger & Monotonic Sequence
 
 **Date**: 2026-10-21  
-**Context**: SRS §10, §14.3 and Block 6.2 require cryptographic proof of historical state changes and tamper-detection without depending on external blockchains or complex distributed consensus.  
+**Context**: SRS Â§10, Â§14.3 and Block 6.2 require cryptographic proof of historical state changes and tamper-detection without depending on external blockchains or complex distributed consensus.  
 **Decision**: Created `audit_chain` table with strictly monotonic `sequence_number`, chronologically sortable ULID identifiers (`id`), and chained hashes. The table is append-only (`INSERT` only; never `UPDATE` or `DELETE`). A singleton `audit_metadata` table tracks the head sequence and head hash in $O(1)$ time to eliminate table scans on ledger append.  
 **Alternatives rejected**: Integrating public/external blockchains (excessive complexity, gas costs, network latency, privacy risk).  
 **Trade-off**: Requires database storage growth over time; mitigated by compact schema and metadata-only storage.
 
 ---
 
-## ADR-026 — Block 6.2: Canonical JSON Serialization & Schema-Versioned SHA-256 Hash Chain
+## ADR-026 â€” Block 6.2: Canonical JSON Serialization & Schema-Versioned SHA-256 Hash Chain
 
 **Date**: 2026-10-21  
 **Context**: Deterministic hashing requires byte-for-byte identical JSON serialization across platforms and object key orders. Changing schema versions years later must not invalidate past chain segments.  
@@ -243,7 +243,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-027 — Block 6.2: Decoupled Fire-and-Forget Event Ingress & Zero Business Logic Coupling
+## ADR-027 â€” Block 6.2: Decoupled Fire-and-Forget Event Ingress & Zero Business Logic Coupling
 
 **Date**: 2026-10-21  
 **Context**: The audit subsystem must remain an observational infrastructure layer and never impede, block, or alter core application operations (tasks, scheduler, reminders, timetable, recurrence, AI).  
@@ -253,7 +253,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-028 — Block 6.2: Configurable Merkle Snapshots for Bounded-Time Verification
+## ADR-028 â€” Block 6.2: Configurable Merkle Snapshots for Bounded-Time Verification
 
 **Date**: 2026-10-21  
 **Context**: As the ledger grows to tens of thousands of records, linear chain verification from sequence 1 to head becomes too slow for frequent health checks.  
@@ -263,7 +263,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-029 — Block 6.2: Forensic Event Replay & Manifest-Signed Offline Export
+## ADR-029 â€” Block 6.2: Forensic Event Replay & Manifest-Signed Offline Export
 
 **Date**: 2026-10-21  
 **Context**: Forensic analysis requires reconstructing entity state histories. Backups and external exports require cryptographic proof of authenticity that can be independently verified offline.  
@@ -275,7 +275,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-030 — Block 4: OS Shell Architecture, Universal Inspector, and State Vocabulary
+## ADR-030 â€” Block 4: OS Shell Architecture, Universal Inspector, and State Vocabulary
 
 **Date**: 2026-10-21  
 **Context**: Block 4 requires an authenticated responsive PWA interface that feels like a unified Personal AI Operating System rather than a collection of disparate CRUD web pages.  
@@ -288,7 +288,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 
 ---
 
-## ADR-031 — Block 4: Strict Backend Ownership of Timetable Expansion & System Status Contracts
+## ADR-031 â€” Block 4: Strict Backend Ownership of Timetable Expansion & System Status Contracts
 
 **Date**: 2026-10-21  
 **Context**: Rule 2 & Block 4 non-negotiable constraints stipulate that the frontend must remain a presentation/interaction layer only, never calculating recurrence expansion, scheduler state, or audit chains locally.  
@@ -315,7 +315,7 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 **Date**: 2026-10-21
 **Context**: SRS Rule 1 forbids AI from directly mutating tasks/recurrence/timetable/reminders/scheduler.
 **Decision**: InputInterpreter produces InterpretationResult which only creates a task_proposals row (status=pending). Owner must confirm before a durable task row is written. Rejection never creates any business entity.
-**Consequences**: Zero AI-driven direct mutations. Complete audit trail from observation to confirmed task. Satisfies SRS ��7.8, 8.4, 11.2 HITL requirements.
+**Consequences**: Zero AI-driven direct mutations. Complete audit trail from observation to confirmed task. Satisfies SRS §§7.8, 8.4, 11.2 HITL requirements.
 
 ## ADR-035 - Block 7: Content-Addressable Attachments
 **Date**: 2026-10-21
@@ -328,3 +328,34 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 **Context**: Owner needed one OS surface to ingest any type of content (text, voice, image, document).
 **Decision**: CommandLayer (Ctrl+K) now exposes two text paths (Direct Task + AI Pipeline Ingress) and three file upload triggers (audio, image, document). File upload uses FileReader ? base64 ? /api/v1/input/* endpoint. All paths produce proposals reviewed in Inbox.
 **Consequences**: Single keyboard shortcut covers all input modalities. No special UI needed for each media type.
+
+
+## ADR-037 - Block 8: Memory Objects as the Canonical Memory Model
+**Date**: 2026-10-21
+**Context**: External inputs (documents, notes, study materials, attachments, AI outputs) previously had no unified representation or long-term permanence.
+**Decision**: Every concept becomes a canonical Memory Object in `memory_objects`. Identical concepts merge via title/source or attachment SHA-256 deduplication. 18 explicit memory types are supported. Memory Objects never execute actions, schedule tasks, or mutate business entities directly.
+**Consequences**: Unifies disparate observations into a queryable knowledge graph. Preserves Rule 1 (HITL proposals for any mutation). Zero duplicate content storage across modalities.
+
+## ADR-038 - Block 8: Relationship Graph Instead of Folder Hierarchies
+**Date**: 2026-10-21
+**Context**: Traditional desktop and cloud hierarchies rely on rigid folder trees that fail for cross-cutting concepts (e.g. an assignment that belongs to a lecture, references exam notes, and links to an audio recording).
+**Decision**: Replaced folders with directed graph relationships in `memory_relationships` (10 relationship types: `references`, `summarizes`, `derived_from`, `supports`, `contradicts`, `mentions`, `related_to`, `belongs_to_subject`, `generated_from`, `duplicate_of`). Edges carry confidence scores (0.0 to 1.0) and origin tracking (`auto`, `user`, `ai_inferred`). Self-referencing loops are strictly prevented.
+**Consequences**: Enables multi-dimensional contextual discovery and flexible knowledge exploration. Cycle-safe traversal algorithms prevent infinite loops.
+
+## ADR-039 - Block 8: AI Context Retrieval from Memory Objects
+**Date**: 2026-10-21
+**Context**: AI prompt construction previously relied on ad-hoc context strings or raw attachment injection, risking prompt budget blowout and security exposure.
+**Decision**: Created `MemoryRetriever` and `MemoryContextProvider`. Context injection injects a structured canonical `<memory>` XML segment into `AIContextBuilder`. Retrieval enforces top-K bounds, token budgeting, and generates explainable citations (`MemoryCitation`) specifying exact selection rationale.
+**Consequences**: Token budgets are strictly respected. Context is explainable and verifiable. Prompt cache keys incorporate deterministic memory representations.
+
+## ADR-040 - Block 8: Deterministic Memory Graph Construction & Traversal
+**Date**: 2026-10-21
+**Context**: Graph queries in SQLite can encounter cycles and non-deterministic edge orderings, leading to inconsistent AI context generation and UI flickering.
+**Decision**: `MemoryGraphEngine` uses breadth-first traversal bounded by depth limit (ceiling 3) with visited-set tracking to guarantee cycle safety. Graph edges and nodes are stably sorted by creation timestamp and ID before formatting.
+**Consequences**: Fully deterministic subgraph construction across multiple runs. Predictable AI context tokens and reproducible test results.
+
+## ADR-041 - Block 8: Separation of Memory Timeline from Cryptographic Audit
+**Date**: 2026-10-21
+**Context**: Both the audit ledger (Block 6.2) and the memory timeline record events over time, creating potential confusion over their roles.
+**Decision**: Kept the cryptographic audit ledger (`audit_chain`) strictly focused on tamper-evident compliance ("Did this operation execute?"), while `MemoryTimelineEngine` synthesizes understanding evolution ("How did our knowledge evolve?"). The Memory timeline aggregates object creation, summaries, tagging, and relationship links.
+**Consequences**: Audit ledger remains append-only and immutable for compliance. Memory timeline remains domain-rich and semantic for owner comprehension.
