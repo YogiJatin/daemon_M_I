@@ -97,8 +97,11 @@ export function createMockD1(): any {
         try {
           for (const s of statements) {
             const stmt = sqlite.prepare(s._query);
-            stmt.run(...s._params);
-            results.push({ success: true });
+            const info = stmt.run(...s._params) as any;
+            results.push({
+              success: true,
+              meta: { changes: Number(info.changes), last_row_id: Number(info.lastInsertRowid) },
+            });
           }
           sqlite.exec("COMMIT");
         } catch (e) {
