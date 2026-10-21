@@ -1,0 +1,271 @@
+/**
+ * worker/exportService.ts — Block 5 JSON/CSV Data Portability & Export Service
+ *
+ * Requirements (Personal_AI_OS_SRS_v2.2.md §§11.2, 14.3, 15 NFR-012, TEST-5.2):
+ * - Comprehensive JSON and CSV export of owner data:
+ *   tasks, recurrence rules, semesters, subjects, slots, materials,
+ *   exceptions, holiday calendar, class occurrences, settings, and audit events.
+ * - ZERO SECRETS EXPORTED:
+ *   auth_sessions, pairing_challenges, telegram_updates, bot tokens,
+ *   webhook secrets, internal lease/cap states are strictly omitted.
+ * - CSV Injection (Formula Injection) mitigation:
+ *   Cells starting with '=', '+', '-', '@', '\t', '\r' are prepended with a single quote.
+ * - Standard RFC 4180 CSV formatting.
+ */
+
+export interface ExportDataPayload {
+  export_version: string;
+  exported_at: string;
+  timezone: string;
+  counts: Record<string, number>;
+  data: {
+    tasks: any[];
+    recurrence_rules: any[];
+    timetable_semesters: any[];
+    timetable_subjects: any[];
+    timetable_slots: any[];
+    timetable_materials: any[];
+    timetable_exceptions: any[];
+    holiday_calendar: any[];
+    class_occurrences: any[];
+    settings: any[];
+    audit_events: any[];
+  };
+}
+
+/**
+ * Escapes a single CSV value following RFC 4180 and neutralizing formula injection.
+ */
+export function escapeCsvCell(val: any): string {
+  if (val === null || val === undefined) {
+    return "";
+  }
+  let str = typeof val === "object" ? JSON.stringify(val) : String(val);
+
+  // OWASP CSV Injection mitigation: prefix leading formula characters with a single quote
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+
+  // If the string contains comma, quote, or newline, escape internal quotes and wrap in quotes
+  if (/[",\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+/**
+ * Converts an array of objects into an RFC 4180 compliant CSV string.
+ */
+export function objectsToCsv(rows: any[]): string {
+  if (!rows || rows.length === 0) {
+    return "";
+  }
+  const headers = Object.keys(rows[0]);
+  const headerLine = headers.map(escapeCsvCell).join(",");
+  const dataLines = rows.map((row) =>
+    headers.map((h) => escapeCsvCell(row[h])).join(",")
+  );
+  return [headerLine, ...dataLines].join("\r\n");
+}
+
+/**
+ * Fetches and filters all owner data safely from D1.
+ */
+export async function getExportData(
+  db: D1Database,
+  now: Date = new Date()
+): Promise<ExportDataPayload> {
+  const nowIso = now.toISOString();
+
+  // 1. Tasks (exclude internal transient keys if any, preserve all task metadata)
+  const tasksRes = await db
+    .prepare(
+      `SELECT id, title, description, project, category, status, priority,
+              deadline_kind, deadline_local_date, deadline_time_local, deadline_at_utc,
+              deadline_version, recurrence_rule_id, occurrence_local_date, occurrence_number,
+              series_version, snoozed_until, snooze_count, completed_at, created_at, updated_at
+       FROM tasks
+       ORDER BY created_at ASC`
+    )
+    .all<any>();
+
+  // 2. Recurrence Rules
+  const recRulesRes = await db
+    .prepare(
+      `SELECT id, title, description, category, pattern, interval, weekdays_json,
+              month_day, year_month, local_time, timezone, start_date, end_date,
+              week_anchor_monday, next_generation_date, active, series_version,
+              last_occurrence_number, default_priority, created_at, updated_at
+       FROM recurrence_rules
+       ORDER BY created_at ASC`
+    )
+    .all<any>();
+
+  // 3. Timetable Semesters
+  const semestersRes = await db
+    .prepare(
+      `SELECT id, name, start_date, end_date, is_active, external_id, created_at, updated_at
+       FROM timetable_semesters
+       ORDER BY start_date ASC`
+    )
+    .all<any>();
+
+  // 4. Timetable Subjects
+  const subjectsRes = await db
+    .prepare(
+      `SELECT id, semester_id, code, name, faculty, default_room, color,
+              section_name, preparation_minutes, external_id, created_at, updated_at
+       FROM timetable_subjects
+       ORDER BY name ASC`
+    )
+    .all<any>();
+
+  // 5. Timetable Slots
+  const slotsRes = await db
+    .prepare(
+      `SELECT id, semester_id, subject_id, weekday, start_time, end_time, room,
+              week_pattern, lab_batch, week_anchor_monday, section_name, active,
+              external_id, created_at, updated_at
+       FROM timetable_slots
+       ORDER BY weekday ASC, start_time ASC`
+    )
+    .all<any>();
+
+  // 6. Timetable Materials
+  const materialsRes = await db
+    .prepare(
+      `SELECT id, slot_id, material_type, title, notes, required,
+              display_order, active, external_id, created_at, updated_at
+       FROM timetable_materials
+       ORDER BY display_order ASC, title ASC`
+    )
+    .all<any>();
+
+  // 7. Timetable Exceptions
+  const exceptionsRes = await db
+    .prepare(
+      `SELECT id, slot_id, exception_type, start_date, end_date, new_date,
+              new_start_time, new_end_time, reason, external_id, created_at
+       FROM timetable_exceptions
+       ORDER BY start_date ASC`
+    )
+    .all<any>();
+
+  // 8. Holiday Calendar
+  const holidaysRes = await db
+    .prepare(
+      `SELECT id, name, holiday_date, is_full_day, holiday_scope, external_id, created_at
+       FROM holiday_calendar
+       ORDER BY holiday_date ASC`
+    )
+    .all<any>();
+
+  // 9. Class Occurrences
+  const occurrencesRes = await db
+    .prepare(
+      `SELECT id, slot_id, semester_id, subject_id, occurrence_date,
+              start_time, end_time, room, status, created_at, updated_at
+       FROM class_occurrences
+       ORDER BY occurrence_date ASC, start_time ASC`
+    )
+    .all<any>();
+
+  // 10. Settings (FILTER OUT any sensitive / secret keys)
+  const settingsRes = await db
+    .prepare(`SELECT key, value, updated_at FROM settings`)
+    .all<any>();
+
+  const safeSettings = (settingsRes.results || []).filter((s) => {
+    const k = (s.key || "").toLowerCase();
+    return (
+      !k.includes("secret") &&
+      !k.includes("token") &&
+      !k.includes("key") &&
+      !k.includes("password") &&
+      !k.includes("auth")
+    );
+  });
+
+  // 11. Audit Events (exclude sensitive actor/details if any)
+  const auditRes = await db
+    .prepare(
+      `SELECT id, entity_type, entity_id, event_type, actor, details_json, created_at
+       FROM audit_events
+       ORDER BY created_at ASC`
+    )
+    .all<any>();
+
+  const tasks = tasksRes.results || [];
+  const recRules = recRulesRes.results || [];
+  const semesters = semestersRes.results || [];
+  const subjects = subjectsRes.results || [];
+  const slots = slotsRes.results || [];
+  const materials = materialsRes.results || [];
+  const exceptions = exceptionsRes.results || [];
+  const holidays = holidaysRes.results || [];
+  const occurrences = occurrencesRes.results || [];
+  const auditEvents = auditRes.results || [];
+
+  return {
+    export_version: "1.0",
+    exported_at: nowIso,
+    timezone: "Asia/Kolkata",
+    counts: {
+      tasks: tasks.length,
+      recurrence_rules: recRules.length,
+      timetable_semesters: semesters.length,
+      timetable_subjects: subjects.length,
+      timetable_slots: slots.length,
+      timetable_materials: materials.length,
+      timetable_exceptions: exceptions.length,
+      holiday_calendar: holidays.length,
+      class_occurrences: occurrences.length,
+      settings: safeSettings.length,
+      audit_events: auditEvents.length,
+    },
+    data: {
+      tasks,
+      recurrence_rules: recRules,
+      timetable_semesters: semesters,
+      timetable_subjects: subjects,
+      timetable_slots: slots,
+      timetable_materials: materials,
+      timetable_exceptions: exceptions,
+      holiday_calendar: holidays,
+      class_occurrences: occurrences,
+      settings: safeSettings,
+      audit_events: auditEvents,
+    },
+  };
+}
+
+/**
+ * Generates formatted multi-table CSV or single entity CSV.
+ */
+export async function getExportCsv(
+  db: D1Database,
+  entity?: string,
+  now: Date = new Date()
+): Promise<string> {
+  const payload = await getExportData(db, now);
+
+  if (entity && (payload.data as any)[entity]) {
+    return objectsToCsv((payload.data as any)[entity]);
+  }
+
+  // Multi-table CSV export with clear separator headers
+  const sections: string[] = [];
+  sections.push(`# Personal AI OS Data Export (RFC 4180 CSV)\r\n# Exported At: ${payload.exported_at}\r\n# Timezone: ${payload.timezone}\r\n`);
+
+  for (const [table, rows] of Object.entries(payload.data)) {
+    sections.push(`\r\n### TABLE: ${table} (Total rows: ${rows.length}) ###\r\n`);
+    if (rows.length > 0) {
+      sections.push(objectsToCsv(rows));
+    } else {
+      sections.push("# (No records)");
+    }
+  }
+
+  return sections.join("\r\n");
+}

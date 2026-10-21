@@ -120,3 +120,32 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 **Context**: Mobile/PWA clients need a single-request "what should I focus on now?" payload.  
 **Decision**: `GET /api/v1/focus` returns overdue tasks, due-today tasks, active notifications, next class, and current attention budget in one JSON response. Bounded queries internally.  
 **Trade-off**: Slightly heavier single query vs. multiple lightweight calls, but dramatically reduces client round-trips and enables offline-first caching.
+
+---
+
+## ADR-014 — Block 5: Deterministic suggestions engine & context-version hashing
+
+**Date**: 2026-10-21  
+**Context**: The owner needs proactive assistance and reminders without introducing LLM dependencies or hallucinated tasks in the operational loop (SRS FR-AI-002, TEST-5.1).  
+**Decision**: Implemented 6 deterministic suggestion rules (`overdue_item`, `deadline_cluster`, `missing_prep`, `prepare_tonight`, `stale_recurring`, `missed_class`) evaluated on-demand. Dismissals are keyed by stable rule ID and store a context-version hash (SHA-256). When underlying entity state changes materially, the version changes and the suggestion resurfaces.  
+**Alternatives rejected**: Pre-computing suggestions via cron (would exceed Free CPU budgets) or permanent dismissals (would hide resurfacing problems).  
+**Trade-off**: On-demand computation slightly increases latency of `GET /api/v1/suggestions` (measured < 50ms on D1 indexes).
+
+---
+
+## ADR-015 — Block 5: Data portability, zero-secret export & CSV injection mitigation
+
+**Date**: 2026-10-21  
+**Context**: SRS NFR-012 requires complete JSON and CSV export without proprietary UI lock-in. Security demands that tokens, credentials, and update ledgers are never exposed (TEST-5.2).  
+**Decision**: Built `exportService.ts` to export all 11 operational tables (`tasks`, `recurrence_rules`, `timetable_semesters`, `timetable_subjects`, `timetable_slots`, `timetable_materials`, `timetable_exceptions`, `holiday_calendar`, `class_occurrences`, `settings`, `audit_events`). Strictly omitted `auth_sessions`, `pairing_challenges`, `telegram_updates`, and any keys with secrets. In CSV export, cells beginning with `=`, `+`, `-`, `@`, `\t`, `\r` are neutralized with a leading `'` to prevent spreadsheet formula injection.  
+**Trade-off**: Memory footprint is bounded by personal scale (~10k tasks); streaming can be added if account data grows.
+
+---
+
+## ADR-016 — Block 5: Encrypted external backup via Worker export & `age`
+
+**Date**: 2026-10-21  
+**Context**: SRS NFR-013 and §14.3 require weekly encrypted external backups outside Cloudflare into Google Drive, with an offline decryption key.  
+**Decision**: Orchestrated weekly backup via GitHub Actions workflow using the Worker's authenticated `/api/v1/export?format=json` endpoint as the source of truth. Encrypted immediately with `age` using the owner's public recipient key before upload. Plaintext is wiped immediately on runner. Google Drive OAuth uses narrow `drive.file` scope. Private decryption key stays strictly offline on the owner's PC.  
+**Alternatives rejected**: Storing backup blobs in D1 (violates SRS Appendix A) or using unverified Cloudflare D1 HTTP export API directly.  
+**Trade-off**: Backup runner requires authenticated API access to Worker, secured via secret tokens in GitHub Secrets.

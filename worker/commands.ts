@@ -17,6 +17,8 @@ import {
   materializeTimetableOccurrences,
 } from "./timetableEngine";
 import { createPairingChallenge } from "./auth";
+import { evaluateSuggestions } from "./suggestionsEngine";
+import { getExportData } from "./exportService";
 
 interface SnoozePresetResult {
   success: boolean;
@@ -1197,6 +1199,84 @@ export async function handlePair(args: string, context?: CommandContext): Promis
   };
 }
 
+export async function handleSuggestions(args: string, context?: CommandContext): Promise<CommandResult> {
+  if (!context?.db) {
+    return {
+      command: "suggestions",
+      args,
+      success: false,
+      response: "Database unavailable.",
+    };
+  }
+
+  const now = context.now ?? new Date();
+  const suggestions = await evaluateSuggestions(context.db, now);
+
+  if (suggestions.length === 0) {
+    return {
+      command: "suggestions",
+      args,
+      success: true,
+      response: "✨ No suggestions right now! Everything is on track.",
+    };
+  }
+
+  const lines = [
+    `💡 *Personal AI OS Suggestions (${suggestions.length})*:\n`,
+  ];
+
+  for (const s of suggestions.slice(0, 5)) {
+    const icon = s.priority === "high" ? "🔴" : s.priority === "medium" ? "🟡" : "ℹ️";
+    lines.push(`${icon} *${s.title}*`);
+    lines.push(`${s.message}`);
+    lines.push(`Key: \`${s.id}\`\n`);
+  }
+
+  return {
+    command: "suggestions",
+    args,
+    success: true,
+    response: lines.join("\n"),
+  };
+}
+
+export async function handleExport(args: string, context?: CommandContext): Promise<CommandResult> {
+  if (!context?.db) {
+    return {
+      command: "export",
+      args,
+      success: false,
+      response: "Database unavailable.",
+    };
+  }
+
+  const now = context.now ?? new Date();
+  const exportPayload = await getExportData(context.db, now);
+
+  const lines = [
+    "📦 *Personal AI OS Data Export*\n",
+    `Exported: ${exportPayload.exported_at}`,
+    `Timezone: ${exportPayload.timezone}\n`,
+    "*Record Counts:*",
+    `- Tasks: ${exportPayload.counts.tasks}`,
+    `- Recurring Rules: ${exportPayload.counts.recurrence_rules}`,
+    `- Semesters: ${exportPayload.counts.timetable_semesters}`,
+    `- Subjects: ${exportPayload.counts.timetable_subjects}`,
+    `- Timetable Slots: ${exportPayload.counts.timetable_slots}`,
+    `- Materials: ${exportPayload.counts.timetable_materials}`,
+    `- Class Occurrences: ${exportPayload.counts.class_occurrences}`,
+    `- Audit Events: ${exportPayload.counts.audit_events}\n`,
+    "ℹ️ Full JSON and CSV exports can be downloaded via authenticated API at `/api/v1/export`.",
+  ];
+
+  return {
+    command: "export",
+    args,
+    success: true,
+    response: lines.join("\n"),
+  };
+}
+
 export async function routeCommand(text: string, context?: CommandContext): Promise<CommandResult | null> {
   const trimmed = text.trim();
   if (!trimmed.startsWith("/")) {
@@ -1249,6 +1329,10 @@ export async function routeCommand(text: string, context?: CommandContext): Prom
       return await handleMaterials(args, context);
     case "pair":
       return await handlePair(args, context);
+    case "suggestions":
+      return await handleSuggestions(args, context);
+    case "export":
+      return await handleExport(args, context);
     default:
       return null;
   }

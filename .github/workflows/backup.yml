@@ -1,0 +1,42 @@
+name: Weekly Encrypted Backup
+
+on:
+  schedule:
+    # Every Saturday at 02:00 UTC (07:30 IST)
+    - cron: '0 2 * * 6'
+  workflow_dispatch:
+    # Allows manual trigger for testing and ad-hoc backup drills
+
+jobs:
+  backup:
+    name: Encrypted Google Drive Backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (age, jq, curl)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y age jq curl
+
+      - name: Run Encrypted Backup
+        run: |
+          chmod +x .github/workflows/scripts/backup.sh
+          ./.github/workflows/scripts/backup.sh
+        env:
+          WORKER_URL: ${{ secrets.WORKER_URL }}
+          WORKER_SESSION_TOKEN: ${{ secrets.WORKER_SESSION_TOKEN }}
+          WORKER_WEBHOOK_SECRET: ${{ secrets.WORKER_WEBHOOK_SECRET }}
+          AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+
+      - name: Report Failure / Send Alert
+        if: failure()
+        run: |
+          echo "::error::Weekly encrypted backup failed! Check workflow logs immediately."

@@ -36,6 +36,14 @@ import {
   createClearSessionCookie,
   SessionRecord,
 } from "./auth";
+import {
+  evaluateSuggestions,
+  dismissSuggestion,
+} from "./suggestionsEngine";
+import {
+  getExportData,
+  getExportCsv,
+} from "./exportService";
 
 // ---------------------------------------------------------------------------
 // Standard Envelopes & Error Helpers
@@ -1136,13 +1144,112 @@ export async function handleApiRequest(
     }
 
     // =======================================================================
-    // 12. RESERVED FUTURE SERVICES (AI, Devices, Integrations Foundations)
+    // 12. SUGGESTIONS SERVICE (Deterministic Rule-Based Nudges)
+    // =======================================================================
+
+    // GET /api/v1/suggestions
+    if (method === "GET" && path === "/api/v1/suggestions") {
+      const suggestions = await evaluateSuggestions(env.DB, now);
+      return jsonSuccess({
+        suggestions,
+        count: suggestions.length,
+        generated_at: now.toISOString(),
+      });
+    }
+
+    // POST /api/v1/suggestions/:id/dismiss
+    if (method === "POST" && path.startsWith("/api/v1/suggestions/") && path.endsWith("/dismiss")) {
+      const rawKey = path.slice("/api/v1/suggestions/".length, path.length - "/dismiss".length);
+      const suggestionKey = decodeURIComponent(rawKey);
+
+      let body: any = {};
+      try {
+        body = await req.json();
+      } catch {
+        body = {};
+      }
+
+      let version = body.version;
+      const expiresAt = body.expires_at || null;
+
+      // If version not explicitly provided in body, evaluate suggestions to find candidate version
+      if (!version) {
+        const currentList = await evaluateSuggestions(env.DB, now);
+        const match = currentList.find((s) => s.id === suggestionKey);
+        if (match) {
+          version = match.version;
+        } else {
+          version = "v1";
+        }
+      }
+
+      await dismissSuggestion(env.DB, suggestionKey, version, expiresAt, now);
+
+      // Audit event
+      const auditId = `aud_${crypto.randomUUID()}`;
+      await env.DB.prepare(
+        `INSERT INTO audit_events (id, entity_type, entity_id, event_type, actor, details_json, created_at)
+         VALUES (?, 'suggestion', ?, 'suggestion.dismissed', 'owner:web', ?, ?)`
+      )
+        .bind(auditId, suggestionKey, JSON.stringify({ suggestion_key: suggestionKey, version }), now.toISOString())
+        .run();
+
+      return jsonSuccess({
+        dismissed: true,
+        suggestion_key: suggestionKey,
+        version,
+      });
+    }
+
+    // =======================================================================
+    // 13. EXPORT SERVICE (JSON / CSV Data Portability & Backup Source)
+    // =======================================================================
+
+    // GET /api/v1/export
+    if (method === "GET" && path === "/api/v1/export") {
+      const format = (url.searchParams.get("format") || "json").toLowerCase();
+      const entity = url.searchParams.get("entity") || undefined;
+
+      // Audit event
+      const auditId = `aud_${crypto.randomUUID()}`;
+      await env.DB.prepare(
+        `INSERT INTO audit_events (id, entity_type, entity_id, event_type, actor, details_json, created_at)
+         VALUES (?, 'system', 'export', 'data.exported', 'owner:web', ?, ?)`
+      )
+        .bind(auditId, JSON.stringify({ format, entity: entity || "all" }), now.toISOString())
+        .run();
+
+      if (format === "csv") {
+        const csvContent = await getExportCsv(env.DB, entity, now);
+        const ist = getISTDateParts(now);
+        const filename = entity
+          ? `personal_ai_os_${entity}_${ist.localDate}.csv`
+          : `personal_ai_os_export_${ist.localDate}.csv`;
+
+        return new Response(csvContent, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": `attachment; filename="${filename}"`,
+          },
+        });
+      }
+
+      if (format === "json") {
+        const dataPayload = await getExportData(env.DB, now);
+        return jsonSuccess(dataPayload);
+      }
+
+      return jsonError("invalid_format", "Export format must be 'json' or 'csv'", 400);
+    }
+
+    // =======================================================================
+    // 14. RESERVED FUTURE SERVICES (AI, Devices, Integrations Foundations)
     // =======================================================================
 
     if (
       path === "/api/v1/assistant" ||
       path === "/api/v1/context" ||
-      path === "/api/v1/suggestions" ||
       path === "/api/v1/assistant/action" ||
       path === "/api/v1/devices" ||
       path === "/api/v1/actions" ||
