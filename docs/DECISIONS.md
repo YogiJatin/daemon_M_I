@@ -298,3 +298,33 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 3. Task details drawer consumes existing `GET /api/v1/tasks/:id/why` for server-backed provenance and mutation audit trails.
 **Alternatives rejected**: Calculating week boundaries, class slot expansions, or audit validation client-side in React.  
 **Trade-off**: Additional read query on initial timetable render; mitigated by D1 single-source-of-truth caching.
+
+## ADR-032 - Block 7: Universal Knowledge Gateway Philosophy
+**Date**: 2026-10-21
+**Context**: Every external input channel (keyboard, voice, image, PDF, Telegram, future browser/desktop captures) needed a single entry point into the OS.
+**Decision**: All external input is routed through InputRouter as an Observation before becoming any business entity. Nothing bypasses the Inbox. AI never mutates tasks directly.
+**Consequences**: Consistent provenance for all data. Owner always reviews before system acts. No shortcut paths from voice or image directly to tasks.
+
+## ADR-033 - Block 7: Provider-Agnostic Multimodal Pipeline
+**Date**: 2026-10-21
+**Context**: Speech transcription (Groq Whisper vs Workers AI Whisper) and OCR providers may change or fail.
+**Decision**: SpeechProvider, OCRProvider, DocumentProvider are interfaces with swappable implementations. MockProviders handle all unit testing without real API calls. Provider selection follows Rule 6 (owner preference first).
+**Consequences**: Can swap providers without touching business logic. Tests are deterministic and offline.
+
+## ADR-034 - Block 7: Proposal-First Architecture for All Ingress
+**Date**: 2026-10-21
+**Context**: SRS Rule 1 forbids AI from directly mutating tasks/recurrence/timetable/reminders/scheduler.
+**Decision**: InputInterpreter produces InterpretationResult which only creates a task_proposals row (status=pending). Owner must confirm before a durable task row is written. Rejection never creates any business entity.
+**Consequences**: Zero AI-driven direct mutations. Complete audit trail from observation to confirmed task. Satisfies SRS §§7.8, 8.4, 11.2 HITL requirements.
+
+## ADR-035 - Block 7: Content-Addressable Attachments
+**Date**: 2026-10-21
+**Context**: The same file (voice note, PDF, screenshot) could be submitted multiple times across sessions.
+**Decision**: AttachmentService computes SHA-256 of raw bytes before inserting. Duplicate SHA-256 ? reuse existing attachment row. Only att_id stored in input_sessions. No raw payload stored in proposal rows (privacy rule).
+**Consequences**: No duplicate binary storage. Deduplication is deterministic and verifiable. No credential or prompt text stored in attachment rows.
+
+## ADR-036 - Block 7: Universal Capture via Command Layer
+**Date**: 2026-10-21
+**Context**: Owner needed one OS surface to ingest any type of content (text, voice, image, document).
+**Decision**: CommandLayer (Ctrl+K) now exposes two text paths (Direct Task + AI Pipeline Ingress) and three file upload triggers (audio, image, document). File upload uses FileReader ? base64 ? /api/v1/input/* endpoint. All paths produce proposals reviewed in Inbox.
+**Consequences**: Single keyboard shortcut covers all input modalities. No special UI needed for each media type.
