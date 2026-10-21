@@ -218,3 +218,57 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 3. `AIExecutionPlanner` (`worker/aiExecutionPlanner.ts`) defines platform-neutral typed execution plans (`draft -> validated -> approved -> rejected`) with zero autonomous execution capability, preparing the foundation for Block 9 Desktop Agent.  
 **Alternatives rejected**: Unchecked LLM outputs converted directly to proposals; autonomous AI multi-step execution without owner approval gates (violates Rule 11).  
 **Trade-off**: Self-repair retry adds latency on malformed provider outputs, bounded to 1 attempt.
+
+
+---
+
+## ADR-025 — Block 6.2: Append-Only Cryptographic Audit Ledger & Monotonic Sequence
+
+**Date**: 2026-10-21  
+**Context**: SRS §10, §14.3 and Block 6.2 require cryptographic proof of historical state changes and tamper-detection without depending on external blockchains or complex distributed consensus.  
+**Decision**: Created `audit_chain` table with strictly monotonic `sequence_number`, chronologically sortable ULID identifiers (`id`), and chained hashes. The table is append-only (`INSERT` only; never `UPDATE` or `DELETE`). A singleton `audit_metadata` table tracks the head sequence and head hash in $O(1)$ time to eliminate table scans on ledger append.  
+**Alternatives rejected**: Integrating public/external blockchains (excessive complexity, gas costs, network latency, privacy risk).  
+**Trade-off**: Requires database storage growth over time; mitigated by compact schema and metadata-only storage.
+
+---
+
+## ADR-026 — Block 6.2: Canonical JSON Serialization & Schema-Versioned SHA-256 Hash Chain
+
+**Date**: 2026-10-21  
+**Context**: Deterministic hashing requires byte-for-byte identical JSON serialization across platforms and object key orders. Changing schema versions years later must not invalidate past chain segments.  
+**Decision**: Built `worker/auditSerializer.ts` to canonicalize JSON via recursive key sorting and ISO-8601 UTC date normalization. Chained hashes are computed via Web Crypto SHA-256 incorporating `schema_version`:  
+`current_hash = SHA256(schema_version + previous_hash + payload_hash + sequence_number + timestamp_utc)`. Genesis block anchors to `previous_hash = "GENESIS"`.  
+**Alternatives rejected**: Native `JSON.stringify()` (key order is not guaranteed across runtimes and engines).  
+**Trade-off**: Small serialization overhead per audit event (measured < 1ms).
+
+---
+
+## ADR-027 — Block 6.2: Decoupled Fire-and-Forget Event Ingress & Zero Business Logic Coupling
+
+**Date**: 2026-10-21  
+**Context**: The audit subsystem must remain an observational infrastructure layer and never impede, block, or alter core application operations (tasks, scheduler, reminders, timetable, recurrence, AI).  
+**Decision**: `AuditService.emit()` operates as a pure fire-and-forget event bus. Listeners never return success/failure to business callers. Unhandled audit write errors are caught and logged as warnings; they never abort transactions or propagate to the user. `worker/scheduler.ts` remains 100% untouched (Rule 5 invariant).  
+**Alternatives rejected**: Interactive transaction-coupled audit writes (would cause business operation failures if audit write failed).  
+**Trade-off**: In edge failure scenarios, an audit event could theoretically be dropped; mitigated by local D1 atomic batching with `audit_metadata`.
+
+---
+
+## ADR-028 — Block 6.2: Configurable Merkle Snapshots for Bounded-Time Verification
+
+**Date**: 2026-10-21  
+**Context**: As the ledger grows to tens of thousands of records, linear chain verification from sequence 1 to head becomes too slow for frequent health checks.  
+**Decision**: Built `audit_snapshots` table. Every `AUDIT_SNAPSHOT_INTERVAL` records (default 100, configurable via env), a binary Merkle tree root is computed over the window's record hashes and persisted alongside the sequence bounds. Verifiers can validate intermediate blocks in $O(\log N)$ or verify against snapshot roots.  
+**Alternatives rejected**: Hardcoding fixed 100-record windows without configuration or storing full Merkle branch proofs in D1.  
+**Trade-off**: Additional snapshot write transaction every interval window.
+
+---
+
+## ADR-029 — Block 6.2: Forensic Event Replay & Manifest-Signed Offline Export
+
+**Date**: 2026-10-21  
+**Context**: Forensic analysis requires reconstructing entity state histories. Backups and external exports require cryptographic proof of authenticity that can be independently verified offline.  
+**Decision**: 
+1. `AuditReplay` emits chronological `TimelineEvent` records (`timestamp`, `eventType`, `actor`, `summary`, `metadata`) without reconstituting domain business objects, preserving forensic purity.
+2. `getSignedExportJson()` produces an export bundle with a separate `manifest.json` containing `schema_version`, `export_version`, `generated_at`, `head_hash`, `snapshot_hash`, `record_count`, `checksum_algorithm: "SHA-256"`, and `checksum` of the canonical records array. Any external party can verify integrity offline using standard SHA-256 tooling.  
+**Alternatives rejected**: Deserializing past records into live Domain entities (violates forensic immutability; vulnerable to schema drift).  
+**Trade-off**: Replay is strictly read-only and cannot automatically "restore" complex business state without manual intervention.

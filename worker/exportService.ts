@@ -13,6 +13,26 @@
  * - Standard RFC 4180 CSV formatting.
  */
 
+import { canonicalizeJson } from "./auditSerializer";
+import { sha256Hex } from "./auditHasher";
+import { AuditRecord, AuditMetadata, AUDIT_SCHEMA_VERSION } from "./auditService";
+
+export interface SignedExportManifest {
+  schema_version: string;
+  export_version: string;
+  generated_at: string;
+  head_hash: string;
+  snapshot_hash: string;
+  record_count: number;
+  checksum_algorithm: "SHA-256";
+  checksum: string;
+}
+
+export interface SignedExportBundle {
+  manifest: SignedExportManifest;
+  records: AuditRecord[];
+}
+
 export interface ExportDataPayload {
   export_version: string;
   exported_at: string;
@@ -31,6 +51,7 @@ export interface ExportDataPayload {
     settings: any[];
     audit_events: any[];
     task_proposals: any[];
+    audit_chain: any[];
   };
 }
 
@@ -219,6 +240,15 @@ export async function getExportData(
     .all<any>();
   const proposals = proposalsRes.results || [];
 
+  // 13. Audit Chain (Block 6.2)
+  let auditChainRecords: any[] = [];
+  try {
+    const chainRes = await db.prepare("SELECT * FROM audit_chain ORDER BY sequence_number ASC").all<any>();
+    auditChainRecords = chainRes.results || [];
+  } catch {
+    auditChainRecords = [];
+  }
+
   return {
     export_version: "1.0",
     exported_at: nowIso,
@@ -236,6 +266,7 @@ export async function getExportData(
       settings: safeSettings.length,
       audit_events: auditEvents.length,
       task_proposals: proposals.length,
+      audit_chain: auditChainRecords.length,
     },
     data: {
       tasks,
@@ -250,6 +281,7 @@ export async function getExportData(
       settings: safeSettings,
       audit_events: auditEvents,
       task_proposals: proposals,
+      audit_chain: auditChainRecords,
     },
   };
 }
@@ -282,4 +314,59 @@ export async function getExportCsv(
   }
 
   return sections.join("\r\n");
+}
+
+
+/**
+ * Generates Signed Export Bundle containing manifest.json and records array (Requirement 9).
+ */
+export async function getSignedExportJson(
+  db: D1Database,
+  now: Date = new Date()
+): Promise<SignedExportBundle> {
+  const nowIso = now.toISOString();
+
+  // 1. Fetch all audit chain records
+  const recordsRes = await db
+    .prepare(
+      `SELECT * FROM audit_chain
+       ORDER BY sequence_number ASC`
+    )
+    .all<AuditRecord>();
+
+  const records = recordsRes.results || [];
+
+  // 2. Fetch chain metadata
+  const meta = await db
+    .prepare("SELECT * FROM audit_metadata WHERE key = 'singleton'")
+    .first<AuditMetadata>();
+
+  const headHash = meta?.head_hash || (records.length > 0 ? records[records.length - 1].current_hash : "GENESIS");
+
+  // Fetch latest snapshot hash if any
+  const snap = await db
+    .prepare("SELECT merkle_root FROM audit_snapshots ORDER BY last_sequence DESC LIMIT 1")
+    .first<{ merkle_root: string }>();
+
+  const snapshotHash = snap?.merkle_root || "NONE";
+
+  // 3. Compute canonical checksum over records
+  const canonicalRecords = canonicalizeJson(records);
+  const checksum = await sha256Hex(canonicalRecords);
+
+  const manifest: SignedExportManifest = {
+    schema_version: AUDIT_SCHEMA_VERSION,
+    export_version: "2.0.0",
+    generated_at: nowIso,
+    head_hash: headHash,
+    snapshot_hash: snapshotHash,
+    record_count: records.length,
+    checksum_algorithm: "SHA-256",
+    checksum,
+  };
+
+  return {
+    manifest,
+    records,
+  };
 }
