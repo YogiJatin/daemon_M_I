@@ -19,6 +19,9 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -45,7 +48,11 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
   if (!isOpen) return null;
 
   const quickCommands = [
-    { label: 'Capture Task / Note', action: () => handleCapture(query), shortcut: 'Enter' },
+    { label: 'Capture Task / Note (Direct)', action: () => handleDirectCapture(query), shortcut: 'Enter' },
+    { label: 'Ingest via AI Pipeline (Proposal Draft)', action: () => handlePipelineIngress(query) },
+    { label: 'Upload Voice Note (Audio Ingress)', action: () => audioInputRef.current?.click() },
+    { label: 'Scan Image / Screenshot (OCR Ingress)', action: () => imageInputRef.current?.click() },
+    { label: 'Upload Document (PDF / DOCX Ingress)', action: () => docInputRef.current?.click() },
     { label: 'Focus Mode (Today)', action: () => { onSelectMode('focus'); onClose(); } },
     { label: 'Memory (All Tasks)', action: () => { onSelectMode('memory'); onClose(); } },
     { label: 'Academy (Timetable)', action: () => { onSelectMode('academy'); onClose(); } },
@@ -59,7 +66,7 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
     ? quickCommands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()))
     : quickCommands;
 
-  const handleCapture = async (text: string) => {
+  const handleDirectCapture = async (text: string) => {
     const title = text.trim();
     if (!title) return;
     setIsSubmitting(true);
@@ -79,6 +86,61 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
     }
   };
 
+  const handlePipelineIngress = async (text: string) => {
+    const content = text.trim();
+    if (!content) return;
+    setIsSubmitting(true);
+    setFeedback(null);
+    try {
+      const res = await api.submitTextInput(content);
+      const title = res.interpretation?.candidateTitle || 'Draft proposal';
+      setFeedback(`📥 Ingested observation! Created proposal: "${title}" (awaiting Inbox approval)`);
+      setQuery('');
+      if (onTaskCreated) onTaskCreated();
+      setTimeout(() => {
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      setFeedback(`Ingress failed: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File, type: 'audio' | 'image' | 'document') => {
+    setIsSubmitting(true);
+    setFeedback(`Ingesting ${file.name}...`);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const result = reader.result as string;
+          const base64 = result.split(',')[1] || '';
+          let res: any;
+          if (type === 'audio') {
+            res = await api.submitAudioInput(base64, file.name, file.type);
+          } else if (type === 'image') {
+            res = await api.submitImageInput(base64, file.name, file.type);
+          } else {
+            res = await api.submitDocumentInput(base64, file.name, file.type);
+          }
+          const candidate = res.interpretation?.candidateTitle || file.name;
+          setFeedback(`✅ ${type.toUpperCase()} ingested. Proposal created: "${candidate}"`);
+          if (onTaskCreated) onTaskCreated();
+          setTimeout(() => onClose(), 1200);
+        } catch (err: any) {
+          setFeedback(`Ingress error: ${err.message}`);
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setFeedback(`File read error: ${err.message}`);
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -89,7 +151,7 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
       return;
     }
 
-    handleCapture(query);
+    handleDirectCapture(query);
   };
 
   return (
@@ -97,6 +159,29 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
       className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/60 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
+      {/* Hidden file inputs for multimodal ingress */}
+      <input
+        type="file"
+        ref={audioInputRef}
+        accept="audio/*"
+        className="hidden"
+        onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'audio')}
+      />
+      <input
+        type="file"
+        ref={imageInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'image')}
+      />
+      <input
+        type="file"
+        ref={docInputRef}
+        accept=".pdf,.docx,.txt,.md"
+        className="hidden"
+        onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0], 'document')}
+      />
+
       <div
         className="w-full max-w-xl bg-surface-container-lowest border border-outline-variant/40 rounded-xl shadow-2xl overflow-hidden animate-slide-up"
         onClick={(e) => e.stopPropagation()}
@@ -108,7 +193,7 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a command or task (e.g. 'Lab report by Friday', 'search', 'health')..."
+            placeholder="Type command, task, or paste text to ingest..."
             className="flex-1 bg-transparent text-on-surface font-sans text-sm focus:outline-none placeholder:text-outline"
             disabled={isSubmitting}
           />
@@ -125,24 +210,40 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
 
         <div className="max-h-72 overflow-y-auto py-2">
           {query.trim() && (
-            <div
-              onClick={() => handleCapture(query)}
-              className="px-4 py-2.5 mx-2 rounded-lg hover:bg-surface-container flex items-center justify-between cursor-pointer group"
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-primary">+</span>
-                <span className="font-sans text-xs text-on-surface font-medium">
-                  Create task: <span className="text-primary italic">"{query}"</span>
+            <>
+              <div
+                onClick={() => handleDirectCapture(query)}
+                className="px-4 py-2.5 mx-2 rounded-lg hover:bg-surface-container flex items-center justify-between cursor-pointer group"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-primary">+</span>
+                  <span className="font-sans text-xs text-on-surface font-medium">
+                    Direct Task: <span className="text-primary italic">"{query}"</span>
+                  </span>
+                </div>
+                <span className="font-mono text-[10px] text-outline group-hover:text-on-surface">
+                  Press Enter ↵
                 </span>
               </div>
-              <span className="font-mono text-[10px] text-outline group-hover:text-on-surface">
-                Press Enter ↵
-              </span>
-            </div>
+              <div
+                onClick={() => handlePipelineIngress(query)}
+                className="px-4 py-2.5 mx-2 rounded-lg hover:bg-surface-container flex items-center justify-between cursor-pointer group"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-tertiary">✦</span>
+                  <span className="font-sans text-xs text-on-surface font-medium">
+                    Ingest via AI Pipeline: <span className="text-tertiary italic">"{query}"</span>
+                  </span>
+                </div>
+                <span className="font-mono text-[10px] text-tertiary group-hover:text-on-surface">
+                  Inbox Proposal
+                </span>
+              </div>
+            </>
           )}
 
           <div className="px-4 py-1 text-[10px] font-mono uppercase tracking-wider text-outline">
-            OS Navigation & Shortcuts
+            Universal Ingress & OS Navigation
           </div>
 
           {filteredCommands.map((cmd, idx) => (

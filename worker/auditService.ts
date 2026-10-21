@@ -60,12 +60,20 @@ export type AuditEventType =
   | "EXECUTION_COMPLETED"
   | "EXECUTION_FAILED"
   | "ROLLBACK_STARTED"
-  | "ROLLBACK_COMPLETED";
+  | "ROLLBACK_COMPLETED"
+  // Multimodal Ingress Events (Block 7)
+  | "INPUT_RECEIVED"
+  | "VOICE_TRANSCRIBED"
+  | "OCR_COMPLETED"
+  | "DOCUMENT_PARSED"
+  | "INTERPRETATION_COMPLETED"
+  | "OWNER_APPROVED"
+  | "OWNER_REJECTED";
 
 export interface AuditEventInput {
   eventType: AuditEventType;
   eventVersion?: string; // Default: '1.0.0'
-  entityType: "task" | "proposal" | "timetable" | "recurrence" | "auth" | "export" | "ai" | "desktop" | "system";
+  entityType: "task" | "proposal" | "timetable" | "recurrence" | "auth" | "export" | "ai" | "desktop" | "system" | "attachment" | "input_session";
   entityId: string;
   actor?: string; // Default: 'system'
   payload: Record<string, any>;

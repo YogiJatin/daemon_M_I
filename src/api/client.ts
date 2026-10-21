@@ -197,4 +197,55 @@ export const api = {
   async search(query: string): Promise<{ tasks: any[]; subjects: any[]; recurrence_rules: any[] }> {
     return request(`/api/v1/search?q=${encodeURIComponent(query)}`);
   },
+
+  // Multimodal Ingress & Proposals (Block 7)
+  async submitTextInput(text: string, metadata?: any): Promise<any> {
+    return request('/api/v1/input/text', {
+      method: 'POST',
+      body: JSON.stringify({ text, metadata }),
+    });
+  },
+
+  async submitAudioInput(audioBase64: string, filename?: string, mimeType?: string): Promise<any> {
+    return request('/api/v1/input/audio', {
+      method: 'POST',
+      body: JSON.stringify({ audio_base64: audioBase64, filename, mime_type: mimeType }),
+    });
+  },
+
+  async submitImageInput(imageBase64: string, filename?: string, mimeType?: string): Promise<any> {
+    return request('/api/v1/input/image', {
+      method: 'POST',
+      body: JSON.stringify({ image_base64: imageBase64, filename, mime_type: mimeType }),
+    });
+  },
+
+  async submitDocumentInput(documentBase64: string, filename?: string, mimeType?: string): Promise<any> {
+    return request('/api/v1/input/document', {
+      method: 'POST',
+      body: JSON.stringify({ document_base64: documentBase64, filename, mime_type: mimeType }),
+    });
+  },
+
+  async getInputSession(id: string): Promise<any> {
+    return request(`/api/v1/input/${encodeURIComponent(id)}`);
+  },
+
+  async getProposals(status: string = 'pending'): Promise<{ proposals: any[]; total: number }> {
+    return request(`/api/v1/proposals?status=${encodeURIComponent(status)}`);
+  },
+
+  async confirmProposal(id: string, overrides?: any): Promise<any> {
+    return request(`/api/v1/proposals/${encodeURIComponent(id)}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ overrides }),
+    });
+  },
+
+  async rejectProposal(id: string, reason?: string): Promise<any> {
+    return request(`/api/v1/proposals/${encodeURIComponent(id)}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
 };

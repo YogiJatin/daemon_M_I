@@ -55,6 +55,7 @@ import {
   confirmProposal,
   rejectProposal,
 } from "./inboxService";
+import { InputRouter } from "./inputRouter";
 
 // ---------------------------------------------------------------------------
 // Standard Envelopes & Error Helpers
@@ -1421,7 +1422,7 @@ export async function handleApiRequest(
     }
 
     // GET /api/v1/inbox
-    if (method === "GET" && path === "/api/v1/inbox") {
+    if (method === "GET" && (path === "/api/v1/inbox" || path === "/api/v1/proposals")) {
       const status = url.searchParams.get("status") || "pending";
       const limit = parseInt(url.searchParams.get("limit") || "20", 10);
       const offset = parseInt(url.searchParams.get("offset") || "0", 10);
@@ -1436,8 +1437,9 @@ export async function handleApiRequest(
     }
 
     // POST /api/v1/inbox/:id/confirm
-    if (method === "POST" && path.startsWith("/api/v1/inbox/") && path.endsWith("/confirm")) {
-      const proposalId = path.slice("/api/v1/inbox/".length, path.length - "/confirm".length);
+    if (method === "POST" && ((path.startsWith("/api/v1/inbox/") && path.endsWith("/confirm")) || (path.startsWith("/api/v1/proposals/") && path.endsWith("/confirm")))) {
+      const prefix = path.startsWith("/api/v1/proposals/") ? "/api/v1/proposals/" : "/api/v1/inbox/";
+      const proposalId = path.slice(prefix.length, path.length - "/confirm".length);
       let body: any = {};
       try {
         body = await request.json();
@@ -1458,8 +1460,9 @@ export async function handleApiRequest(
     }
 
     // POST /api/v1/inbox/:id/reject
-    if (method === "POST" && path.startsWith("/api/v1/inbox/") && path.endsWith("/reject")) {
-      const proposalId = path.slice("/api/v1/inbox/".length, path.length - "/reject".length);
+    if (method === "POST" && ((path.startsWith("/api/v1/inbox/") && path.endsWith("/reject")) || (path.startsWith("/api/v1/proposals/") && path.endsWith("/reject")))) {
+      const prefix = path.startsWith("/api/v1/proposals/") ? "/api/v1/proposals/" : "/api/v1/inbox/";
+      const proposalId = path.slice(prefix.length, path.length - "/reject".length);
       let body: any = {};
       try {
         body = await request.json();
@@ -1475,6 +1478,199 @@ export async function handleApiRequest(
       return jsonSuccess({
         message: "Proposal rejected",
         proposal: result.proposal,
+      });
+    }
+
+    // =======================================================================
+    // 14B. MULTIMODAL INGRESS ENDPOINTS (Block 7)
+    // =======================================================================
+
+    // POST /api/v1/input/text
+    if (method === "POST" && path === "/api/v1/input/text") {
+      const body = await request.json<any>().catch(() => ({}));
+      if (!body.text || typeof body.text !== "string" || !body.text.trim()) {
+        return jsonError("bad_request", "Missing or empty text content in request body", 400);
+      }
+
+      const res = await InputRouter.routeInput(
+        env.DB,
+        {
+          source: body.source || "web",
+          rawType: "text",
+          payload: body.text.trim(),
+          metadata: body.metadata || {},
+        },
+        env,
+        now
+      );
+
+      return jsonSuccess(res, undefined, 201);
+    }
+
+    // POST /api/v1/input/audio
+    if (method === "POST" && path === "/api/v1/input/audio") {
+      let payloadBytes: Uint8Array;
+      let filename = "audio_recording.ogg";
+      let mimeType = "audio/ogg";
+      let source = "web";
+      let metadata: any = {};
+
+      const contentType = request.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const body = await request.json<any>().catch(() => ({}));
+        if (!body.audio_base64) {
+          return jsonError("bad_request", "Missing audio_base64 string in request body", 400);
+        }
+        const binaryString = atob(body.audio_base64);
+        payloadBytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          payloadBytes[i] = binaryString.charCodeAt(i);
+        }
+        if (body.filename) filename = body.filename;
+        if (body.mime_type) mimeType = body.mime_type;
+        if (body.source) source = body.source;
+        if (body.metadata) metadata = body.metadata;
+      } else {
+        const buffer = await request.arrayBuffer();
+        payloadBytes = new Uint8Array(buffer);
+        if (contentType) mimeType = contentType;
+      }
+
+      const res = await InputRouter.routeInput(
+        env.DB,
+        {
+          source: source as any,
+          rawType: "audio",
+          payload: payloadBytes,
+          filename,
+          mimeType,
+          metadata,
+        },
+        env,
+        now
+      );
+
+      return jsonSuccess(res, undefined, 201);
+    }
+
+    // POST /api/v1/input/image
+    if (method === "POST" && path === "/api/v1/input/image") {
+      let payloadBytes: Uint8Array;
+      let filename = "image_capture.png";
+      let mimeType = "image/png";
+      let source = "web";
+      let metadata: any = {};
+
+      const contentType = request.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const body = await request.json<any>().catch(() => ({}));
+        if (!body.image_base64) {
+          return jsonError("bad_request", "Missing image_base64 string in request body", 400);
+        }
+        const binaryString = atob(body.image_base64);
+        payloadBytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          payloadBytes[i] = binaryString.charCodeAt(i);
+        }
+        if (body.filename) filename = body.filename;
+        if (body.mime_type) mimeType = body.mime_type;
+        if (body.source) source = body.source;
+        if (body.metadata) metadata = body.metadata;
+      } else {
+        const buffer = await request.arrayBuffer();
+        payloadBytes = new Uint8Array(buffer);
+        if (contentType) mimeType = contentType;
+      }
+
+      const res = await InputRouter.routeInput(
+        env.DB,
+        {
+          source: source as any,
+          rawType: "image",
+          payload: payloadBytes,
+          filename,
+          mimeType,
+          metadata,
+        },
+        env,
+        now
+      );
+
+      return jsonSuccess(res, undefined, 201);
+    }
+
+    // POST /api/v1/input/document
+    if (method === "POST" && path === "/api/v1/input/document") {
+      let payloadData: Uint8Array | string;
+      let filename = "document.txt";
+      let mimeType = "text/plain";
+      let source = "web";
+      let metadata: any = {};
+
+      const contentType = request.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const body = await request.json<any>().catch(() => ({}));
+        if (body.document_base64) {
+          const binaryString = atob(body.document_base64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          payloadData = bytes;
+        } else if (body.text) {
+          payloadData = body.text;
+        } else {
+          return jsonError("bad_request", "Missing document_base64 or text content", 400);
+        }
+        if (body.filename) filename = body.filename;
+        if (body.mime_type) mimeType = body.mime_type;
+        if (body.source) source = body.source;
+        if (body.metadata) metadata = body.metadata;
+      } else {
+        const buffer = await request.arrayBuffer();
+        payloadData = new Uint8Array(buffer);
+        if (contentType) mimeType = contentType;
+      }
+
+      const res = await InputRouter.routeInput(
+        env.DB,
+        {
+          source: source as any,
+          rawType: "document",
+          payload: payloadData,
+          filename,
+          mimeType,
+          metadata,
+        },
+        env,
+        now
+      );
+
+      return jsonSuccess(res, undefined, 201);
+    }
+
+    // GET /api/v1/input/:id
+    if (method === "GET" && path.startsWith("/api/v1/input/")) {
+      const sessionId = path.replace("/api/v1/input/", "");
+      const session = await InputRouter.getSession(env.DB, sessionId);
+      if (!session) {
+        return jsonError("not_found", `Input session ${sessionId} not found`, 404);
+      }
+
+      let attachment = null;
+      if (session.attachmentId) {
+        attachment = await env.DB.prepare("SELECT * FROM attachments WHERE id = ?").bind(session.attachmentId).first();
+      }
+
+      let proposal = null;
+      if (session.proposalId) {
+        proposal = await env.DB.prepare("SELECT * FROM task_proposals WHERE id = ?").bind(session.proposalId).first();
+      }
+
+      return jsonSuccess({
+        session,
+        attachment,
+        proposal,
       });
     }
 

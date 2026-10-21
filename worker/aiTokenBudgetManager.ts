@@ -17,7 +17,7 @@
 
 export interface ContextEntity {
   id: string;
-  type: "task" | "class" | "material" | "history" | "other";
+  type: "task" | "class" | "material" | "history" | "attachment" | "other";
   priority: "mandatory" | "high" | "normal" | "low";
   payload: any;
   xmlRepresentation?: string;

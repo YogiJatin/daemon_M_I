@@ -1,4 +1,5 @@
 import { routeCommand, handlePlainText } from "./commands";
+import { handleTelegramMediaIngress } from "./telegramMedia";
 import { sendTelegramMessage, answerCallbackQuery } from "./telegram";
 import { runScheduler } from "./scheduler";
 import {
@@ -1387,10 +1388,19 @@ export default {
       const messageText = typeof payload?.message?.text === "string" ? payload.message.text : "";
       const context = { db: env.DB, updateId, senderId, chatId, env };
 
-      let routed = await routeCommand(messageText, context);
+      const isVoice = Boolean(payload?.message?.voice);
+      const isPhoto = Boolean(payload?.message?.photo && payload?.message?.photo.length > 0);
+      const isDocument = Boolean(payload?.message?.document);
+
+      let routed: any = null;
+      if (isVoice || isPhoto || isDocument) {
+        routed = await handleTelegramMediaIngress(payload.message, context);
+      } else {
+        routed = await routeCommand(messageText, context);
+      }
 
       // Plain-text (non-command, non-empty) → capture verbatim as a task with no date
-      if (routed === null && messageText.trim() && !messageText.trim().startsWith("/")) {
+      if (!isVoice && !isPhoto && !isDocument && routed === null && messageText.trim() && !messageText.trim().startsWith("/")) {
         routed = await handlePlainText(messageText, context);
       }
 
