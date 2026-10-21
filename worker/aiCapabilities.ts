@@ -1,21 +1,37 @@
 /**
- * worker/aiCapabilities.ts — Block 6 Grounded Analytical AI Capabilities
+ * worker/aiCapabilities.ts — Block 6.1 Grounded Analytical AI Capabilities
  *
- * Requirements (Personal_AI_OS_SRS_v2.2.md §§7.8, 10.6, 16 TEST-6.4, TEST-6.9):
- * - Operating assistant capabilities grounded strictly in D1 operational state:
- *   1. task_breakdown: Decomposes tasks into structured subtask proposals
- *   2. weekly_plan: Synthesizes timetable, lab preparation materials, and deadlines
- *   3. prioritize: Ranks open tasks based on deadlines, effort, and timetable constraints
- *   4. suggest_next: Recommends the highest-impact immediate action
- * - Output proposal pattern: Candidate tasks are persisted into task_proposals table
- *   for owner review/confirmation (SRS §8.4). No unconfirmed mutations to tasks table.
- * - Prompt injection quarantine: Untrusted user strings are fenced in <user_data> blocks.
+ * Implements hardened architecture:
+ * - Capabilities registered in AICapabilityRegistry.
+ * - XML Context assembled via AIContextBuilder and TokenBudgetManager.
+ * - Outputs validated via AIVerifier and typed Schemas.
+ * - Human-in-the-loop proposals persisted into task_proposals table.
+ * - Explainability metadata (reason, confidence, evidence, affected_record_ids) strictly enforced.
  */
 
 import { AIAdapter, PrivacyClass, AIResponse } from "./aiAdapter";
 import { getISTDateParts } from "./dateParser";
 import { addDaysYmd } from "./recurrenceEngine";
 import { createTaskProposal, TaskProposalInput } from "./inboxService";
+import { AICapabilityRegistry, AICapabilityDefinition } from "./aiCapabilityRegistry";
+import { AIContextBuilder } from "./aiContextBuilder";
+import { AIVerifier } from "./aiVerifier";
+import {
+  TaskBreakdownOutput,
+  validateTaskBreakdownOutput,
+} from "./schemas/task_breakdown";
+import {
+  WeeklyPlanOutput,
+  validateWeeklyPlanOutput,
+} from "./schemas/weekly_plan";
+import {
+  PrioritizeOutput,
+  validatePrioritizeOutput,
+} from "./schemas/prioritize";
+import {
+  SuggestNextOutput,
+  validateSuggestNextOutput,
+} from "./schemas/suggest_next";
 
 export interface TaskBreakdownInput {
   taskId?: string;
@@ -23,134 +39,65 @@ export interface TaskBreakdownInput {
   notes?: string;
 }
 
-export interface TaskBreakdownOutput {
-  summary: string;
-  proposals: Array<{
-    id?: string;
-    title: string;
-    estimated_minutes: number;
-    suggested_deadline_offset_hours: number;
-    priority: "low" | "normal" | "high" | "urgent";
-    evidence: string;
-  }>;
-}
-
-export interface WeeklyPlanOutput {
-  summary: string;
-  focus_areas: string[];
-  bottlenecks: string[];
-  proposals: Array<{
-    id?: string;
-    title: string;
-    suggested_deadline_offset_hours: number;
-    priority: "low" | "normal" | "high" | "urgent";
-    evidence: string;
-  }>;
-}
-
-export interface PrioritizeOutput {
-  summary: string;
-  recommended_order: Array<{
-    task_id: string;
-    rank: number;
-    urgency_score: number;
-    reasoning: string;
-  }>;
-}
-
-export interface SuggestNextOutput {
-  next_action: string;
-  rationale: string;
-  confidence: number;
-  related_task_id?: string;
-}
-
-export class AICapabilities {
-  private adapter: AIAdapter;
-  private db: D1Database;
-
-  constructor(env: any, db: D1Database) {
-    this.adapter = new AIAdapter(env, db);
-    this.db = db;
-  }
-
-  /**
-   * Capability 1: task_breakdown
-   * Breaks down a complex project or existing task into 2-4 concrete subtasks.
-   */
-  public async taskBreakdown(
-    input: TaskBreakdownInput,
-    privacyClass: PrivacyClass = "personal",
-    simulatedFailure?: any,
-    now: Date = new Date()
-  ): Promise<AIResponse<TaskBreakdownOutput>> {
-    let taskTitle = input.title;
-    let taskDescription = input.notes || "";
-    let baseDeadline = "";
-
-    // If taskId is provided, fetch ground truth from tasks table
-    if (input.taskId) {
-      const task = await this.db
-        .prepare("SELECT * FROM tasks WHERE id = ?")
-        .bind(input.taskId)
-        .first<any>();
-
-      if (task) {
-        taskTitle = task.title;
-        taskDescription = task.description || "";
-        baseDeadline = task.deadline_local_date ? `${task.deadline_local_date} ${task.deadline_time_local || ""}`.trim() : "";
-      }
-    }
-
-    if (!taskTitle) {
-      return {
-        ok: false,
-        provider: "none",
-        model: "none",
-        durationMs: 0,
-        fallbackTriggered: false,
-        error: { code: "schema_invalid", message: "Task title or valid taskId is required for breakdown" },
-      };
-    }
-
-    const systemPrompt = `You are the Personal AI OS Analytical Engine.
+// ---------------------------------------------------------------------------
+// Register Capability 1: task_breakdown
+// ---------------------------------------------------------------------------
+AICapabilityRegistry.register<TaskBreakdownInput, TaskBreakdownOutput>({
+  id: "task_breakdown",
+  promptId: "p_task_breakdown",
+  promptVersion: "1.1.0",
+  checksum: "sha256_tb_v1_1",
+  dependencies: ["tasks"],
+  supportedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
+  maxContextTokens: 2500,
+  maxOutputTokens: 800,
+  timeoutMs: 6000,
+  systemRules: `You are the Personal AI OS Analytical Engine.
 You break down tasks into concrete, actionable steps.
 RULES:
 1. Propose 2 to 4 sequential subtasks.
 2. Return strictly a JSON object with:
    - "summary": string
-   - "subtasks": array of objects with:
-     - "title": string (clear, actionable action starting with a verb)
-     - "estimated_minutes": number
-     - "suggested_deadline_offset_hours": number
-     - "priority": "low" | "normal" | "high" | "urgent"
-     - "evidence": string (reason for this step)
-3. Do NOT invent dates or external dependencies outside the task context.`;
-
-    const userPrompt = `Task Title: "${taskTitle}"
-Description: "${taskDescription}"
-Current Deadline: "${baseDeadline || "None"}"`;
-
-    const aiRes = await this.adapter.execute<any>(
-      {
-        capability: "task_breakdown",
-        systemPrompt,
-        userPrompt,
-        inputContext: { taskId: input.taskId, title: taskTitle },
-        privacyClass,
-        simulatedFailure,
-      },
-      now
-    );
-
-    if (!aiRes.ok || !aiRes.data) {
-      return aiRes;
+   - "subtasks": array of objects with "title", "estimated_minutes", "suggested_deadline_offset_hours", "priority", "evidence"
+   - "reason": string
+   - "confidence": number (0.0 to 1.0)
+   - "evidence": string
+   - "affected_record_ids": array of string IDs cited
+3. Do NOT invent dates or external dependencies outside the task context.`,
+  outputContract: `JSON format:
+{
+  "summary": string,
+  "subtasks": [
+    { "title": string, "estimated_minutes": number, "suggested_deadline_offset_hours": number, "priority": "low"|"normal"|"high"|"urgent", "evidence": string }
+  ],
+  "reason": string,
+  "confidence": number,
+  "evidence": string,
+  "affected_record_ids": string[]
+}`,
+  contextBuilder: async (db, input, builder, now) => {
+    let taskTitle = input.title;
+    let taskDescription = input.notes || "";
+    if (input.taskId && db) {
+      const task = await db.prepare("SELECT * FROM tasks WHERE id = ?").bind(input.taskId).first<any>();
+      if (task) {
+        taskTitle = task.title;
+        taskDescription = task.description || "";
+        builder.addEntity(task.id, "task", task, "mandatory");
+      }
     }
-
-    // Persist proposals to task_proposals table for owner confirmation (SRS §8.4)
+    builder.setOwnerRequest(`Decompose project/task: "${taskTitle || ""}". Notes: "${taskDescription}"`);
+  },
+  validator: (data, indexedIds) => AIVerifier.verify(data, validateTaskBreakdownOutput, indexedIds),
+  handler: async (db, validated, input, now) => {
     const proposals: any[] = [];
-    const subtasks = Array.isArray(aiRes.data.subtasks) ? aiRes.data.subtasks : [];
+    const subtasks = Array.isArray(validated.subtasks)
+      ? validated.subtasks
+      : Array.isArray(validated.proposals)
+      ? validated.proposals
+      : [];
     const ist = getISTDateParts(now);
+    const taskTitle = input.title || validated.summary || "Task";
 
     for (const st of subtasks) {
       const offsetDays = Math.max(1, Math.round((st.suggested_deadline_offset_hours || 24) / 24));
@@ -165,10 +112,10 @@ Current Deadline: "${baseDeadline || "None"}"`;
         proposedLocalDate: proposedDate,
         proposedLocalTime: "18:00",
         evidenceQuote: String(st.evidence || `Derived from ${taskTitle}`),
-        advisoryConfidence: 0.95,
+        advisoryConfidence: typeof validated.confidence === "number" ? validated.confidence : 0.95,
       };
 
-      const proposal = await createTaskProposal(this.db, propInput, now);
+      const proposal = await createTaskProposal(db, propInput, now);
       proposals.push({
         id: proposal.id,
         title: propInput.title,
@@ -180,89 +127,89 @@ Current Deadline: "${baseDeadline || "None"}"`;
     }
 
     return {
-      ...aiRes,
-      data: {
-        summary: aiRes.data.summary || `Decomposed "${taskTitle}" into subtasks`,
-        proposals,
-      },
+      summary: validated.summary || `Decomposed "${taskTitle}" into subtasks`,
+      proposals,
+      reason: validated.reason || "Project milestone decomposition",
+      confidence: typeof validated.confidence === "number" ? validated.confidence : 0.95,
+      evidence: validated.evidence || "Derived from input task scope",
+      affected_record_ids: Array.isArray(validated.affected_record_ids) ? validated.affected_record_ids : [],
     };
-  }
+  },
+});
 
-  /**
-   * Capability 2: weekly_plan
-   * Synthesizes timetable, preparation materials, and open deadlines for the upcoming 7 days.
-   */
-  public async weeklyPlan(
-    privacyClass: PrivacyClass = "personal",
-    simulatedFailure?: any,
-    now: Date = new Date()
-  ): Promise<AIResponse<WeeklyPlanOutput>> {
-    const ist = getISTDateParts(now);
-    const todayYmd = ist.localDate;
-    const weekEndYmd = addDaysYmd(todayYmd, 6);
-
-    // Fetch open tasks due in next 7 days
-    const tasksRes = await this.db
-      .prepare(
-        `SELECT id, title, priority, deadline_local_date, deadline_time_local
-         FROM tasks
-         WHERE status IN ('open', 'snoozed')
-           AND deadline_local_date BETWEEN ? AND ?
-         ORDER BY deadline_local_date ASC`
-      )
-      .bind(todayYmd, weekEndYmd)
-      .all<any>();
-
-    // Fetch scheduled class occurrences and materials
-    const classesRes = await this.db
-      .prepare(
-        `SELECT o.occurrence_date, o.start_time, o.end_time, s.name as subject_name,
-                (SELECT COUNT(*) FROM timetable_materials m WHERE m.slot_id = o.slot_id AND m.active = 1) as mat_count
-         FROM class_occurrences o
-         JOIN timetable_subjects s ON o.subject_id = s.id
-         WHERE o.occurrence_date BETWEEN ? AND ? AND o.status = 'planned'
-         ORDER BY o.occurrence_date ASC, o.start_time ASC`
-      )
-      .bind(todayYmd, weekEndYmd)
-      .all<any>();
-
-    const tasksList = tasksRes.results || [];
-    const classesList = classesRes.results || [];
-
-    const systemPrompt = `You are the Personal AI OS Analytical Engine.
+// ---------------------------------------------------------------------------
+// Register Capability 2: weekly_plan
+// ---------------------------------------------------------------------------
+AICapabilityRegistry.register<void, WeeklyPlanOutput>({
+  id: "weekly_plan",
+  promptId: "p_weekly_plan",
+  promptVersion: "1.1.0",
+  checksum: "sha256_wp_v1_1",
+  dependencies: ["tasks", "timetable", "materials"],
+  supportedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
+  maxContextTokens: 3000,
+  maxOutputTokens: 1000,
+  timeoutMs: 8000,
+  systemRules: `You are the Personal AI OS Analytical Engine.
 You synthesize academic schedules and deadlines into actionable executive planning.
 RULES:
-1. Highlight preparation requirements (e.g. labs with missing or required materials).
-2. Identify deadline clusters (days with multiple tasks).
+1. Highlight preparation requirements.
+2. Identify deadline clusters.
 3. Return strictly a JSON object with:
    - "summary": string
    - "focus_areas": array of strings
    - "bottlenecks": array of strings
-   - "proposals": array of objects with "title", "suggested_deadline_offset_hours", "priority", "evidence"`;
+   - "proposals": array of objects with "title", "suggested_deadline_offset_hours", "priority", "evidence"
+   - "reason": string
+   - "confidence": number (0.0 to 1.0)
+   - "evidence": string
+   - "affected_record_ids": array of string IDs cited`,
+  outputContract: `JSON format with summary, focus_areas, bottlenecks, proposals, reason, confidence, evidence, affected_record_ids`,
+  contextBuilder: async (db, _input, builder, now) => {
+    const ist = getISTDateParts(now);
+    const todayYmd = ist.localDate;
+    const weekEndYmd = addDaysYmd(todayYmd, 6);
 
-    const userPrompt = `Current IST Date: ${todayYmd}
-Scheduled Classes: ${JSON.stringify(classesList)}
-Upcoming Tasks: ${JSON.stringify(tasksList)}`;
+    if (db) {
+      const tasksRes = await db
+        .prepare(
+          `SELECT id, title, priority, deadline_local_date, deadline_time_local
+           FROM tasks
+           WHERE status IN ('open', 'snoozed') AND deadline_local_date BETWEEN ? AND ?
+           ORDER BY deadline_local_date ASC`
+        )
+        .bind(todayYmd, weekEndYmd)
+        .all<any>();
 
-    const aiRes = await this.adapter.execute<any>(
-      {
-        capability: "weekly_plan",
-        systemPrompt,
-        userPrompt,
-        inputContext: { todayYmd, tasksCount: tasksList.length, classesCount: classesList.length },
-        privacyClass,
-        simulatedFailure,
-      },
-      now
-    );
+      for (const t of tasksRes.results || []) {
+        builder.addEntity(t.id, "task", t, "high");
+      }
 
-    if (!aiRes.ok || !aiRes.data) {
-      return aiRes;
+      const classesRes = await db
+        .prepare(
+          `SELECT o.id, o.occurrence_date, o.start_time, o.end_time, s.name as subject_name
+           FROM class_occurrences o
+           JOIN timetable_subjects s ON o.subject_id = s.id
+           WHERE o.occurrence_date BETWEEN ? AND ? AND o.status = 'planned'
+           ORDER BY o.occurrence_date ASC, o.start_time ASC`
+        )
+        .bind(todayYmd, weekEndYmd)
+        .all<any>();
+
+      for (const c of classesRes.results || []) {
+        builder.addEntity(c.id, "class", c, "high");
+      }
     }
 
-    // Persist any generated plan proposals
+    builder.setOwnerRequest(`Generate weekly executive plan for the next 7 days starting from IST date ${todayYmd}`);
+  },
+  validator: (data, indexedIds) => AIVerifier.verify(data, validateWeeklyPlanOutput, indexedIds),
+  handler: async (db, validated, _input, now) => {
+    const ist = getISTDateParts(now);
+    const todayYmd = ist.localDate;
     const proposals: any[] = [];
-    const rawProposals = Array.isArray(aiRes.data.proposals) ? aiRes.data.proposals : [];
+    const rawProposals = Array.isArray(validated.proposals) ? validated.proposals : [];
+
     for (const p of rawProposals) {
       const propInput: TaskProposalInput = {
         title: String(p.title || "Weekly preparation step").trim(),
@@ -273,10 +220,10 @@ Upcoming Tasks: ${JSON.stringify(tasksList)}`;
         proposedLocalDate: addDaysYmd(todayYmd, 1),
         proposedLocalTime: "18:00",
         evidenceQuote: String(p.evidence || "Timetable preparation bottleneck"),
-        advisoryConfidence: 0.9,
+        advisoryConfidence: typeof validated.confidence === "number" ? validated.confidence : 0.9,
       };
 
-      const created = await createTaskProposal(this.db, propInput, now);
+      const created = await createTaskProposal(db, propInput, now);
       proposals.push({
         id: created.id,
         title: propInput.title,
@@ -287,149 +234,82 @@ Upcoming Tasks: ${JSON.stringify(tasksList)}`;
     }
 
     return {
-      ...aiRes,
-      data: {
-        summary: aiRes.data.summary || "Weekly academic and personal overview",
-        focus_areas: Array.isArray(aiRes.data.focus_areas) ? aiRes.data.focus_areas : [],
-        bottlenecks: Array.isArray(aiRes.data.bottlenecks) ? aiRes.data.bottlenecks : [],
-        proposals,
-      },
+      summary: validated.summary || "Weekly academic and personal overview",
+      focus_areas: Array.isArray(validated.focus_areas) ? validated.focus_areas : [],
+      bottlenecks: Array.isArray(validated.bottlenecks) ? validated.bottlenecks : [],
+      proposals,
+      reason: validated.reason || "Weekly schedule synthesis",
+      confidence: typeof validated.confidence === "number" ? validated.confidence : 0.9,
+      evidence: validated.evidence || "Grounded in upcoming timetable classes and tasks",
+      affected_record_ids: Array.isArray(validated.affected_record_ids) ? validated.affected_record_ids : [],
     };
-  }
+  },
+});
 
-  /**
-   * Capability 3: prioritize
-   * Ranks open tasks based on deadlines, effort, and timetable schedule.
-   */
-  public async prioritize(
-    privacyClass: PrivacyClass = "personal",
-    simulatedFailure?: any,
-    now: Date = new Date()
-  ): Promise<AIResponse<PrioritizeOutput>> {
-    const tasksRes = await this.db
-      .prepare(
-        `SELECT id, title, priority, deadline_kind, deadline_local_date, deadline_time_local, snooze_count
-         FROM tasks
-         WHERE status IN ('open', 'snoozed')
-         ORDER BY deadline_local_date ASC, priority DESC
-         LIMIT 15`
-      )
-      .all<any>();
-
-    const tasks = tasksRes.results || [];
-    if (tasks.length === 0) {
-      return {
-        ok: true,
-        data: {
-          summary: "No open tasks to prioritize",
-          recommended_order: [],
-        },
-        provider: "none",
-        model: "none",
-        durationMs: 0,
-        fallbackTriggered: false,
-      };
-    }
-
-    const systemPrompt = `You are the Personal AI OS Analytical Engine.
+// ---------------------------------------------------------------------------
+// Register Capability 3: prioritize
+// ---------------------------------------------------------------------------
+AICapabilityRegistry.register<void, PrioritizeOutput>({
+  id: "prioritize",
+  promptId: "p_prioritize",
+  promptVersion: "1.1.0",
+  checksum: "sha256_pr_v1_1",
+  dependencies: ["tasks"],
+  supportedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
+  maxContextTokens: 2500,
+  maxOutputTokens: 600,
+  timeoutMs: 6000,
+  systemRules: `You are the Personal AI OS Analytical Engine.
 Prioritize open tasks using deadline urgency, priority, and snooze count.
 RULES:
-1. Every item in "recommended_order" MUST use an exact "task_id" from the input.
-2. Return strictly JSON with:
-   - "summary": string
-   - "recommended_order": array of { "task_id", "rank", "urgency_score", "reasoning" }`;
+1. Every item in "recommended_order" MUST cite an exact "task_id" present in the context.
+2. Return strictly JSON with summary, recommended_order, reason, confidence, evidence, affected_record_ids.`,
+  outputContract: `JSON format with summary, recommended_order: [{ task_id, rank, urgency_score, reasoning }], reason, confidence, evidence, affected_record_ids`,
+  contextBuilder: async (db, _input, builder) => {
+    if (db) {
+      const tasksRes = await db
+        .prepare(
+          `SELECT id, title, priority, deadline_kind, deadline_local_date, deadline_time_local, snooze_count
+           FROM tasks
+           WHERE status IN ('open', 'snoozed')
+           ORDER BY deadline_local_date ASC, priority DESC
+           LIMIT 15`
+        )
+        .all<any>();
 
-    const userPrompt = `Open Tasks:\n${JSON.stringify(tasks, null, 2)}`;
-
-    const aiRes = await this.adapter.execute<any>(
-      {
-        capability: "prioritize",
-        systemPrompt,
-        userPrompt,
-        inputContext: { tasks },
-        privacyClass,
-        simulatedFailure,
-      },
-      now
-    );
-
-    if (!aiRes.ok || !aiRes.data) {
-      return aiRes;
+      for (const t of tasksRes.results || []) {
+        builder.addEntity(t.id, "task", t, "mandatory");
+      }
     }
-
-    // Anti-hallucination check: ensure cited task_ids exist in the queried list
-    const validTaskIds = new Set(tasks.map((t) => t.id));
-    const validatedOrder = (aiRes.data.recommended_order || [])
-      .filter((item: any) => validTaskIds.has(item.task_id))
-      .map((item: any, idx: number) => ({
-        task_id: item.task_id,
-        rank: idx + 1,
-        urgency_score: typeof item.urgency_score === "number" ? item.urgency_score : 5.0,
-        reasoning: String(item.reasoning || "Prioritized according to deadline"),
-      }));
-
+    builder.setOwnerRequest("Rank open tasks based on deadlines and effort");
+  },
+  validator: (data, indexedIds) => AIVerifier.verify(data, validatePrioritizeOutput, indexedIds),
+  handler: async (_db, validated) => {
     return {
-      ...aiRes,
-      data: {
-        summary: aiRes.data.summary || "Prioritized open task schedule",
-        recommended_order: validatedOrder,
-      },
+      summary: validated.summary || "Prioritized open task schedule",
+      recommended_order: Array.isArray(validated.recommended_order) ? validated.recommended_order : [],
+      reason: validated.reason || "Urgency and deadline scoring",
+      confidence: typeof validated.confidence === "number" ? validated.confidence : 0.95,
+      evidence: validated.evidence || "Grounded in task deadlines and priority tags",
+      affected_record_ids: Array.isArray(validated.affected_record_ids) ? validated.affected_record_ids : [],
     };
-  }
+  },
+});
 
-  /**
-   * Capability 4: suggest_next
-   * Recommends the highest-impact immediate action based on current context.
-   */
-  public async suggestNext(
-    ownerQuery?: string,
-    privacyClass: PrivacyClass = "personal",
-    simulatedFailure?: any,
-    now: Date = new Date()
-  ): Promise<AIResponse<SuggestNextOutput>> {
-    const ist = getISTDateParts(now);
-
-    // Overdue tasks
-    const overdueRes = await this.db
-      .prepare(
-        `SELECT id, title, priority, deadline_local_date FROM tasks
-         WHERE status = 'open' AND deadline_local_date < ?
-         LIMIT 3`
-      )
-      .bind(ist.localDate)
-      .all<any>();
-
-    // Tasks due today
-    const dueTodayRes = await this.db
-      .prepare(
-        `SELECT id, title, priority, deadline_time_local FROM tasks
-         WHERE status = 'open' AND deadline_local_date = ?
-         LIMIT 3`
-      )
-      .bind(ist.localDate)
-      .all<any>();
-
-    // Next class today
-    const nextClassRes = await this.db
-      .prepare(
-        `SELECT o.start_time, o.room, s.name as subject_name
-         FROM class_occurrences o
-         JOIN timetable_subjects s ON o.subject_id = s.id
-         WHERE o.occurrence_date = ? AND o.start_time >= ? AND o.status = 'planned'
-         ORDER BY o.start_time ASC LIMIT 1`
-      )
-      .bind(ist.localDate, ist.localTime)
-      .first<any>();
-
-    const context = {
-      currentTimeIST: `${ist.localDate} ${ist.localTime}`,
-      overdueTasks: overdueRes.results || [],
-      dueTodayTasks: dueTodayRes.results || [],
-      nextClass: nextClassRes || null,
-      userQuery: ownerQuery || "What should I focus on next?",
-    };
-
-    const systemPrompt = `You are the Personal AI OS Analytical Engine.
+// ---------------------------------------------------------------------------
+// Register Capability 4: suggest_next
+// ---------------------------------------------------------------------------
+AICapabilityRegistry.register<{ query?: string }, SuggestNextOutput>({
+  id: "suggest_next",
+  promptId: "p_suggest_next",
+  promptVersion: "1.1.0",
+  checksum: "sha256_sn_v1_1",
+  dependencies: ["tasks", "timetable"],
+  supportedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
+  maxContextTokens: 2000,
+  maxOutputTokens: 400,
+  timeoutMs: 5000,
+  systemRules: `You are the Personal AI OS Analytical Engine.
 Recommend the single highest-impact next action based on current time and commitments.
 RULES:
 1. Give preference to immediate classes or overdue items.
@@ -437,34 +317,131 @@ RULES:
    - "next_action": string (one concise imperative sentence)
    - "rationale": string
    - "confidence": number (0.0 to 1.0)
-   - "related_task_id": optional string`;
+   - "related_task_id": optional string
+   - "reason": string
+   - "evidence": string
+   - "affected_record_ids": array of strings`,
+  outputContract: `JSON format with next_action, rationale, confidence, related_task_id, reason, evidence, affected_record_ids`,
+  contextBuilder: async (db, input, builder, now) => {
+    const ist = getISTDateParts(now);
+    if (db) {
+      const overdueRes = await db
+        .prepare(`SELECT id, title, priority, deadline_local_date FROM tasks WHERE status = 'open' AND deadline_local_date < ? LIMIT 3`)
+        .bind(ist.localDate)
+        .all<any>();
 
-    const userPrompt = JSON.stringify(context, null, 2);
+      for (const t of overdueRes.results || []) {
+        builder.addEntity(t.id, "task", t, "mandatory");
+      }
 
-    const aiRes = await this.adapter.execute<any>(
-      {
-        capability: "suggest_next",
-        systemPrompt,
-        userPrompt,
-        inputContext: context,
-        privacyClass,
-        simulatedFailure,
-      },
-      now
-    );
+      const dueTodayRes = await db
+        .prepare(`SELECT id, title, priority, deadline_time_local FROM tasks WHERE status = 'open' AND deadline_local_date = ? LIMIT 3`)
+        .bind(ist.localDate)
+        .all<any>();
 
-    if (!aiRes.ok || !aiRes.data) {
-      return aiRes;
+      for (const t of dueTodayRes.results || []) {
+        builder.addEntity(t.id, "task", t, "high");
+      }
+
+      const nextClassRes = await db
+        .prepare(
+          `SELECT o.id, o.start_time, o.room, s.name as subject_name
+           FROM class_occurrences o
+           JOIN timetable_subjects s ON o.subject_id = s.id
+           WHERE o.occurrence_date = ? AND o.start_time >= ? AND o.status = 'planned'
+           ORDER BY o.start_time ASC LIMIT 1`
+        )
+        .bind(ist.localDate, ist.localTime)
+        .first<any>();
+
+      if (nextClassRes) {
+        builder.addEntity(nextClassRes.id, "class", nextClassRes, "mandatory");
+      }
     }
 
+    builder.setOwnerRequest(input?.query || "What should I focus on next?");
+  },
+  validator: (data, indexedIds) => AIVerifier.verify(data, validateSuggestNextOutput, indexedIds),
+  handler: async (_db, validated) => {
     return {
-      ...aiRes,
-      data: {
-        next_action: aiRes.data.next_action || "Review pending tasks and upcoming schedule",
-        rationale: aiRes.data.rationale || "Derived from current timetable and task status",
-        confidence: typeof aiRes.data.confidence === "number" ? aiRes.data.confidence : 0.9,
-        related_task_id: aiRes.data.related_task_id || undefined,
-      },
+      next_action: validated.next_action || "Review pending tasks and upcoming schedule",
+      rationale: validated.rationale || validated.reason || "Derived from current timetable and task status",
+      confidence: typeof validated.confidence === "number" ? validated.confidence : 0.9,
+      related_task_id: validated.related_task_id || undefined,
+      reason: validated.reason || validated.rationale || "Immediate schedule optimization",
+      evidence: validated.evidence || "Current IST time and upcoming commitments",
+      affected_record_ids: Array.isArray(validated.affected_record_ids) ? validated.affected_record_ids : [],
     };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// AICapabilities Facade (Preserves exact Block 6 method signatures)
+// ---------------------------------------------------------------------------
+export class AICapabilities {
+  private adapter: AIAdapter;
+  private db: D1Database;
+
+  constructor(env: any, db: D1Database) {
+    this.adapter = new AIAdapter(env, db);
+    this.db = db;
+  }
+
+  public async taskBreakdown(
+    input: TaskBreakdownInput,
+    privacyClass: PrivacyClass = "personal",
+    simulatedFailure?: any,
+    now: Date = new Date()
+  ): Promise<AIResponse<TaskBreakdownOutput>> {
+    return this.adapter.executeCapability<TaskBreakdownInput, TaskBreakdownOutput>(
+      "task_breakdown",
+      input,
+      privacyClass,
+      simulatedFailure,
+      now
+    );
+  }
+
+  public async weeklyPlan(
+    privacyClass: PrivacyClass = "personal",
+    simulatedFailure?: any,
+    now: Date = new Date()
+  ): Promise<AIResponse<WeeklyPlanOutput>> {
+    return this.adapter.executeCapability<void, WeeklyPlanOutput>(
+      "weekly_plan",
+      undefined as any,
+      privacyClass,
+      simulatedFailure,
+      now
+    );
+  }
+
+  public async prioritize(
+    privacyClass: PrivacyClass = "personal",
+    simulatedFailure?: any,
+    now: Date = new Date()
+  ): Promise<AIResponse<PrioritizeOutput>> {
+    return this.adapter.executeCapability<void, PrioritizeOutput>(
+      "prioritize",
+      undefined as any,
+      privacyClass,
+      simulatedFailure,
+      now
+    );
+  }
+
+  public async suggestNext(
+    ownerQuery?: string,
+    privacyClass: PrivacyClass = "personal",
+    simulatedFailure?: any,
+    now: Date = new Date()
+  ): Promise<AIResponse<SuggestNextOutput>> {
+    return this.adapter.executeCapability<{ query?: string }, SuggestNextOutput>(
+      "suggest_next",
+      { query: ownerQuery },
+      privacyClass,
+      simulatedFailure,
+      now
+    );
   }
 }
