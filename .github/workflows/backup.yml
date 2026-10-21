@@ -7,36 +7,46 @@ on:
   workflow_dispatch:
     # Allows manual trigger for testing and ad-hoc backup drills
 
+permissions:
+  contents: read
+
+concurrency:
+  group: personal-ai-os-encrypted-backup
+  cancel-in-progress: false
+
 jobs:
   backup:
     name: Encrypted Google Drive Backup
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Install dependencies (age, jq, curl)
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y age jq curl
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends age jq curl coreutils
 
-      - name: Run Encrypted Backup
-        run: |
-          chmod +x .github/workflows/scripts/backup.sh
-          ./.github/workflows/scripts/backup.sh
+      - name: Run encrypted backup
+        shell: bash
         env:
           WORKER_URL: ${{ secrets.WORKER_URL }}
-          WORKER_SESSION_TOKEN: ${{ secrets.WORKER_SESSION_TOKEN }}
-          WORKER_WEBHOOK_SECRET: ${{ secrets.WORKER_WEBHOOK_SECRET }}
+          BACKUP_EXPORT_TOKEN: ${{ secrets.BACKUP_EXPORT_TOKEN }}
           AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
           GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
-
-      - name: Report Failure / Send Alert
-        if: failure()
         run: |
-          echo "::error::Weekly encrypted backup failed! Check workflow logs immediately."
+          chmod +x .github/workflows/scripts/backup.sh
+          ./.github/workflows/scripts/backup.sh
+
+      - name: Report failure
+        if: failure()
+        shell: bash
+        run: echo '::error::Encrypted backup failed. Review the sanitized workflow logs and resolve the reported stage.'

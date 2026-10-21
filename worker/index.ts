@@ -60,6 +60,40 @@ export default {
       return await handleApiRequest(request, env);
     }
 
+    // Dedicated backup credential: permits only the full JSON export.
+    // It does not create a general-purpose authenticated session.
+    const configuredBackupToken = (
+      env as unknown as Record<string, unknown>
+    ).BACKUP_EXPORT_TOKEN;
+
+    const authorizationHeader = request.headers.get("Authorization") || "";
+    const bearerMatch = authorizationHeader.match(/^Bearer\s+(.+)$/i);
+    const suppliedBackupToken = bearerMatch?.[1]?.trim() || "";
+
+    const backupFormat = (
+      url.searchParams.get("format") || "json"
+    ).toLowerCase();
+
+    const backupQueryKeys = [...url.searchParams.keys()];
+    const isFullJsonBackupExport =
+      request.method === "GET" &&
+      url.pathname === "/api/v1/export" &&
+      backupFormat === "json" &&
+      !url.searchParams.has("entity") &&
+      backupQueryKeys.every((key) => key === "format") &&
+      url.searchParams.getAll("format").length <= 1;
+
+    if (
+      isFullJsonBackupExport &&
+      typeof configuredBackupToken === "string" &&
+      configuredBackupToken.length >= 32 &&
+      suppliedBackupToken.length >= 32 &&
+      suppliedBackupToken === configuredBackupToken
+    ) {
+      // The bypass is limited to this exact export request.
+      return await handleApiRequest(request, env);
+    }
+
     // Block 4: General Authentication Middleware for private /api/v1/* routes
     const isExempt =
       url.pathname === "/health/public" ||
