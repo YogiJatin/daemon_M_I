@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-primary-fixed-variant": "#004f51",
+          "on-surface-variant": "#bfc8c8",
+          "primary": "#90d2d3",
+          "on-error": "#690005",
+          "surface-container-high": "#282a2e",
+          "inverse-primary": "#216869",
+          "on-primary": "#003738",
+          "primary-fixed": "#aceeef",
+          "on-secondary-fixed-variant": "#5a4309",
+          "on-background": "#e2e2e8",
+          "on-surface": "#e2e2e8",
+          "on-secondary": "#402d00",
+          "primary-fixed-dim": "#90d2d3",
+          "on-tertiary-container": "#fff9f7",
+          "surface-bright": "#37393e",
+          "inverse-on-surface": "#2f3035",
+          "on-primary-fixed": "#002020",
+          "secondary-fixed": "#ffdf9f",
+          "primary-container": "#3a7d7e",
+          "on-secondary-container": "#d5b470",
+          "inverse-surface": "#e2e2e8",
+          "on-tertiary-fixed": "#3b0900",
+          "tertiary-container": "#bd5234",
+          "surface-container-lowest": "#0c0e12",
+          "surface-container-highest": "#333539",
+          "surface-variant": "#333539",
+          "secondary-fixed-dim": "#e4c27d",
+          "on-tertiary": "#601400",
+          "outline-variant": "#3f4948",
+          "surface-dim": "#111317",
+          "error-container": "#93000a",
+          "surface-container-low": "#1a1c20",
+          "tertiary-fixed": "#ffdbd1",
+          "outline": "#899392",
+          "surface": "#111317",
+          "on-primary-container": "#e5ffff",
+          "surface-tint": "#90d2d3",
+          "tertiary-fixed-dim": "#ffb5a0",
+          "background": "#111317",
+          "tertiary": "#ffb5a0",
+          "error": "#ffb4ab",
+          "on-error-container": "#ffdad6",
+          "on-tertiary-fixed-variant": "#82270c",
+          "secondary-container": "#5d450b",
+          "on-secondary-fixed": "#261a00",
+          "secondary": "#e4c27d",
+          "surface-container": "#1e2024"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "gutter-mobile": "0.75rem",
+          "space-sm": "0.5rem",
+          "space-xs": "0.25rem",
+          "gutter": "1rem",
+          "margin": "2rem",
+          "space-xl": "2.5rem",
+          "space-lg": "1.5rem",
+          "margin-mobile": "1rem",
+          "space-md": "1rem"
+        },
+        "fontFamily": {
+          "body-lg": [
+            "IBM Plex Sans"
+          ],
+          "display-lg-mobile": [
+            "IBM Plex Sans"
+          ],
+          "label-md": [
+            "Space Mono"
+          ],
+          "headline-sm": [
+            "IBM Plex Sans"
+          ],
+          "code-md": [
+            "Space Mono"
+          ],
+          "body-md": [
+            "IBM Plex Sans"
+          ],
+          "headline-lg": [
+            "IBM Plex Sans"
+          ],
+          "display-lg": [
+            "IBM Plex Sans"
+          ],
+          "title-md": [
+            "IBM Plex Sans"
+          ],
+          "label-sm": [
+            "Space Mono"
+          ]
+        },
+        "fontSize": {
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0.01em",
+              "fontWeight": "400"
+            }
+          ],
+          "display-lg-mobile": [
+            "30px",
+            {
+              "lineHeight": "38px",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "label-md": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0.04em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "20px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.005em",
+              "fontWeight": "500"
+            }
+          ],
+          "code-md": [
+            "13px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0.01em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "28px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "500"
+            }
+          ],
+          "display-lg": [
+            "40px",
+            {
+              "lineHeight": "48px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "600"
+            }
+          ],
+          "title-md": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "label-sm": [
+            "10px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "400"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-low z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex flex-col"><div class="h-14 px-gutter flex items-center justify-between bg-surface-container-lowest/60"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-primary text-[20px]">terminal</span><span class="font-label-md text-label-md text-on-surface font-bold tracking-tight uppercase">Personal AI OS</span></div><span class="w-1.5 h-1.5 rounded-full bg-primary ring-2 ring-primary/20"></span></div><div class="px-gutter pt-space-md pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Workspace</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="today" href="#"><span class="material-symbols-outlined text-[18px]">wb_sunny</span><span>Today</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="tasks" href="#"><span class="material-symbols-outlined text-[18px]">check_box</span><span>Tasks</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="timetable" href="#"><span class="material-symbols-outlined text-[18px]">calendar_month</span><span>Timetable</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="recurring" href="#"><span class="material-symbols-outlined text-[18px]">sync</span><span>Recurring</span></a></nav><div class="px-gutter pt-space-lg pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Intelligence</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="suggestions" href="#"><span class="material-symbols-outlined text-[18px]">smart_toy</span><span>Suggestions</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="inbox" href="#"><span class="material-symbols-outlined text-[18px]">inbox</span><span>Inbox</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="history" href="#"><span class="material-symbols-outlined text-[18px]">history</span><span>History</span></a></nav><div class="px-gutter pt-space-lg pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">System</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="desktop" href="#"><span class="material-symbols-outlined text-[18px]">laptop_mac</span><span>Desktop</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="health" href="#"><span class="material-symbols-outlined text-[18px]">monitor_heart</span><span>Health</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="settings" href="#"><span class="material-symbols-outlined text-[18px]">settings</span><span>Settings</span></a></nav></div><div class="p-space-sm bg-surface-container-lowest/80 m-space-xs rounded flex flex-col gap-1"><div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Node Relay</span><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span></div><div class="flex items-center gap-1.5 font-code-md text-code-md text-on-surface"><span class="text-primary">rpi-relay-blr</span></div><span class="font-label-sm text-label-sm text-outline">synced 14s ago</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-14 bg-surface-container-low/95 backdrop-blur-xl z-40 px-gutter flex items-center justify-between gap-space-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-2"><div class="relative flex items-center justify-center w-5 h-5"><span class="absolute inline-flex w-full h-full rounded-full opacity-30 bg-primary animate-ping"></span><span class="relative inline-flex w-2.5 h-2.5 rounded-full bg-primary"></span></div><div class="flex items-center gap-2 font-code-md text-code-md text-on-surface-variant"><span class="text-on-surface font-medium">Scheduler</span><span class="text-outline">·</span><span>38s ago</span><span class="text-outline">·</span><span class="text-primary font-medium">96%</span></div></div><div class="relative w-80 lg:w-96"><span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-outline">search</span><input class="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline font-body-md text-body-md pl-8 pr-16 py-1 rounded focus:outline-none focus:ring-1 focus:ring-primary/40" placeholder="Add task or type a command..." readonly="" type="text"/><kbd class="absolute right-2 top-1/2 -translate-y-1/2 font-label-sm text-label-sm text-outline bg-surface-container-high px-1.5 py-0.5 rounded">Ctrl K</kbd></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-1.5 font-code-md text-code-md text-on-surface-variant"><span class="material-symbols-outlined text-[16px] text-outline">schedule</span><span>Wed 21 Oct 2026, 10:42 IST</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="relative pt-14 w-full px-gutter bg-surface min-h-screen"><div class="flex flex-col w-full pb-12">
+<!-- Top Command & Telemetry Header Bar -->
+<section class="flex flex-col lg:flex-row lg:items-end justify-between gap-space-md pt-space-lg pb-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-xs text-primary font-label-sm uppercase tracking-widest">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-primary ring-2 ring-primary/20"></span>
+<span>Audit Trail · Journal v4.12</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight">History</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">
+        Immutable audit log of all owner actions, state mutations, and daemon dispatches.
+      </p>
+</div>
+<div class="flex items-center gap-space-sm self-start lg:self-auto">
+<div class="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 rounded shadow-sm">
+<span class="material-symbols-outlined text-primary text-[15px]">verified</span>
+<span class="font-code-md text-label-sm text-primary uppercase font-bold tracking-wider">7 EVENTS RECORDED</span>
+<span class="text-outline-variant font-code-md text-label-sm">·</span>
+<span class="font-code-md text-label-sm text-on-surface-variant">LOG INTEGRITY VERIFIED</span>
+</div>
+<button class="bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface p-1.5 rounded flex items-center justify-center" title="Refresh Log">
+<span class="material-symbols-outlined text-[18px]">sync</span>
+</button>
+</div>
+</section>
+<!-- Filter & Query Control Deck -->
+<section class="bg-surface-container-low rounded p-space-sm mb-space-lg shadow-sm flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-space-sm">
+<div class="flex items-center gap-1.5 overflow-x-auto pb-1 xl:pb-0" id="actor-filter-group">
+<button class="actor-btn active bg-surface-container-high text-primary font-code-md text-label-md px-2.5 py-1 rounded shadow-sm whitespace-nowrap transition-colors" data-actor="all">
+        All
+      </button>
+<button class="actor-btn bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-code-md text-label-md px-2.5 py-1 rounded whitespace-nowrap transition-colors" data-actor="owner:telegram">
+        owner:telegram
+      </button>
+<button class="actor-btn bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-code-md text-label-md px-2.5 py-1 rounded whitespace-nowrap transition-colors" data-actor="owner:web">
+        owner:web
+      </button>
+<button class="actor-btn bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-code-md text-label-md px-2.5 py-1 rounded whitespace-nowrap transition-colors" data-actor="system:scheduler">
+        system:scheduler
+      </button>
+<button class="actor-btn bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container font-code-md text-label-md px-2.5 py-1 rounded whitespace-nowrap transition-colors" data-actor="system:desktop-agent">
+        system:desktop-agent
+      </button>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="relative flex-1 xl:w-72">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]">filter_list</span>
+<input class="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline font-code-md text-code-md pl-8 pr-3 py-1.5 rounded focus:outline-none focus:ring-1 focus:ring-primary/40 shadow-inner" id="history-search" placeholder="Search by task, id, or diff..." type="text"/>
+</div>
+<button class="flex items-center gap-2 bg-surface-container-lowest hover:bg-surface-container px-3 py-1.5 rounded font-code-md text-label-md text-on-surface transition-colors whitespace-nowrap shadow-sm">
+<span class="material-symbols-outlined text-[15px] text-outline">date_range</span>
+<span>Today · Last 7 days</span>
+<span class="material-symbols-outlined text-[14px] text-outline">arrow_drop_down</span>
+</button>
+</div>
+</section>
+<!-- Dual Pane Canvas: Left Event Feed (~900px flex-1), Right Task Inspection Drawer (~400px) -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- LEFT: Audit Event Stream -->
+<div class="lg:col-span-7 xl:col-span-8 flex flex-col gap-space-lg">
+<!-- Day Group 1: Today -->
+<div class="flex flex-col day-group" id="group-today">
+<div class="flex items-center justify-between pb-2 mb-2">
+<div class="flex items-center gap-2">
+<span class="font-code-md text-label-sm uppercase tracking-wider text-outline">Day Segment</span>
+<span class="text-on-surface font-title-md text-title-md font-semibold">Today — Wed 21 Oct 2026</span>
+</div>
+<span class="font-code-md text-label-sm text-outline">5 occurrences</span>
+</div>
+<!-- Relative vertical timeline container -->
+<div class="relative pl-6 flex flex-col space-y-1.5">
+<!-- Continuous Hairline connector -->
+<div class="absolute left-2.5 top-2 bottom-3 w-px bg-surface-variant"></div>
+<!-- Row 1: Selected Task (Normal -> Urgent) -->
+<div class="history-item relative flex items-center justify-between min-h-[44px] px-3 py-2 bg-surface-container-high rounded cursor-pointer transition-all shadow-sm" data-actor="owner:web" data-task="task_982bf" onclick="selectTaskRow(this, 'task_982bf')">
+<!-- Node pip -->
+<span class="absolute -left-[19px] top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(144,210,211,0.6)]"></span>
+<div class="flex items-center gap-3 min-w-0 pr-2">
+<span class="font-code-md text-label-md text-outline shrink-0 w-12">09:14</span>
+<span class="bg-surface-container-lowest font-code-md text-label-sm px-2 py-0.5 rounded text-primary shrink-0">owner:web</span>
+<div class="flex items-center gap-1.5 min-w-0 truncate font-body-md text-body-md">
+<span class="text-on-surface-variant shrink-0">Priority changed ·</span>
+<span class="text-on-surface font-medium truncate underline decoration-dotted underline-offset-4 decoration-primary/60 hover:text-primary transition-colors">Data Structures assignment 4 upload</span>
+</div>
+</div>
+<!-- Diff Pill Right -->
+<div class="flex items-center gap-1.5 shrink-0 bg-surface-container-lowest px-2.5 py-1 rounded">
+<span class="font-code-md text-label-sm text-on-surface-variant line-through opacity-70">normal</span>
+<span class="material-symbols-outlined text-[13px] text-error">trending_up</span>
+<span class="font-code-md text-label-sm text-error font-bold uppercase tracking-wide">urgent</span>
+</div>
+</div>
+<!-- Row 2: Task Created -->
+<div class="history-item relative flex items-center justify-between min-h-[44px] px-3 py-2 bg-surface-container-low hover:bg-surface-container rounded cursor-pointer transition-all" data-actor="owner:telegram" data-task="task_982bf" onclick="selectTaskRow(this, 'task_982bf')">
+<span class="absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-outline-variant"></span>
+<div class="flex items-center gap-3 min-w-0 pr-2">
+<span class="font-code-md text-label-md text-outline shrink-0 w-12">09:10</span>
+<span class="bg-surface-container-lowest font-code-md text-label-sm px-2 py-0.5 rounded text-secondary shrink-0">owner:telegram</span>
+<div class="flex items-center gap-1.5 min-w-0 truncate font-body-md text-body-md">
+<span class="text-on-surface-variant shrink-0">Task created ·</span>
+<span class="text-on-surface truncate underline decoration-dotted underline-offset-4 decoration-outline hover:text-primary transition-colors">Data Structures assignment 4 upload</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 shrink-0 bg-surface-container-lowest px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[13px] text-outline">schedule</span>
+<span class="font-code-md text-label-sm text-on-surface-variant">deadline 21 Oct 18:00</span>
+</div>
+</div>
+<!-- Row 3: Delivery Unknown / Retry queued (EMBER) -->
+<div class="history-item relative flex items-center justify-between min-h-[44px] px-3 py-2 bg-surface-container-low hover:bg-surface-container rounded cursor-pointer transition-all" data-actor="system:scheduler" data-task="task_773ac" onclick="selectTaskRow(this, 'task_773ac')">
+<span class="absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-secondary"></span>
+<div class="flex items-center gap-3 min-w-0 pr-2">
+<span class="font-code-md text-label-md text-outline shrink-0 w-12">08:02</span>
+<span class="bg-surface-container-lowest font-code-md text-label-sm px-2 py-0.5 rounded text-on-surface-variant shrink-0">system:scheduler</span>
+<div class="flex items-center gap-1.5 min-w-0 truncate font-body-md text-body-md">
+<span class="text-on-surface-variant shrink-0">Delivery unknown ·</span>
+<span class="text-on-surface truncate underline decoration-dotted underline-offset-4 decoration-outline hover:text-secondary transition-colors">Gym slot booking</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 shrink-0 bg-secondary-container/30 px-2 py-0.5 rounded">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-code-md text-label-sm text-secondary font-medium">retry queued</span>
+</div>
+</div>
+<!-- Row 4: Snooze returned -->
+<div class="history-item relative flex items-center justify-between min-h-[44px] px-3 py-2 bg-surface-container-low hover:bg-surface-container rounded cursor-pointer transition-all" data-actor="system:scheduler" data-task="task_551da" onclick="selectTaskRow(this, 'task_551da')">
+<span class="absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-outline-variant"></span>
+<div class="flex items-center gap-3 min-w-0 pr-2">
+<span class="font-code-md text-label-md text-outline shrink-0 w-12">06:45</span>
+<span class="bg-surface-container-lowest font-code-md text-label-sm px-2 py-0.5 rounded text-on-surface-variant shrink-0">system:scheduler</span>
+<div class="flex items-center gap-1.5 min-w-0 truncate font-body-md text-body-md">
+<span class="text-on-surface-variant shrink-0">Snooze returned ·</span>
+<span class="text-on-surface truncate underline decoration-dotted underline-offset-4 decoration-outline hover:text-primary transition-colors">Renew gym membership</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 shrink-0 bg-surface-container-lowest px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[13px] text-primary">replay</span>
+<span class="font-code-md text-label-sm text-primary">reopened</span>
+</div>
+</div>
+<!-- Row 5: Morning overview sent -->
+<div class="history-item relative flex items-center justify-between min-h-[44px] px-3 py-2 bg-surface-container-low hover:bg-surface-container rounded cursor-pointer transition-all" data-actor="system:scheduler" data-task="digest_daily" onclick="selectTaskRow(this, 'digest_daily')">
+<span class="absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-outline-variant"></span>
+<div class="flex items-center gap-3 min-w-0 pr-2">
+<span class="font-code-md text-label-md text-outline shrink-0 w-12">06:45</span>
+<span class="bg-surface-container-lowest font-code-md text-label-sm px-2 py-0.5 rounded text-on-surface-variant shrink-0">system:scheduler</span>
+<div class="flex items-center gap-1.5 min-w-0 truncate font-body-md text-body-md">
+<span class="text-on-surface font-medium truncate">Morning overview sent</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 shrink-0 bg-surface-container-lowest px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[13px] text-outline">mark_chat_read</span>
+<span class="font-code-md text-label-sm text-on-surface-variant">confirmed by Telegram</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Day Group 2: Yesterday -->
+<div class="flex flex-col day-group" id="group-yesterday">
+<div class="flex items-center justify-between pb-2 mb-2">
+<div class="flex items-center gap-2">
+<span class="font-code-md text-label-sm uppercase tracking-wider text-outline">Day Segment</span>
+<span class="text-on-surface font-title-md text-title-md font-semibold">Yesterday — Tue 20 Oct 2026</span>
+</div>
+<span class="font-code-md text-label-sm text-outline">2 occurrences</span>
+</div>
+<div class="relative pl-6 flex flex-col space-y-1.5">
+<div class="absolute left-2.5 top-2 bottom-3 w-px bg-surface-variant"></div>
+<!-- Row 6: Snoozed -->
+<div class="history-item relative flex items-center justify-between min-h-[44px] px-3 py-2 bg-surface-container-low hover:bg-surface-container rounded cursor-pointer transition-all" data-actor="owner:telegram" data-task="task_551da" onclick="selectTaskRow(this, 'task_551da')">
+<span class="absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-outline-variant"></span>
+<div class="flex items-center gap-3 min-w-0 pr-2">
+<span class="font-code-md text-label-md text-outline shrink-0 w-12">22:14</span>
+<span class="bg-surface-container-lowest font-code-md text-label-sm px-2 py-0.5 rounded text-secondary shrink-0">owner:telegram</span>
+<div class="flex items-center gap-1.5 min-w-0 truncate font-body-md text-body-md">
+<span class="text-on-surface-variant shrink-0">Snoozed ·</span>
+<span class="text-on-surface truncate underline decoration-dotted underline-offset-4 decoration-outline hover:text-primary transition-colors">Renew gym membership</span>
+</div>
+</div>
+<div class="flex items-center gap-1.5 shrink-0 bg-surface-container-lowest px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[13px] text-secondary">snooze</span>
+<span class="font-code-md text-label-sm text-secondary">until Wed 06:45</span>
+</div>
+</div>
+<!-- Row 7: Command Succeeded -->
+<div class="history-item relative flex items-center justify-between min-h-[44px] px-3 py-2 bg-surface-container-low hover:bg-surface-container rounded cursor-pointer transition-all" data-actor="system:desktop-agent" data-task="agent_cmd_02" onclick="selectTaskRow(this, 'agent_cmd_02')">
+<span class="absolute -left-[18px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-outline-variant"></span>
+<div class="flex items-center gap-3 min-w-0 pr-2">
+<span class="font-code-md text-label-md text-outline shrink-0 w-12">19:30</span>
+<span class="bg-surface-container-lowest font-code-md text-label-sm px-2 py-0.5 rounded text-primary shrink-0">system:desktop-agent</span>
+<div class="flex items-center gap-1.5 min-w-0 truncate font-body-md text-body-md">
+<span class="text-on-surface-variant shrink-0">Command succeeded ·</span>
+<code class="font-code-md text-code-md text-primary bg-surface-container px-1.5 py-0.2 rounded">open_app</code>
+</div>
+</div>
+<div class="flex items-center gap-1.5 shrink-0 bg-surface-container-lowest px-2 py-0.5 rounded">
+<span class="material-symbols-outlined text-[13px] text-primary">security</span>
+<span class="font-code-md text-label-sm text-on-surface-variant">allowlisted app</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Empty State Indicator (Hidden by default, shown via search/filter JS) -->
+<div class="hidden flex-col items-center justify-center p-space-xl bg-surface-container-low rounded text-center" id="history-empty">
+<span class="material-symbols-outlined text-outline text-[32px] mb-2">manage_search</span>
+<span class="font-code-md text-label-md text-on-surface">No events match these filters.</span>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Try resetting the actor filters or clear the active query string.</p>
+<button class="mt-space-md bg-surface-container-high hover:bg-surface-container text-primary font-code-md text-label-md px-3 py-1.5 rounded transition-colors" onclick="resetFilters()">
+          Reset Filter Pipeline
+        </button>
+</div>
+<!-- Audit Footer Note -->
+<div class="flex items-center justify-between text-outline font-code-md text-label-sm pt-space-xs px-2">
+<span>SQLite journal WAL index · 7 items parsed</span>
+<span>sync status: local only · zero external leakage</span>
+</div>
+</div>
+<!-- RIGHT: Drawer Panel (400px Glass Sheet inspection window) -->
+<div class="lg:col-span-5 xl:col-span-4 sticky top-20 bg-surface-container-low/80 backdrop-blur-xl rounded p-space-md shadow-xl flex flex-col gap-space-md" id="inspector-drawer">
+<!-- Drawer Top Bar -->
+<div class="flex items-start justify-between pb-space-sm bg-surface-container-lowest/40 p-space-sm rounded">
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-2">
+<span class="font-code-md text-label-sm text-outline uppercase tracking-wider">Task Timeline</span>
+<span class="font-code-md text-label-sm text-primary bg-surface-container px-1 rounded">task_982bf</span>
+</div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold leading-tight mt-1" id="drawer-task-title">
+            Data Structures assignment 4 upload
+          </h2>
+<span class="font-code-md text-label-sm text-outline" id="drawer-task-meta">College / CS-201 · Priority Log</span>
+</div>
+<button class="text-outline hover:text-on-surface transition-colors p-1 rounded hover:bg-surface-container" onclick="toggleDrawer(false)" title="Dismiss Drawer">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+<!-- State & Priority Banner -->
+<div class="flex items-center justify-between bg-surface-container-lowest px-3 py-2 rounded">
+<div class="flex items-center gap-2">
+<span class="inline-block w-2 h-2 rounded-full bg-error ring-2 ring-error/20 animate-pulse"></span>
+<span class="font-code-md text-label-md font-bold text-on-surface">STATUS: OPEN</span>
+</div>
+<div class="flex items-center gap-1 font-code-md text-label-sm text-error bg-error-container/20 px-2 py-0.5 rounded font-bold tracking-wider">
+<span>//// URGENT</span>
+</div>
+</div>
+<!-- Granular Task Lifecycle Steps -->
+<div class="flex flex-col gap-space-xs">
+<span class="font-code-md text-label-sm uppercase tracking-wider text-outline px-1">Mutation Sequence</span>
+<div class="relative pl-5 space-y-4 pt-1">
+<!-- Timeline Vertical Wire -->
+<div class="absolute left-1.5 top-2 bottom-3 w-px bg-surface-variant"></div>
+<!-- Stage 1 -->
+<div class="relative flex flex-col gap-0.5">
+<span class="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-primary"></span>
+<div class="flex items-center justify-between font-code-md text-label-sm">
+<span class="text-primary font-bold">09:10 IST · v1 Ingestion</span>
+<span class="text-outline">Telegram Bot</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-0.5">
+              Created via direct command:
+            </p>
+<div class="bg-surface-container-lowest p-2 rounded mt-1 font-code-md text-code-md text-primary overflow-x-auto">
+              /add wed 18:00 | Data Structures assignment 4 upload
+            </div>
+</div>
+<!-- Stage 2 -->
+<div class="relative flex flex-col gap-0.5">
+<span class="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-error"></span>
+<div class="flex items-center justify-between font-code-md text-label-sm">
+<span class="text-error font-bold">09:14 IST · State Mutation</span>
+<span class="text-outline">Web Console</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface mt-0.5">
+              Priority escalated from <code class="font-code-md text-label-sm bg-surface-container-high px-1 py-0.5 rounded">normal</code> → <code class="font-code-md text-label-sm bg-error-container/40 text-error px-1 py-0.5 rounded font-bold">urgent</code>.
+            </p>
+</div>
+<!-- Stage 3 -->
+<div class="relative flex flex-col gap-0.5">
+<span class="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-outline-variant"></span>
+<div class="flex items-center justify-between font-code-md text-label-sm">
+<span class="text-secondary font-bold">16:00 IST · Dispatch Node</span>
+<span class="text-outline">Scheduled</span>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="font-body-md text-body-md text-on-surface-variant">Advance reminder (2h prior)</span>
+<span class="font-code-md text-label-sm bg-secondary-container/20 text-secondary px-1.5 py-0.2 rounded font-semibold uppercase">PENDING</span>
+</div>
+</div>
+<!-- Stage 4 -->
+<div class="relative flex flex-col gap-0.5">
+<span class="absolute -left-[17px] top-1.5 w-2 h-2 rounded-full bg-outline"></span>
+<div class="flex items-center justify-between font-code-md text-label-sm">
+<span class="text-on-surface font-bold">18:00 IST · Hard Deadline</span>
+<span class="text-outline">Target</span>
+</div>
+<p class="font-body-md text-body-md text-outline mt-0.5">
+              Wed 21 Oct 18:00 IST deadline expiration threshold.
+            </p>
+</div>
+</div>
+</div>
+<!-- Provenance Footprint Block -->
+<div class="mt-auto bg-surface-container-lowest p-3 rounded flex flex-col gap-1.5 font-code-md text-label-sm">
+<div class="flex items-center justify-between text-outline">
+<span class="uppercase tracking-wider">Provenance Info</span>
+<span class="text-primary font-bold">VERIFIED_NODE</span>
+</div>
+<div class="flex flex-col gap-0.5 text-on-surface-variant">
+<div class="flex items-center justify-between">
+<span class="text-outline">Storage:</span>
+<span>local sqlite (WAL)</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-outline">Replicated:</span>
+<span class="text-primary">rpi-relay-blr</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-outline">SHA256:</span>
+<span class="text-on-surface font-mono">e4a778b0...9b12f6c</span>
+</div>
+</div>
+</div>
+<!-- Quick Actions Tray -->
+<div class="grid grid-cols-2 gap-space-xs pt-1">
+<button class="bg-surface-container hover:bg-surface-container-high text-on-surface font-code-md text-label-sm py-2 px-3 rounded flex items-center justify-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-[15px]">code</span>
+<span>View JSON</span>
+</button>
+<button class="bg-primary-container hover:bg-primary-container/80 text-on-primary-container font-code-md text-label-sm py-2 px-3 rounded flex items-center justify-center gap-1.5 transition-colors">
+<span class="material-symbols-outlined text-[15px]">edit_calendar</span>
+<span>Reschedule</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+<script>
+  function selectTaskRow(element, taskId) {
+    document.querySelectorAll('.history-item').forEach(el => {
+      el.classList.remove('bg-surface-container-high', 'shadow-sm');
+      el.classList.add('bg-surface-container-low');
+      const pip = el.querySelector('span.absolute');
+      if (pip) {
+        pip.classList.remove('bg-primary', 'shadow-[0_0_8px_rgba(144,210,211,0.6)]');
+        if (!pip.classList.contains('bg-secondary') && !pip.classList.contains('bg-error')) {
+          pip.classList.add('bg-outline-variant');
+        }
+      }
+    });
+
+    element.classList.remove('bg-surface-container-low');
+    element.classList.add('bg-surface-container-high', 'shadow-sm');
+    
+    const nodePip = element.querySelector('span.absolute');
+    if (nodePip) {
+      nodePip.classList.remove('bg-outline-variant');
+      nodePip.classList.add('bg-primary', 'shadow-[0_0_8px_rgba(144,210,211,0.6)]');
+    }
+
+    const drawer = document.getElementById('inspector-drawer');
+    if (drawer) {
+      drawer.classList.remove('hidden');
+    }
+  }
+
+  function toggleDrawer(show) {
+    const drawer = document.getElementById('inspector-drawer');
+    if (!drawer) return;
+    if (show === false) {
+      drawer.classList.add('hidden');
+    } else {
+      drawer.classList.remove('hidden');
+    }
+  }
+
+  // Filter Button Handler
+  const filterButtons = document.querySelectorAll('.actor-btn');
+  const historyItems = document.querySelectorAll('.history-item');
+  const searchInput = document.getElementById('history-search');
+  const emptyState = document.getElementById('history-empty');
+
+  function filterItems() {
+    const activeBtn = document.querySelector('.actor-btn.active');
+    const selectedActor = activeBtn ? activeBtn.getAttribute('data-actor') : 'all';
+    const query = (searchInput.value || '').trim().toLowerCase();
+
+    let visibleCount = 0;
+
+    historyItems.forEach(item => {
+      const itemActor = item.getAttribute('data-actor') || '';
+      const itemText = item.textContent.toLowerCase();
+
+      const actorMatches = (selectedActor === 'all' || itemActor === selectedActor);
+      const textMatches = query === '' || itemText.includes(query);
+
+      if (actorMatches && textMatches) {
+        item.style.display = 'flex';
+        visibleCount++;
+      } else {
+        item.style.display = 'none';
+      }
+    });
+
+    // Check Day Group visibility
+    document.querySelectorAll('.day-group').forEach(group => {
+      const visibleChildren = group.querySelectorAll('.history-item:not([style*="display: none"])');
+      if (visibleChildren.length === 0) {
+        group.style.display = 'none';
+      } else {
+        group.style.display = 'flex';
+      }
+    });
+
+    if (visibleCount === 0) {
+      emptyState.classList.remove('hidden');
+      emptyState.classList.add('flex');
+    } else {
+      emptyState.classList.add('hidden');
+      emptyState.classList.remove('flex');
+    }
+  }
+
+  filterButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterButtons.forEach(b => {
+        b.classList.remove('active', 'bg-surface-container-high', 'text-primary');
+        b.classList.add('bg-surface-container-lowest', 'text-on-surface-variant');
+      });
+      btn.classList.add('active', 'bg-surface-container-high', 'text-primary');
+      btn.classList.remove('bg-surface-container-lowest', 'text-on-surface-variant');
+      filterItems();
+    });
+  });
+
+  searchInput.addEventListener('input', filterItems);
+
+  function resetFilters() {
+    searchInput.value = '';
+    const allBtn = document.querySelector('.actor-btn[data-actor="all"]');
+    if (allBtn) {
+      allBtn.click();
+    }
+  }
+</script></main></div></body></html>

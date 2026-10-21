@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal AI OS · Today (Mobile)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --bg: #0A0C0F;
+      --surface: #11141A;
+      --raised: #171B22;
+      --border: rgba(255, 255, 255, 0.07);
+      --border-raised: rgba(255, 255, 255, 0.12);
+      --text-primary: #E8ECF1;
+      --text-secondary: #9AA4B2;
+      --text-tertiary: #6B7585;
+      --arc: #62D2E6;
+      --ember: #E8B04A;
+      --crimson: #E5545B;
+    }
+
+    body {
+      background-color: #050608;
+      font-family: 'Instrument Sans', sans-serif;
+      color: var(--text-primary);
+      margin: 0;
+      padding: 24px 16px;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .font-mono-code {
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .device-viewport {
+      width: 360px;
+      height: 800px;
+      background-color: var(--bg);
+      border-radius: 28px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    /* Subtle custom scrollbar */
+    .screen-content::-webkit-scrollbar {
+      display: none;
+    }
+    .screen-content {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Modal overlay */
+    .sheet-overlay {
+      background: rgba(10, 12, 15, 0.72);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+    }
+
+    .glass-top-edge {
+      border-top: 1px solid rgba(255, 255, 255, 0.14);
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Header label on canvas -->
+  <div class="text-center">
+    <div class="font-mono-code text-[11px] uppercase tracking-widest text-[#6B7585] mb-1">Personal AI OS · v4.12 · Mobile Viewports</div>
+    <h1 class="text-xl font-medium tracking-tight text-[#E8ECF1]">Today (Morning Briefing & Snooze Sheet)</h1>
+  </div>
+
+  <!-- Multi-Frame Showcase Container -->
+  <div class="flex flex-wrap items-center justify-center gap-8 max-w-full">
+
+    <!-- ==================== FRAME 1: TODAY DEFAULT STATE ==================== -->
+    <div class="flex flex-col items-center gap-3">
+      <div class="font-mono-code text-[11px] text-[#9AA4B2] flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-[#62D2E6]"></span> Frame 1 · Today Morning Briefing
+      </div>
+
+      <div class="device-viewport">
+        <!-- Status Bar Safe Area -->
+        <div class="w-full h-8 pt-2 px-5 flex justify-between items-center text-[12px] font-mono-code text-[#6B7585] z-20 select-none">
+          <span>10:42</span>
+          <div class="flex items-center gap-1.5 text-[11px]">
+            <span>5G</span>
+            <span>96%</span>
+          </div>
+        </div>
+
+        <!-- App Header (Sticky) -->
+        <header class="h-14 px-4 flex items-center justify-between border-b border-[rgba(255,255,255,0.07)] bg-[#0A0C0F]/95 backdrop-blur z-20 flex-shrink-0">
+          <div class="flex items-center gap-2.5">
+            <h2 class="text-[20px] font-semibold text-[#E8ECF1] tracking-tight">Today</h2>
+            <span class="font-mono-code text-[10px] text-[#6B7585] bg-[#11141A] px-1.5 py-0.5 rounded border border-[rgba(255,255,255,0.07)]">Wed 21 Oct</span>
+          </div>
+
+          <!-- Presence Ring (24px) -->
+          <div class="flex items-center gap-2">
+            <div class="relative w-6 h-6 flex items-center justify-center" title="Scheduler Alive · 96%">
+              <svg class="w-6 h-6 -rotate-90" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.08)" stroke-width="2" fill="none"/>
+                <circle cx="12" cy="12" r="9" stroke="#62D2E6" stroke-width="2" fill="none" stroke-dasharray="56.5" stroke-dashoffset="3.5" stroke-linecap="round"/>
+              </svg>
+              <div class="w-1.5 h-1.5 rounded-full bg-[#62D2E6]"></div>
+            </div>
+            <span class="font-mono-code text-[11px] text-[#9AA4B2]">38s</span>
+          </div>
+        </header>
+
+        <!-- Main Scroll Area -->
+        <main class="screen-content flex-1 overflow-y-auto px-4 pt-4 pb-28 space-y-4">
+
+          <!-- 1. THE BRIEFING (No card, straight on bg) -->
+          <section class="space-y-1.5">
+            <div class="font-mono-code text-[11px] text-[#6B7585] tracking-wide">Wed 21 Oct · 10:42 IST</div>
+            <p class="text-[22px] font-medium leading-[1.28] tracking-tight text-[#E8ECF1]">
+              <span class="underline decoration-[#E5545B]/60 underline-offset-4">1 overdue</span>, 
+              <span class="underline decoration-white/20 underline-offset-4">3 due today</span>. 
+              <span class="underline decoration-[#62D2E6]/60 underline-offset-4">Discrete Math</span> starts in 33 minutes. 
+              <span class="underline decoration-[#E8B04A]/60 underline-offset-4">Tomorrow’s Physics Lab</span> needs 5 items packed.
+            </p>
+            <div class="font-mono-code text-[10px] text-[#6B7585] pt-0.5">
+              Composed from tasks and timetable · synced 12 s ago
+            </div>
+          </section>
+
+          <!-- 2. NEEDS ATTENTION COLLAPSED EMBER ROW -->
+          <div class="w-full bg-[#171B22]/60 hover:bg-[#171B22] border border-[#E8B04A]/40 rounded-lg px-3 py-2.5 flex items-center justify-between cursor-pointer transition-colors active:scale-[0.99]">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-[#E8B04A] animate-pulse"></span>
+              <span class="text-[13px] font-medium text-[#E8ECF1]">2 items need attention</span>
+            </div>
+            <div class="flex items-center gap-1 font-mono-code text-[12px] text-[#E8B04A]">
+              <span>Review</span>
+              <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                <path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06z"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- 3. NEXT CLASS CARD -->
+          <div class="bg-[#11141A] border border-[rgba(255,255,255,0.07)] rounded-xl p-3.5 space-y-2 relative overflow-hidden">
+            <div class="absolute top-0 left-0 bottom-0 w-[2px] bg-[#62D2E6]"></div>
+            <div class="flex items-center justify-between">
+              <span class="font-mono-code text-[10px] uppercase tracking-wider text-[#62D2E6]">Next Class</span>
+              <span class="font-mono-code text-[11px] text-[#62D2E6] bg-[#62D2E6]/10 px-2 py-0.5 rounded-full border border-[#62D2E6]/25 font-medium">in 33 min</span>
+            </div>
+            <div>
+              <div class="text-[15px] font-medium text-[#E8ECF1] leading-snug">Discrete Mathematics</div>
+              <div class="font-mono-code text-[12px] text-[#9AA4B2] mt-0.5">11:15–12:05 · Room 3-12</div>
+            </div>
+          </div>
+
+          <!-- 4. OVERDUE SECTION (1 task) -->
+          <section class="space-y-1.5">
+            <div class="flex items-center justify-between px-0.5">
+              <span class="font-mono-code text-[11px] uppercase tracking-wider text-[#E5545B] font-medium">Overdue (1)</span>
+              <span class="font-mono-code text-[10px] text-[#6B7585]">Critical</span>
+            </div>
+
+            <!-- 56px Task Row: Submit Digital Logic -->
+            <div class="h-14 bg-[#11141A] border border-[rgba(255,255,255,0.07)] rounded-xl px-2.5 flex items-center justify-between relative overflow-hidden active:bg-[#171B22] transition-colors">
+              <div class="absolute left-0 top-0 bottom-0 w-[2px] bg-[#E5545B]"></div>
+
+              <div class="flex items-center gap-2.5 min-w-0 flex-1 pl-1">
+                <!-- 44px Checkbox Hit Area -->
+                <button class="w-11 h-11 flex items-center justify-center flex-shrink-0 cursor-pointer" aria-label="Mark task done">
+                  <div class="w-4 h-4 rounded-[4px] border border-[#6B7585] hover:border-[#62D2E6] transition-colors flex items-center justify-center"></div>
+                </button>
+
+                <div class="min-w-0 flex-1">
+                  <div class="text-[14px] font-medium text-[#E8ECF1] truncate">Submit Digital Logic record book</div>
+                  <div class="flex items-center gap-1.5 font-mono-code text-[11px] text-[#6B7585]">
+                    <span class="text-[#9AA4B2]">College</span>
+                    <span>·</span>
+                    <span>TG</span>
+                    <span>·</span>
+                    <span class="text-[#E5545B]">1d ago</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Trailing Snooze trigger (min 44px hit area) -->
+              <button class="h-11 px-2.5 flex items-center justify-center font-mono-code text-[11px] text-[#9AA4B2] hover:text-[#E8ECF1] bg-[#171B22] hover:bg-[#20252E] rounded-lg border border-[rgba(255,255,255,0.07)] flex-shrink-0 ml-1 active:scale-95 transition-all">
+                Snooze
+              </button>
+            </div>
+          </section>
+
+          <!-- 5. DUE TODAY SECTION (3 tasks) -->
+          <section class="space-y-1.5">
+            <div class="flex items-center justify-between px-0.5">
+              <span class="font-mono-code text-[11px] uppercase tracking-wider text-[#9AA4B2]">Due Today (3)</span>
+              <span class="font-mono-code text-[10px] text-[#6B7585]">IST 24h</span>
+            </div>
+
+            <!-- Task 1: Pay library fine (All day) -->
+            <div class="h-14 bg-[#11141A] border border-[rgba(255,255,255,0.07)] rounded-xl px-2.5 flex items-center justify-between active:bg-[#171B22] transition-colors">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1 pl-1">
+                <button class="w-11 h-11 flex items-center justify-center flex-shrink-0 cursor-pointer" aria-label="Mark done">
+                  <div class="w-4 h-4 rounded-[4px] border border-[#6B7585] hover:border-[#62D2E6] transition-colors"></div>
+                </button>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[14px] font-medium text-[#E8ECF1] truncate">Pay library fine</div>
+                  <div class="flex items-center gap-1.5 font-mono-code text-[11px] text-[#6B7585]">
+                    <span class="text-[#9AA4B2]">Personal</span>
+                    <span>·</span>
+                    <span>manual</span>
+                    <span>·</span>
+                    <span>all day</span>
+                  </div>
+                </div>
+              </div>
+              <button class="h-11 px-2.5 flex items-center justify-center font-mono-code text-[11px] text-[#9AA4B2] hover:text-[#E8ECF1] bg-[#171B22] rounded-lg border border-[rgba(255,255,255,0.07)] flex-shrink-0 ml-1">
+                Snooze
+              </button>
+            </div>
+
+            <!-- Task 2: Call bank about education loan (16:30) -->
+            <div class="h-14 bg-[#11141A] border border-[rgba(255,255,255,0.07)] rounded-xl px-2.5 flex items-center justify-between active:bg-[#171B22] transition-colors">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1 pl-1">
+                <button class="w-11 h-11 flex items-center justify-center flex-shrink-0 cursor-pointer" aria-label="Mark done">
+                  <div class="w-4 h-4 rounded-[4px] border border-[#6B7585] hover:border-[#62D2E6] transition-colors"></div>
+                </button>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[14px] font-medium text-[#E8ECF1] truncate">Call bank about education loan</div>
+                  <div class="flex items-center gap-1.5 font-mono-code text-[11px] text-[#6B7585]">
+                    <span class="text-[#9AA4B2]">Personal</span>
+                    <span>·</span>
+                    <span>app</span>
+                    <span>·</span>
+                    <span class="text-[#E8ECF1]">16:30</span>
+                  </div>
+                </div>
+              </div>
+              <button class="h-11 px-2.5 flex items-center justify-center font-mono-code text-[11px] text-[#9AA4B2] hover:text-[#E8ECF1] bg-[#171B22] rounded-lg border border-[rgba(255,255,255,0.07)] flex-shrink-0 ml-1">
+                Snooze
+              </button>
+            </div>
+
+            <!-- Task 3: Data Structures assignment 4 upload (18:00) -->
+            <div class="h-14 bg-[#11141A] border border-[rgba(255,255,255,0.07)] rounded-xl px-2.5 flex items-center justify-between active:bg-[#171B22] transition-colors">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1 pl-1">
+                <button class="w-11 h-11 flex items-center justify-center flex-shrink-0 cursor-pointer" aria-label="Mark done">
+                  <div class="w-4 h-4 rounded-[4px] border border-[#6B7585] hover:border-[#62D2E6] transition-colors"></div>
+                </button>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[14px] font-medium text-[#E8ECF1] truncate">Data Structures assignment 4 upload</div>
+                  <div class="flex items-center gap-1.5 font-mono-code text-[11px] text-[#6B7585]">
+                    <span class="text-[#9AA4B2]">College</span>
+                    <span>·</span>
+                    <span>TG</span>
+                    <span>·</span>
+                    <span class="text-[#E8B04A]">18:00</span>
+                  </div>
+                </div>
+              </div>
+              <button class="h-11 px-2.5 flex items-center justify-center font-mono-code text-[11px] text-[#9AA4B2] hover:text-[#E8ECF1] bg-[#171B22] rounded-lg border border-[rgba(255,255,255,0.07)] flex-shrink-0 ml-1">
+                Snooze
+              </button>
+            </div>
+          </section>
+
+          <!-- 6. TOMORROW'S PREP (Expandable card) -->
+          <div class="bg-[#11141A] border border-[rgba(255,255,255,0.07)] rounded-xl p-3.5 space-y-2">
+            <div class="flex items-center justify-between cursor-pointer">
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-[2px] bg-[#E8B04A]"></div>
+                <span class="text-[14px] font-medium text-[#E8ECF1]">Tomorrow · 5 items to pack</span>
+              </div>
+              <span class="font-mono-code text-[11px] text-[#9AA4B2] flex items-center gap-1">
+                2/5
+                <svg class="w-3.5 h-3.5 text-[#6B7585]" viewBox="0 0 16 16" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06z"/>
+                </svg>
+              </span>
+            </div>
+            <div class="text-[12px] text-[#6B7585] font-mono-code pl-4">
+              Thu 22 Oct · Physics Lab · 09:00
+            </div>
+          </div>
+
+          <!-- 7. ROUTINES SUMMARY -->
+          <div class="bg-[#11141A]/70 border border-[rgba(255,255,255,0.07)] rounded-xl px-3.5 py-2.5 flex items-center justify-between">
+            <div class="flex items-center gap-2 text-[13px] text-[#E8ECF1]">
+              <span class="text-[#62D2E6]">↻</span>
+              <span>Gym — push day</span>
+            </div>
+            <span class="font-mono-code text-[12px] text-[#9AA4B2]">18:30</span>
+          </div>
+
+          <!-- Bottom Telemetry Footer -->
+          <div class="pt-2 pb-1 text-center font-mono-code text-[10px] text-[#6B7585]">
+            Reminders 1 of 3 · Quiet hours 22:00–06:30
+          </div>
+        </main>
+
+        <!-- DOCKED COMMAND BAR (48px) -->
+        <div class="absolute bottom-[60px] left-0 right-0 px-3 z-30 pointer-events-auto">
+          <div class="h-12 bg-[#171B22]/90 backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl px-3 flex items-center justify-between shadow-lg">
+            <div class="flex items-center gap-2.5 text-[#6B7585]">
+              <svg class="w-4 h-4 text-[#62D2E6]" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/>
+              </svg>
+              <span class="text-[13px] text-[#9AA4B2]">Add task or type command…</span>
+            </div>
+            <span class="font-mono-code text-[10px] text-[#6B7585] bg-[#11141A] px-1.5 py-0.5 rounded border border-[rgba(255,255,255,0.07)]">⌘K</span>
+          </div>
+        </div>
+
+        <!-- BOTTOM TAB BAR (5 TABS, 60px) -->
+        <nav class="h-[60px] bg-[#0A0C0F]/95 backdrop-blur border-t border-[rgba(255,255,255,0.07)] px-2 flex items-center justify-around z-30 flex-shrink-0">
+          <!-- Tab 1: Today (Active) -->
+          <button class="flex flex-col items-center justify-center w-14 h-12 text-[#62D2E6]">
+            <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span class="text-[10px] font-medium">Today</span>
+          </button>
+
+          <!-- Tab 2: Tasks -->
+          <button class="flex flex-col items-center justify-center w-14 h-12 text-[#6B7585] hover:text-[#9AA4B2]">
+            <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4"></path>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            <span class="text-[10px] font-medium">Tasks</span>
+          </button>
+
+          <!-- Tab 3: Timetable -->
+          <button class="flex flex-col items-center justify-center w-14 h-12 text-[#6B7585] hover:text-[#9AA4B2]">
+            <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span class="text-[10px] font-medium">Timetable</span>
+          </button>
+
+          <!-- Tab 4: Desktop -->
+          <button class="flex flex-col items-center justify-center w-14 h-12 text-[#6B7585] hover:text-[#9AA4B2]">
+            <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <span class="text-[10px] font-medium">Desktop</span>
+          </button>
+
+          <!-- Tab 5: More -->
+          <button class="flex flex-col items-center justify-center w-14 h-12 text-[#6B7585] hover:text-[#9AA4B2]">
+            <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="1"></circle>
+              <circle cx="19" cy="12" r="1"></circle>
+              <circle cx="5" cy="12" r="1"></circle>
+            </svg>
+            <span class="text-[10px] font-medium">More</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+
+
+    <!-- ==================== FRAME 2: SNOOZE BOTTOM SHEET OPEN ==================== -->
+    <div class="flex flex-col items-center gap-3">
+      <div class="font-mono-code text-[11px] text-[#9AA4B2] flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-[#E8B04A]"></span> Frame 2 · Snooze Presets Bottom Sheet
+      </div>
+
+      <div class="device-viewport">
+        <!-- Status Bar -->
+        <div class="w-full h-8 pt-2 px-5 flex justify-between items-center text-[12px] font-mono-code text-[#6B7585] z-10 select-none">
+          <span>10:42</span>
+          <div class="flex items-center gap-1.5 text-[11px]">
+            <span>5G</span>
+            <span>96%</span>
+          </div>
+        </div>
+
+        <!-- Dimmed Background Content (Simulating Underlying Page) -->
+        <div class="px-4 pt-2 opacity-35 filter blur-[1px] pointer-events-none space-y-4">
+          <div class="h-10 flex items-center justify-between border-b border-white/5">
+            <span class="text-xl font-bold">Today</span>
+            <span class="font-mono-code text-xs">38s</span>
+          </div>
+          <div class="space-y-1">
+            <div class="text-[20px] font-medium leading-snug">
+              1 overdue, 3 due today. Discrete Math starts in 33 minutes.
+            </div>
+          </div>
+          <div class="h-10 bg-[#171B22] rounded-lg border border-[#E8B04A]/30"></div>
+          <div class="h-20 bg-[#11141A] rounded-xl border border-white/5"></div>
+          <div class="h-14 bg-[#11141A] rounded-xl border border-white/5"></div>
+        </div>
+
+        <!-- Full Dimmed Overlay -->
+        <div class="absolute inset-0 sheet-overlay z-40 flex flex-col justify-end">
+
+          <!-- Bottom Sheet Container -->
+          <div class="w-full bg-[#11141A] rounded-t-2xl border-t border-[rgba(255,255,255,0.14)] shadow-2xl p-4 space-y-4 glass-top-edge z-50 animate-in slide-in-from-bottom duration-200">
+            
+            <!-- Pull Handle -->
+            <div class="w-full flex justify-center -mt-1 mb-1">
+              <div class="w-10 h-1 bg-white/20 rounded-full"></div>
+            </div>
+
+            <!-- Sheet Header -->
+            <div class="flex items-start justify-between border-b border-[rgba(255,255,255,0.07)] pb-3">
+              <div>
+                <span class="font-mono-code text-[11px] text-[#E8B04A] uppercase tracking-wider font-medium">Snooze reminder</span>
+                <h3 class="text-[15px] font-medium text-[#E8ECF1] mt-0.5 leading-snug">
+                  Submit Digital Logic record book
+                </h3>
+                <div class="font-mono-code text-[11px] text-[#6B7585] mt-0.5">
+                  Currently overdue by 1 day · CS201 College
+                </div>
+              </div>
+              <button class="w-8 h-8 rounded-full bg-[#171B22] flex items-center justify-center text-[#9AA4B2] hover:text-white border border-[rgba(255,255,255,0.07)]">
+                ✕
+              </button>
+            </div>
+
+            <!-- Preset Options List (Min 44px hit targets) -->
+            <div class="space-y-1.5">
+              
+              <!-- Option 1: 1 hour -->
+              <button class="w-full h-12 px-3.5 bg-[#171B22] hover:bg-[#20252E] active:bg-[#242a35] border border-[rgba(255,255,255,0.07)] rounded-xl flex items-center justify-between transition-colors">
+                <div class="flex items-center gap-2.5">
+                  <span class="font-mono-code text-[13px] text-[#62D2E6] w-5">1h</span>
+                  <span class="text-[14px] text-[#E8ECF1]">1 hour</span>
+                </div>
+                <span class="font-mono-code text-[12px] text-[#9AA4B2]">11:42 IST</span>
+              </button>
+
+              <!-- Option 2: Tonight 20:30 -->
+              <button class="w-full h-12 px-3.5 bg-[#171B22] hover:bg-[#20252E] active:bg-[#242a35] border border-[rgba(255,255,255,0.07)] rounded-xl flex items-center justify-between transition-colors">
+                <div class="flex items-center gap-2.5">
+                  <span class="font-mono-code text-[13px] text-[#E8B04A] w-5">Eve</span>
+                  <span class="text-[14px] text-[#E8ECF1]">Tonight</span>
+                </div>
+                <span class="font-mono-code text-[12px] text-[#9AA4B2]">20:30 IST</span>
+              </button>
+
+              <!-- Option 3: Tomorrow 06:45 -->
+              <button class="w-full h-12 px-3.5 bg-[#171B22] hover:bg-[#20252E] active:bg-[#242a35] border border-[rgba(255,255,255,0.07)] rounded-xl flex items-center justify-between transition-colors">
+                <div class="flex items-center gap-2.5">
+                  <span class="font-mono-code text-[13px] text-[#9AA4B2] w-5">Morn</span>
+                  <span class="text-[14px] text-[#E8ECF1]">Tomorrow morning</span>
+                </div>
+                <span class="font-mono-code text-[12px] text-[#9AA4B2]">Thu 06:45 IST</span>
+              </button>
+
+              <!-- Option 4: +2 h -->
+              <button class="w-full h-12 px-3.5 bg-[#171B22] hover:bg-[#20252E] active:bg-[#242a35] border border-[rgba(255,255,255,0.07)] rounded-xl flex items-center justify-between transition-colors">
+                <div class="flex items-center gap-2.5">
+                  <span class="font-mono-code text-[13px] text-[#62D2E6] w-5">+2</span>
+                  <span class="text-[14px] text-[#E8ECF1]">After next lecture (+2 h)</span>
+                </div>
+                <span class="font-mono-code text-[12px] text-[#9AA4B2]">12:42 IST</span>
+              </button>
+
+              <!-- Option 5: Custom Picker -->
+              <button class="w-full h-12 px-3.5 bg-[#171B22] hover:bg-[#20252E] active:bg-[#242a35] border border-[rgba(255,255,255,0.07)] rounded-xl flex items-center justify-between transition-colors">
+                <div class="flex items-center gap-2.5">
+                  <svg class="w-4 h-4 text-[#9AA4B2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                  <span class="text-[14px] text-[#E8ECF1]">Pick date and time…</span>
+                </div>
+                <span class="font-mono-code text-[11px] text-[#62D2E6]">Custom</span>
+              </button>
+            </div>
+
+            <!-- Cancel Button / Safe Area Space -->
+            <div class="pt-1">
+              <button class="w-full h-11 rounded-xl bg-transparent hover:bg-white/5 font-mono-code text-[12px] text-[#9AA4B2] border border-[rgba(255,255,255,0.07)]">
+                Cancel
+              </button>
+            </div>
+
+            <div class="h-2"></div>
+          </div>
+        </div>
+
+        <!-- Tab Bar visible underneath -->
+        <nav class="h-[60px] bg-[#0A0C0F] border-t border-white/5 px-2 flex items-center justify-around z-10 flex-shrink-0">
+          <div class="w-10 h-8"></div>
+        </nav>
+      </div>
+    </div>
+
+
+    <!-- ==================== FRAME 3: TOMORROW'S PREP CHECKLIST EXPANDED ==================== -->
+    <div class="flex flex-col items-center gap-3">
+      <div class="font-mono-code text-[11px] text-[#9AA4B2] flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-[#62D2E6]"></span> Frame 3 · Tomorrow Prep Expanded & Details View
+      </div>
+
+      <div class="device-viewport">
+        <!-- Status Bar -->
+        <div class="w-full h-8 pt-2 px-5 flex justify-between items-center text-[12px] font-mono-code text-[#6B7585] z-20 select-none">
+          <span>10:42</span>
+          <div class="flex items-center gap-1.5 text-[11px]">
+            <span>5G</span>
+            <span>96%</span>
+          </div>
+        </div>
+
+        <!-- Top Header -->
+        <header class="h-14 px-4 flex items-center justify-between border-b border-[rgba(255,255,255,0.07)] bg-[#0A0C0F]/95 backdrop-blur z-20 flex-shrink-0">
+          <div class="flex items-center gap-2">
+            <h2 class="text-[20px] font-semibold text-[#E8ECF1] tracking-tight">Today</h2>
+            <span class="font-mono-code text-[10px] text-[#6B7585] bg-[#11141A] px-1.5 py-0.5 rounded border border-[rgba(255,255,255,0.07)]">Preparation</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="relative w-6 h-6 flex items-center justify-center">
+              <svg class="w-6 h-6 -rotate-90" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.08)" stroke-width="2" fill="none"/>
+                <circle cx="12" cy="12" r="9" stroke="#62D2E6" stroke-width="2" fill="none" stroke-dasharray="56.5" stroke-dashoffset="3.5" stroke-linecap="round"/>
+              </svg>
+              <div class="w-1.5 h-1.5 rounded-full bg-[#62D2E6]"></div>
+            </div>
+            <span class="font-mono-code text-[11px] text-[#9AA4B2]">38s</span>
+          </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="screen-content flex-1 overflow-y-auto px-4 pt-3 pb-28 space-y-4">
+          
+          <!-- Next Class snippet -->
+          <div class="bg-[#11141A] border border-[rgba(255,255,255,0.07)] rounded-xl p-3 flex items-center justify-between">
+            <div>
+              <div class="text-[13px] font-medium text-[#E8ECF1]">Discrete Math in 33 min</div>
+              <div class="font-mono-code text-[11px] text-[#6B7585]">11:15 · Room 3-12</div>
+            </div>
+            <span class="font-mono-code text-[11px] text-[#62D2E6] bg-[#62D2E6]/10 px-2 py-0.5 rounded border border-[#62D2E6]/20">Slot 01</span>
+          </div>
+
+          <!-- FULLY EXPANDED TOMORROW'S PREP CARD -->
+          <section class="bg-[#11141A] border border-[rgba(255,255,255,0.12)] rounded-xl p-3.5 space-y-3">
+            <div class="flex items-start justify-between border-b border-[rgba(255,255,255,0.07)] pb-2.5">
+              <div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-[2px] bg-[#E8B04A]"></span>
+                  <span class="text-[14px] font-semibold text-[#E8ECF1]">Thu 22 Oct · Engineering Physics Lab</span>
+                </div>
+                <div class="font-mono-code text-[11px] text-[#9AA4B2] mt-0.5">
+                  09:00 · Lab B-204 · Batch 2
+                </div>
+              </div>
+              <span class="font-mono-code text-[11px] text-[#62D2E6] bg-[#62D2E6]/10 px-2 py-0.5 rounded border border-[#62D2E6]/25 font-medium">
+                2 of 5
+              </span>
+            </div>
+
+            <!-- 5 Checklist Items (Min 44px touch targets) -->
+            <div class="space-y-1">
+              
+              <!-- Item 1: Lab manual (Checked) -->
+              <div class="h-11 px-2 rounded-lg bg-[#171B22]/50 flex items-center gap-3">
+                <div class="w-5 h-5 rounded-[4px] bg-[#62D2E6]/20 border border-[#62D2E6] flex items-center justify-center text-[#62D2E6] text-[12px]">
+                  ✓
+                </div>
+                <span class="text-[13px] text-[#9AA4B2] line-through">Lab manual</span>
+              </div>
+
+              <!-- Item 2: Observation book (Checked) -->
+              <div class="h-11 px-2 rounded-lg bg-[#171B22]/50 flex items-center gap-3">
+                <div class="w-5 h-5 rounded-[4px] bg-[#62D2E6]/20 border border-[#62D2E6] flex items-center justify-center text-[#62D2E6] text-[12px]">
+                  ✓
+                </div>
+                <span class="text-[13px] text-[#9AA4B2] line-through">Observation book</span>
+              </div>
+
+              <!-- Item 3: Record book (Unchecked) -->
+              <div class="h-11 px-2 rounded-lg bg-[#171B22] flex items-center gap-3">
+                <div class="w-5 h-5 rounded-[4px] border border-[#6B7585] flex items-center justify-center"></div>
+                <span class="text-[13px] text-[#E8ECF1] font-medium">Record book</span>
+              </div>
+
+              <!-- Item 4: Scientific calculator (Unchecked) -->
+              <div class="h-11 px-2 rounded-lg bg-[#171B22] flex items-center gap-3">
+                <div class="w-5 h-5 rounded-[4px] border border-[#6B7585] flex items-center justify-center"></div>
+                <div class="flex-1 flex items-center justify-between pr-1">
+                  <span class="text-[13px] text-[#E8ECF1] font-medium">Scientific calculator</span>
+                  <span class="font-mono-code text-[10px] text-[#E8B04A] bg-[#E8B04A]/10 px-1.5 py-0.5 rounded">Casio fx</span>
+                </div>
+              </div>
+
+              <!-- Item 5: Signed lab form (Unchecked) -->
+              <div class="h-11 px-2 rounded-lg bg-[#171B22] flex items-center gap-3">
+                <div class="w-5 h-5 rounded-[4px] border border-[#6B7585] flex items-center justify-center"></div>
+                <span class="text-[13px] text-[#E8ECF1] font-medium">Signed lab form</span>
+              </div>
+            </div>
+
+            <!-- Prep Footer Note -->
+            <div class="pt-1.5 border-t border-[rgba(255,255,255,0.07)] flex items-center justify-between font-mono-code text-[11px] text-[#6B7585]">
+              <span>Prep digest sends 20:30 tonight</span>
+              <span class="text-[#62D2E6] cursor-pointer">Pack all</span>
+            </div>
+          </section>
+
+          <!-- Suggestion Card -->
+          <div class="bg-[#11141A] border border-[rgba(255,255,255,0.07)] rounded-xl p-3 space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#E8B04A]"></span>
+              <span class="font-mono-code text-[11px] uppercase tracking-wider text-[#E8B04A]">Deadline cluster</span>
+            </div>
+            <p class="text-[13px] text-[#E8ECF1] leading-snug">
+              3 tasks fall between Fri 23 and Mon 26 Oct.
+            </p>
+            <div class="flex items-center gap-3 pt-1 font-mono-code text-[11px]">
+              <span class="text-[#62D2E6] cursor-pointer">View tasks ›</span>
+              <span class="text-[#6B7585] cursor-pointer">Dismiss</span>
+            </div>
+          </div>
+        </main>
+
+        <!-- Docked Command Bar -->
+        <div class="absolute bottom-[60px] left-0 right-0 px-3 z-30">
+          <div class="h-12 bg-[#171B22]/90 backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl px-3 flex items-center justify-between shadow-lg">
+            <div class="flex items-center gap-2.5 text-[#6B7585]">
+              <svg class="w-4 h-4 text-[#62D2E6]" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/>
+              </svg>
+              <span class="text-[13px] text-[#9AA4B2]">Add task or type command…</span>
+            </div>
+            <span class="font-mono-code text-[10px] text-[#6B7585] bg-[#11141A] px-1.5 py-0.5 rounded border border-[rgba(255,255,255,0.07)]">⌘K</span>
+          </div>
+        </div>
+
+        <!-- 5 Tabs Bottom Nav -->
+        <nav class="h-[60px] bg-[#0A0C0F]/95 backdrop-blur border-t border-[rgba(255,255,255,0.07)] px-2 flex items-center justify-around z-30 flex-shrink-0">
+          <button class="flex flex-col items-center justify-center w-14 h-12 text-[#62D2E6]">
+            <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span class="text-[10px] font-medium">Today</span>
+          </button>
+          <button class="flex flex-col items-center justify-center w-14 h-12 text-[#6B7585]">
+            <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4"></path>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            <span class="text-[10px] font-medium">Tasks</span>
+          </button>
+          <button class="flex flex-col items-center justify-center w-14 h-12 text-[#6B7585]">
+            <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span class="text-[10px] font-medium">Timetable</span>
+          </button>
+          <button class="flex flex-col items-center justify-center w-14 h-12 text-[#6B7585]">
+            <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+              <line x1="8" y1="21" x2="16" y2="21"></line>
+              <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <span class="text-[10px] font-medium">Desktop</span>
+          </button>
+          <button class="flex flex-col items-center justify-center w-14 h-12 text-[#6B7585]">
+            <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="1"></circle>
+              <circle cx="19" cy="12" r="1"></circle>
+              <circle cx="5" cy="12" r="1"></circle>
+            </svg>
+            <span class="text-[10px] font-medium">More</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

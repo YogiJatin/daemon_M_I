@@ -265,12 +265,12 @@ export class AIAdapter {
         let verification = capability.validator(parsedData, builder.getIndexedRecordIds());
 
         // Bounded Self-Repair Retry (1 attempt max)
-        if (!verification.valid && verification.repairPrompt) {
+        if (!verification.valid && (verification as any).repairPrompt) {
           try {
             const repairReq: AIRequest = {
               capability: capability.id as any,
               systemPrompt: capability.systemRules,
-              userPrompt: `${canonicalXml}\n\n${verification.repairPrompt}`,
+              userPrompt: `${canonicalXml}\n\n${(verification as any).repairPrompt}`,
               inputContext: input,
               privacyClass,
             };

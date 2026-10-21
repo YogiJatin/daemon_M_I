@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Personal AI OS</title>
+<!-- Google Fonts: Instrument Sans & IBM Plex Mono / Space Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&amp;family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&amp;family=Space+Grotesk:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            app: {
+              bg: '#0E0F12',
+              surface: '#14171C',
+              raised: '#181B22',
+              hover: '#1F232C',
+              card: '#161920',
+              hairline: 'rgba(220, 210, 195, 0.08)',
+              'hairline-strong': 'rgba(220, 210, 195, 0.15)',
+              'text-primary': '#EDE8DF',
+              'text-secondary': '#A39D92',
+              'text-muted': '#6B665E',
+            },
+            teal: {
+              oxidized: '#3D8384',
+              hover: '#4E9B9C',
+              dim: 'rgba(61, 131, 132, 0.15)',
+              border: 'rgba(61, 131, 132, 0.35)',
+              glow: 'rgba(61, 131, 132, 0.20)',
+            },
+            copper: {
+              rust: '#C65D3B',
+              dim: 'rgba(198, 93, 59, 0.15)',
+              border: 'rgba(198, 93, 59, 0.35)',
+            },
+            moss: {
+              sage: '#4F7C63',
+              dim: 'rgba(79, 124, 99, 0.18)',
+              border: 'rgba(79, 124, 99, 0.32)',
+            },
+            brass: {
+              aged: '#C2A366',
+              dim: 'rgba(194, 163, 102, 0.14)',
+              border: 'rgba(194, 163, 102, 0.3)',
+            }
+          },
+          fontFamily: {
+            sans: ['"Instrument Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    :root {
+      --bg: #0E0F12;
+      --surface: #14171C;
+      --raised: #181B22;
+      --hairline: rgba(220, 210, 195, 0.08);
+      --hairline-strong: rgba(220, 210, 195, 0.15);
+      --text-pri: #EDE8DF;
+      --text-sec: #A39D92;
+      --text-mut: #6B665E;
+      --signal-teal: #3D8384;
+      --signal-copper: #C65D3B;
+      --signal-brass: #C2A366;
+      --signal-moss: #4F7C63;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-pri);
+      font-family: 'Instrument Sans', sans-serif;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* Ambient warm parchment tone top-left */
+    .ambient-glow {
+      position: fixed;
+      top: -120px;
+      left: 140px;
+      width: 760px;
+      height: 760px;
+      pointer-events: none;
+      background: radial-gradient(circle at 35% 35%, rgba(61, 131, 132, 0.04) 0%, rgba(194, 163, 102, 0.02) 40%, rgba(14, 15, 18, 0) 75%);
+      z-index: 0;
+    }
+
+    /* Presence Ring Breathing Animation */
+    .presence-breath {
+      animation: ringBreath 6s ease-in-out infinite;
+    }
+    @keyframes ringBreath {
+      0%, 100% { opacity: 0.7; transform: scale(0.985); }
+      50% { opacity: 1; transform: scale(1.015); }
+    }
+
+    /* Soft pulse for NOW timeline point in oxidized teal */
+    .pulse-dot {
+      animation: pulseGlow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.9; box-shadow: 0 0 0 0 rgba(61, 131, 132, 0.5); }
+      50% { opacity: 1; box-shadow: 0 0 0 6px rgba(61, 131, 132, 0); }
+    }
+
+    /* Focus Mode active dimming */
+    body.focus-mode-active .periphery-fade {
+      opacity: 0.18;
+      filter: blur(1.5px);
+      transition: all 400ms cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    body.focus-mode-active #hero-focus-card {
+      transform: translateY(-2px);
+      box-shadow: 0 0 45px -10px rgba(61, 131, 132, 0.25);
+      border-color: rgba(61, 131, 132, 0.55);
+    }
+
+    /* Glass overlay style for floating command bar - warm graphite glass with aged brass rim */
+    .glass-command {
+      background: rgba(20, 23, 28, 0.88);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border-top: 1px solid rgba(194, 163, 102, 0.22);
+      border-bottom: 1px solid rgba(220, 210, 195, 0.08);
+      box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.75);
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Custom subtle warm scrollbar */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(220, 210, 195, 0.12);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-app-text-primary bg-app-bg flex flex-col antialiased selection:bg-teal-oxidized/25 selection:text-[#EDE8DF]">
+<div class="ambient-glow pointer-events-none" style="background: radial-gradient(circle at 18% 12%, rgba(196, 164, 90, 0.05) 0%, rgba(46, 105, 107, 0.04) 30%, rgba(13, 14, 17, 0) 70%), radial-gradient(circle at 82% 85%, rgba(200, 90, 50, 0.03) 0%, transparent 50%); position: fixed; inset: 0; z-index: 0;"></div><div 0="" 200="" 200"="" class="fixed inset-0 pointer-events-none opacity-[0.025] mix-blend-overlay z-[1]" style="background-image: url('data:image/svg+xml;utf8,&lt;svg viewBox=" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feturbulence basefrequency="0.8" numoctaves="3" stitchtiles="stitch" type="fractalNoise"></feturbulence></filter><rect filter="url(%23noiseFilter)" height="100%" width="100%"></rect>');"&gt;</div>
+<!-- Main System Layout -->
+<div class="relative z-10 flex min-h-screen w-full">
+<!-- LEFT SIDEBAR: MODES NAVIGATION (240px) -->
+<aside class="w-[240px] shrink-0 border-r border-app-hairline flex flex-col justify-between py-6 px-4 bg-app-surface select-none z-20"><div class="space-y-6">
+<!-- Desk Header & Identity Stamp -->
+<div class="flex items-center gap-3 px-1.5 pt-1 border-b border-[rgba(220,210,195,0.07)] pb-4">
+<div class="relative w-8 h-8 rounded-md bg-[#13161B] border border-[rgba(196,164,90,0.35)] flex items-center justify-center shrink-0 shadow-inner group">
+<div class="w-4 h-4 rounded-full border border-[#2E696B] flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-[#387D7F] shadow-[0_0_8px_rgba(56,125,127,0.9)]"></div>
+</div>
+<span class="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-[#C4A45A]"></span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="text-[13px] font-semibold tracking-[-0.01em] text-[#EFE9DC] font-sans">Personal AI OS</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="font-mono text-[9.5px] uppercase tracking-[0.14em] text-[#827E77]">DESK · STATION 01</span>
+</div>
+</div>
+</div>
+<!-- OPERATING REGIMES (MODES) -->
+<div class="space-y-1.5">
+<div class="flex items-center justify-between px-2 pb-1.5">
+<span class="text-[9.5px] font-mono uppercase tracking-[0.12em] text-[#827E77]">OPERATING MODES</span>
+<span class="font-mono text-[9px] text-[#59554E]">CH 04</span>
+</div>
+<!-- Mode 1: Focus (Engaged - Archival Slate + Petrol Inset) -->
+<a class="flex items-center justify-between px-2.5 py-2 rounded-md bg-[#181D24] border-l-2 border-l-[#387D7F] border-y border-r border-[rgba(56,125,127,0.3)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] text-[#EFE9DC] group transition-all" href="#focus">
+<div class="flex items-center gap-2.5">
+<span class="w-1.5 h-1.5 rounded-full bg-[#387D7F] shadow-[0_0_6px_rgba(56,125,127,0.9)]"></span>
+<span class="text-[13px] font-medium tracking-tight">Focus</span>
+</div>
+<span class="font-mono text-[9.5px] tracking-wider uppercase bg-[#2E696B]/20 text-[#387D7F] px-1.5 py-0.5 rounded border border-[#2E696B]/40 font-semibold">ACTIVE</span>
+</a>
+<!-- Mode 2: Flow -->
+<a class="flex items-center justify-between px-2.5 py-2 rounded-md hover:bg-[#15181F] text-[#827E77] hover:text-[#D8D1C2] border border-transparent hover:border-[rgba(220,210,195,0.05)] transition-all" href="#flow">
+<div class="flex items-center gap-2.5">
+<span class="w-1.5 h-1.5 rounded-sm bg-[#59554E]"></span>
+<span class="text-[13px] tracking-tight">Flow</span>
+</div>
+<span class="font-mono text-[10px] text-[#59554E] tabular-nums">10:30</span>
+</a>
+<!-- Mode 3: Memory Ledger -->
+<a class="flex items-center justify-between px-2.5 py-2 rounded-md hover:bg-[#15181F] text-[#827E77] hover:text-[#D8D1C2] border border-transparent hover:border-[rgba(220,210,195,0.05)] transition-all" href="#memory">
+<div class="flex items-center gap-2.5">
+<span class="w-1.5 h-1.5 rounded-sm bg-[#59554E]"></span>
+<span class="text-[13px] tracking-tight">Memory</span>
+</div>
+<span class="font-mono text-[10px] text-[#59554E] px-1 rounded bg-[#111317]">18 slips</span>
+</a>
+<!-- Mode 4: Academy Docket -->
+<a class="flex items-center justify-between px-2.5 py-2 rounded-md hover:bg-[#15181F] text-[#827E77] hover:text-[#D8D1C2] border border-transparent hover:border-[rgba(220,210,195,0.05)] transition-all" href="#academy">
+<div class="flex items-center gap-2.5">
+<span class="w-1.5 h-1.5 rounded-sm bg-[#C85A32]"></span>
+<span class="text-[13px] tracking-tight">Academy</span>
+</div>
+<span class="font-mono text-[9.5px] text-[#C85A32] bg-[#C85A32]/10 border border-[#C85A32]/30 px-1.5 py-0.2 rounded font-medium">1 due</span>
+</a>
+<!-- Mode 5: Intelligence Observation -->
+<a class="flex items-center justify-between px-2.5 py-2 rounded-md hover:bg-[#15181F] text-[#827E77] hover:text-[#D8D1C2] border border-transparent hover:border-[rgba(220,210,195,0.05)] transition-all" href="#intelligence">
+<div class="flex items-center gap-2.5">
+<span class="w-1.5 h-1.5 rounded-full bg-[#C4A45A]"></span>
+<span class="text-[13px] tracking-tight">Intelligence</span>
+</div>
+<span class="w-1.5 h-1.5 rounded-full bg-[#C4A45A]/80 shadow-[0_0_6px_rgba(196,164,90,0.6)]"></span>
+</a>
+</div>
+<!-- ARCHIVAL LEDGER INDEX -->
+<div class="pt-3 border-t border-[rgba(220,210,195,0.06)] space-y-2">
+<div class="text-[9.5px] font-mono uppercase tracking-[0.12em] text-[#59554E] px-2">FILING BINDERS</div>
+<div class="space-y-1 font-mono text-[11px] text-[#827E77]">
+<div class="flex items-center justify-between px-2 py-1 rounded hover:bg-[#15181F] cursor-pointer">
+<span class="text-[#A39D92] truncate">📁 cs201_discrete</span>
+<span class="text-[9.5px] text-[#59554E]">today</span>
+</div>
+<div class="flex items-center justify-between px-2 py-1 rounded hover:bg-[#15181F] cursor-pointer">
+<span class="text-[#A39D92] truncate">📁 cs302_lab_eval</span>
+<span class="text-[9.5px] text-[#C85A32]">!crit</span>
+</div>
+<div class="flex items-center justify-between px-2 py-1 rounded hover:bg-[#15181F] cursor-pointer">
+<span class="text-[#827E77] truncate">📁 socket_net_p2</span>
+<span class="text-[9.5px] text-[#59554E]">15:00</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Mechanical Telemetry Docket -->
+<div class="space-y-3 pt-3 border-t border-[rgba(220,210,195,0.08)]">
+<!-- Raspberry Pi Relay Telemetry Block -->
+<div class="p-2.5 rounded-md bg-[#0F1115] border border-[rgba(196,164,90,0.18)] space-y-1.5 relative overflow-hidden">
+<div class="flex items-center justify-between text-[10.5px] font-mono">
+<div class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-[#487358] shadow-[0_0_6px_rgba(72,115,88,0.8)]"></span>
+<span class="text-[#D8D1C2] font-semibold">rpi-relay-blr</span>
+</div>
+<span class="text-[9.5px] text-[#827E77] tabular-nums font-mono">14s sync</span>
+</div>
+<div class="text-[9.5px] font-mono text-[#827E77] flex items-center justify-between">
+<span>TG daemon online</span>
+<span class="text-[#487358]">48.2°C</span>
+</div>
+<div class="w-full bg-[#181B22] h-[2px] rounded-full overflow-hidden">
+<div class="bg-[#487358] h-full w-[92%]"></div>
+</div>
+</div>
+<!-- Calibration & Version Stamp -->
+<div class="flex items-center justify-between px-1 text-[10px] font-mono text-[#59554E]">
+<span class="tracking-wider">FIRMWARE v2.4b</span>
+<span class="hover:text-[#C4A45A] cursor-pointer">CALIBRATE</span>
+</div>
+</div></aside>
+<!-- MAIN CONTROL SURFACE -->
+<main class="flex-1 flex flex-col min-w-0 pb-36">
+<!-- TOP BAR: LIVING AMBIENT AI PRESENCE & TELEMETRY -->
+<header class="h-16 border-b border-app-hairline px-8 flex items-center justify-between shrink-0 bg-app-bg/85 backdrop-blur-md sticky top-0 z-20"><!-- Calibrated Living Presence Gauge -->
+<div class="flex items-center gap-4">
+<div class="relative w-8 h-8 rounded-full bg-[#121418] border border-[rgba(196,164,90,0.28)] flex items-center justify-center shrink-0 shadow-inner">
+<svg class="w-7 h-7 -rotate-90 presence-breath" viewbox="0 0 28 28">
+<circle cx="14" cy="14" fill="none" r="11" stroke="rgba(220, 210, 195, 0.1)" stroke-width="1.5"></circle>
+<circle cx="14" cy="14" fill="none" r="11" stroke="#387D7F" stroke-dasharray="69.1" stroke-dashoffset="5.2" stroke-linecap="round" stroke-width="1.6"></circle>
+</svg>
+<div class="absolute w-2 h-2 rounded-full bg-[#387D7F] shadow-[0_0_8px_rgba(56,125,127,1)]"></div>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="text-[12.5px] font-mono uppercase tracking-[0.1em] text-[#EFE9DC] font-medium">SYSTEM ALIVE</span>
+<span class="font-mono text-[10px] text-[#59554E]">·</span>
+<span class="font-mono text-[11px] text-[#487358] bg-[#487358]/10 px-1.5 py-0.2 rounded border border-[#487358]/25">HEARTBEAT 1.0Hz</span>
+<span class="font-mono text-[11px] text-[#827E77] tabular-nums">scheduler sync 14s ago</span>
+</div>
+<span class="font-mono text-[10px] text-[#827E77]">
+      relay: telegram headless daemon · physical host: rpi-relay-blr [192.168.1.104]
+    </span>
+</div>
+</div>
+<!-- Precision Timestamp & Command Key Engraving -->
+<div class="flex items-center gap-4">
+<!-- Calibrated Clock -->
+<div class="flex items-center gap-2 px-3 py-1.5 rounded border border-[rgba(196,164,90,0.22)] bg-[#12151B] font-mono text-[11.5px] tabular-nums text-[#D8D1C2] shadow-inner">
+<span class="text-[#827E77]">WED 21 OCT</span>
+<span class="text-[#59554E]">|</span>
+<span class="text-[#EFE9DC] font-semibold tracking-wider">10:12:44 IST</span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#387D7F] animate-pulse ml-0.5"></span>
+</div>
+<!-- Quick Command Key Trigger -->
+<button class="flex items-center gap-2 px-3 py-1.5 rounded bg-[#161920] border border-[rgba(220,210,195,0.12)] hover:border-[#C4A45A]/50 text-[#A39D92] hover:text-[#EFE9DC] text-[11.5px] font-mono transition-all group" onclick="document.getElementById('command-input').focus();">
+<span>SEARCH / COMMAND</span>
+<kbd class="px-1.5 py-0.5 rounded bg-[#0D0E11] border border-[rgba(220,210,195,0.14)] text-[10px] text-[#C4A45A] font-semibold">⌘K</kbd>
+</button>
+</div></header>
+<!-- SPATIAL ISLAND CANVAS -->
+<div class="px-8 py-7 max-w-5xl w-full mx-auto space-y-9">
+<!-- AI OBSERVATIONAL WHISPER (Calm, authoritative, strictly observational) -->
+<!-- TACTILE ARCHIVAL LEDGER WHISPER -->
+<div class="relative rounded-lg p-3.5 bg-[#121419] border-l-2 border-l-[#C4A45A] border-y border-r border-[rgba(196,164,90,0.15)] flex items-start gap-3.5 shadow-sm">
+<div class="shrink-0 mt-0.5">
+<span class="font-mono text-[9px] uppercase tracking-[0.14em] text-[#C4A45A] bg-[#C4A45A]/10 border border-[#C4A45A]/25 px-1.5 py-0.5 rounded">DESK DISPATCH</span>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-[13.5px] leading-relaxed text-[#D8D1C2] font-normal" style="font-family: 'Newsreader', Georgia, serif;">
+      “Looks like today is heavier than usual. Lab work is normally deferred until after dinner. If you depart within <span class="text-[#EFE9DC] font-semibold border-b border-[#C4A45A]/50 font-mono text-[12.5px]">18 minutes</span>, you will arrive at <span class="text-[#EFE9DC] font-medium">Hall 304</span> with three minutes of calm reserve.”
+    </p>
+</div>
+<div class="font-mono text-[10px] text-[#59554E] shrink-0 self-center">
+    09:54 IST · OBS-7
+  </div>
+</div>
+<!-- ISLAND 1: HERO FOCUS SURFACE ("What deserves attention right now?") -->
+<!-- ISLAND 1: THE DESK BLOTTER / CURRENT FOCUS SLAB -->
+<section class="relative rounded-xl border border-[rgba(196,164,90,0.3)] bg-[#14171E] p-6 shadow-[0_12px_32px_-8px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-300 overflow-hidden" id="hero-focus-card">
+<!-- Physical Inset Blotter Corner Accents -->
+<div class="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#C4A45A] pointer-events-none"></div>
+<div class="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#C4A45A] pointer-events-none"></div>
+<div class="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[rgba(196,164,90,0.4)] pointer-events-none"></div>
+<div class="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[rgba(196,164,90,0.4)] pointer-events-none"></div>
+<!-- Ambient Petrol Glow Inset -->
+<div class="absolute -right-16 -top-16 w-72 h-72 rounded-full bg-[#387D7F]/8 blur-3xl pointer-events-none"></div>
+<div class="relative z-10 flex flex-col md:flex-row md:items-start justify-between gap-6">
+<div class="space-y-4 max-w-2xl">
+<!-- Calibration Header / Stamp -->
+<div class="flex items-center gap-2.5">
+<span class="w-2 h-2 rounded-full bg-[#387D7F] animate-pulse shadow-[0_0_8px_rgba(56,125,127,0.9)]"></span>
+<span class="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[#387D7F] font-semibold">CURRENT ATTENTION TARGET</span>
+<span class="text-[#59554E]">·</span>
+<span class="font-mono text-[10.5px] uppercase tracking-wider text-[#C4A45A] bg-[#C4A45A]/10 border border-[#C4A45A]/30 px-1.5 py-0.5 rounded font-medium">CS201 · LECTURE</span>
+</div>
+<!-- Main Heading in Literary Editorial Serif + Technical Monospace Coordinates -->
+<div>
+<h2 class="text-[26px] font-medium text-[#EFE9DC] tracking-[-0.015em] leading-snug" style="font-family: 'Newsreader', Georgia, serif;">
+          Discrete Mathematical Structures
+        </h2>
+<div class="flex flex-wrap items-center gap-2.5 mt-2 font-mono text-[12px] tabular-nums">
+<span class="text-[#EFE9DC] font-semibold bg-[#387D7F]/20 text-[#387D7F] px-2 py-0.5 rounded border border-[#387D7F]/30">STARTS IN 18 MIN</span>
+<span class="text-[#59554E]">/</span>
+<span class="text-[#D8D1C2] font-medium">10:30 – 11:30 IST</span>
+<span class="text-[#59554E]">/</span>
+<span class="text-[#C4A45A] font-medium">Hall 304</span>
+<span class="text-[#59554E]">/</span>
+<span class="text-[#827E77]">Prof. Ramanathan</span>
+</div>
+</div>
+<!-- PHYSICAL PREPARATION FOLDER TRAY (Casio fx-991CW Equipment Slip) -->
+<div class="p-3 rounded-lg bg-[#0F1116] border border-[rgba(196,164,90,0.22)] shadow-inner space-y-1.5">
+<div class="flex items-center justify-between text-[10px] font-mono text-[#827E77] uppercase tracking-wider">
+<span class="flex items-center gap-1.5 text-[#C4A45A]">
+<span class="w-1.5 h-1.5 rounded-sm bg-[#C4A45A]"></span>
+            EQUIPMENT &amp; PREPARATION TRAY
+          </span>
+<span class="text-[#59554E]">SLOT 01</span>
+</div>
+<div class="flex items-center gap-2.5 text-[12px] text-[#D8D1C2]">
+<div class="w-6 h-6 rounded bg-[#181B22] border border-[rgba(220,210,195,0.12)] flex items-center justify-center shrink-0 text-[#C4A45A] font-mono text-[10px] font-bold">
+            CALC
+          </div>
+<span class="font-sans">
+            Take your <strong class="text-[#EFE9DC] font-semibold underline decoration-[#C4A45A]/50 underline-offset-2">Casio fx-991CW</strong> · Graph traversal evaluation scheduled in OS lab immediately following.
+          </span>
+</div>
+</div>
+</div>
+<!-- Right: Tactile Heavy Engraved Toggle Switch -->
+<div class="shrink-0 flex md:flex-col items-center md:items-end justify-between gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-[rgba(220,210,195,0.08)]">
+<button class="px-4 py-2.5 rounded-lg bg-[#182024] hover:bg-[#1E272C] text-[#387D7F] hover:text-[#52B4B6] border border-[#387D7F]/50 shadow-[0_4px_12px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.06)] text-[12.5px] font-mono font-medium tracking-tight transition-all flex items-center gap-2.5 active:translate-y-0.5 cursor-pointer" id="focus-toggle-btn" onclick="toggleFocusMode()">
+<span class="w-2 h-2 rounded-full bg-[#387D7F] shadow-[0_0_8px_rgba(56,125,127,1)]"></span>
+<span class="tracking-wider uppercase font-semibold" id="focus-btn-text">ENGAGE FOCUS</span>
+</button>
+<div class="font-mono text-[9.5px] text-[#827E77] text-right space-y-0.5">
+<div>PERIPHERAL FADE : 82%</div>
+<div class="text-[#59554E]">ESC TO RELEASE</div>
+</div>
+</div>
+</div>
+</section>
+<!-- TWO-COLUMN SPATIAL COMPOSITION: ISLAND 2 (TIME RIVER) & ISLAND 3 (NOTEBOOK) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start periphery-fade"><!-- ISLAND 2: THE LIVING INSTRUMENT RAIL / TIME RIVER (5 cols) -->
+<section class="lg:col-span-5 space-y-3">
+<div class="flex items-center justify-between px-1">
+<div class="flex items-center gap-2 font-mono text-[10.5px] tracking-[0.12em] uppercase">
+<span class="text-[#C4A45A]">INSTRUMENT RAIL</span>
+<span class="text-[#59554E]">/</span>
+<span class="text-[#827E77]">TIME RIVER</span>
+</div>
+<span class="font-mono text-[10px] text-[#59554E] tabular-nums">5 ENTRIES STAGED</span>
+</div>
+<!-- Continuous Vertical Mechanical Calibrated Rail -->
+<div class="p-5 rounded-xl border border-[rgba(220,210,195,0.09)] bg-[#12151B] relative overflow-hidden shadow-inner">
+<!-- Brass Tick Ruler Markings along background -->
+<div class="relative pl-7 space-y-5.5 before:absolute before:left-[10px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gradient-to-b before:from-[#C4A45A]/40 before:via-[#387D7F] before:to-[rgba(220,210,195,0.08)]">
+<!-- PROMINENT LIVING NEEDLE: NOW · 10:12 IST -->
+<div class="relative flex items-center gap-2.5 -ml-7 py-1 z-10">
+<div class="relative flex items-center justify-center w-6 shrink-0">
+<span class="w-3 h-3 rounded-full bg-[#387D7F] pulse-dot shadow-[0_0_10px_rgba(56,125,127,1)]"></span>
+<span class="absolute w-1 h-1 rounded-full bg-[#EFE9DC]"></span>
+</div>
+<div class="flex-1 flex items-center gap-2 border-t border-dashed border-[#387D7F]/60 pr-1">
+<span class="font-mono text-[10px] uppercase tracking-wider text-[#387D7F] bg-[#12151B] px-2 py-0.5 rounded border border-[#387D7F]/40 font-bold shadow-sm">
+            NOW NEEDLE · 10:12 IST
+          </span>
+</div>
+</div>
+<!-- Event 1: Discrete Math (Immediate Target) -->
+<div class="relative group cursor-pointer pl-1">
+<div class="absolute -left-[23px] top-1.5 w-3 h-3 rounded-full bg-[#182024] border-2 border-[#387D7F] shadow-[0_0_6px_rgba(56,125,127,0.7)] ring-2 ring-[#12151B]"></div>
+<div class="p-2.5 rounded-lg bg-[#171B22] border border-[#387D7F]/30 hover:border-[#387D7F] transition-all">
+<div class="flex items-center justify-between">
+<span class="text-[13.5px] font-medium text-[#EFE9DC] group-hover:text-[#52B4B6] transition-colors font-sans">Discrete Mathematics</span>
+<span class="font-mono text-[11px] text-[#387D7F] font-bold tabular-nums">10:30</span>
+</div>
+<div class="flex items-center gap-2 mt-0.5 text-[11.5px] text-[#A39D92] font-mono">
+<span class="text-[#C4A45A]">Hall 304</span>
+<span class="text-[#59554E]">·</span>
+<span>Prof. Ramanathan</span>
+</div>
+</div>
+</div>
+<!-- Event 2: Operating Systems Lab -->
+<div class="relative group cursor-pointer pl-1">
+<div class="absolute -left-[23px] top-1.5 w-3 h-3 rounded-full bg-[#14171E] border border-[rgba(220,210,195,0.25)] ring-2 ring-[#12151B] group-hover:border-[#C4A45A] transition-colors"></div>
+<div class="p-2.5 rounded-lg bg-[#14171E]/70 border border-[rgba(220,210,195,0.07)] hover:border-[rgba(220,210,195,0.18)] transition-all">
+<div class="flex items-center justify-between">
+<span class="text-[13.5px] font-normal text-[#D8D1C2] group-hover:text-[#EFE9DC]">Operating Systems Lab</span>
+<span class="font-mono text-[11px] text-[#827E77] tabular-nums">12:15</span>
+</div>
+<div class="text-[11px] text-[#827E77] font-mono mt-0.5">
+            Lab 3 · Red-Black Trees evaluation check
+          </div>
+</div>
+</div>
+<!-- Event 3: Lunch Break -->
+<div class="relative group cursor-pointer pl-1 opacity-80">
+<div class="absolute -left-[23px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#12151B] border border-[rgba(220,210,195,0.2)] ring-2 ring-[#12151B]"></div>
+<div class="px-2.5 py-1.5 rounded bg-transparent hover:bg-[#161920]/60 transition-colors">
+<div class="flex items-center justify-between">
+<span class="text-[13px] text-[#A39D92]">Refectory Lunch &amp; Reset</span>
+<span class="font-mono text-[11px] text-[#59554E] tabular-nums">13:30</span>
+</div>
+<span class="text-[10.5px] text-[#59554E] font-mono">Refectory South</span>
+</div>
+</div>
+<!-- Event 4: Protocols Tutorial -->
+<div class="relative group cursor-pointer pl-1 opacity-75">
+<div class="absolute -left-[23px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#12151B] border border-[rgba(220,210,195,0.2)] ring-2 ring-[#12151B]"></div>
+<div class="px-2.5 py-1.5 rounded bg-transparent hover:bg-[#161920]/60 transition-colors">
+<div class="flex items-center justify-between">
+<span class="text-[13px] text-[#A39D92]">Network Protocols Tutorial</span>
+<span class="font-mono text-[11px] text-[#59554E] tabular-nums">15:00</span>
+</div>
+<span class="text-[10.5px] text-[#59554E] font-mono">Room 201 · Socket programming</span>
+</div>
+</div>
+<!-- Event 5: Conditioning -->
+<div class="relative group cursor-pointer pl-1 opacity-60">
+<div class="absolute -left-[23px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#12151B] border border-[rgba(220,210,195,0.15)] ring-2 ring-[#12151B]"></div>
+<div class="px-2.5 py-1.5 rounded bg-transparent">
+<div class="flex items-center justify-between">
+<span class="text-[13px] text-[#59554E]">Gym · Conditioning</span>
+<span class="font-mono text-[11px] text-[#59554E] tabular-nums">18:30</span>
+</div>
+<span class="text-[10.5px] text-[#59554E] font-mono">Campus Sports Complex</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ISLAND 3: ARCHIVAL DOCKET TASKS & INDEX SLIPS (7 cols) -->
+<section class="lg:col-span-7 space-y-3">
+<div class="flex items-center justify-between px-1">
+<div class="flex items-center gap-2 font-mono text-[10.5px] tracking-[0.12em] uppercase">
+<span class="text-[#C4A45A]">TASK DOCKET</span>
+<span class="text-[#59554E]">/</span>
+<span class="text-[#C85A32] font-semibold">1 OVERDUE ITEM</span>
+</div>
+<span class="font-mono text-[10px] text-[#59554E]">TELEGRAM SYNC ACTIVE</span>
+</div>
+<!-- Physical Slips Stack -->
+<div class="space-y-3">
+<!-- SLIP 1: Folded Archival Index Slip with Burnished Rust Stamp -->
+<div class="rounded-xl border border-[#C85A32]/40 bg-[#161414] shadow-[0_4px_16px_rgba(0,0,0,0.6)] relative overflow-hidden transition-all" id="notebook-card-1">
+<!-- Perforated top margin indicator -->
+<div class="h-[3px] w-full bg-gradient-to-r from-[#C85A32] via-[#9E4324] to-[#C85A32]/50"></div>
+<div class="p-4 flex items-start gap-3.5 cursor-pointer hover:bg-[#1A1616] transition-colors select-none" onclick="toggleNotebookExpand('notebook-card-1')">
+<!-- Checkbox with physical mechanical toggle -->
+<button class="mt-0.5 w-4 h-4 rounded border border-[#C85A32] bg-[#120F0F] flex items-center justify-center shrink-0 hover:bg-[#C85A32]/20 transition-all" onclick="event.stopPropagation(); toggleTaskDone(this, 'task-title-1')">
+<span class="hidden check-mark text-[#EFE9DC] text-[11px] font-bold">✓</span>
+</button>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between gap-2">
+<span class="text-[14.5px] font-medium text-[#EFE9DC] tracking-tight font-sans" id="task-title-1">
+              Red-Black Tree Implementation
+            </span>
+<!-- Physical Stamped Seal -->
+<span class="font-mono text-[9.5px] text-[#EFE9DC] bg-[#C85A32] px-2 py-0.5 rounded font-bold tracking-wider uppercase shadow-sm shrink-0">
+              OVERDUE 1D · CRITICAL
+            </span>
+</div>
+<p class="text-[12px] text-[#A39D92] mt-0.5 font-mono">
+            Due Tue 20 Oct · Required for CS302 Lab evaluation session
+          </p>
+</div>
+<div class="shrink-0 text-[#827E77] pl-1 pt-0.5">
+<svg class="w-4 h-4 transform rotate-180 transition-transform duration-200" fill="none" id="chevron-1" stroke="currentColor" stroke-width="1.8" viewbox="0 0 20 20">
+<polyline points="6 8 10 12 14 8"></polyline>
+</svg>
+</div>
+</div>
+<!-- Unfolded Inspection Micro-Ledger -->
+<div class="px-5 pb-4 pt-2 border-t border-[rgba(200,90,50,0.2)] bg-[#121010] space-y-3" id="unfolded-panel-1">
+<div class="text-[11.5px] space-y-1.5">
+<div class="flex items-center justify-between">
+<span class="font-mono text-[9.5px] uppercase tracking-wider text-[#C4A45A]">CHECKLIST &amp; VERIFICATION LOG</span>
+<span class="font-mono text-[9.5px] text-[#827E77]">1 / 3 VERIFIED</span>
+</div>
+<div class="space-y-1.5 font-mono text-[12px]">
+<label class="flex items-center gap-2 cursor-pointer text-[#827E77]">
+<input checked="" class="rounded bg-[#1A1616] border-[#59554E] text-[#387D7F] focus:ring-0 w-3.5 h-3.5" type="checkbox"/>
+<span class="line-through">Rotations: Left and right rotation pointer swaps</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer text-[#EFE9DC]">
+<input class="rounded bg-[#1A1616] border-[#C85A32]/60 text-[#387D7F] focus:ring-0 w-3.5 h-3.5" type="checkbox"/>
+<span>Fix node recoloring loop in insert_fixup()</span>
+</label>
+<label class="flex items-center gap-2 cursor-pointer text-[#EFE9DC]">
+<input class="rounded bg-[#1A1616] border-[#C85A32]/60 text-[#387D7F] focus:ring-0 w-3.5 h-3.5" type="checkbox"/>
+<span>Test edge rotation case with 10k random elements</span>
+</label>
+</div>
+</div>
+<!-- Action Bars with Archival Buttons -->
+<div class="flex items-center justify-between pt-2 border-t border-[rgba(220,210,195,0.08)]">
+<div class="flex items-center gap-2">
+<button class="px-3 py-1 rounded bg-[#387D7F]/20 text-[#387D7F] hover:bg-[#387D7F] hover:text-[#0E0F12] border border-[#387D7F]/50 text-[11px] font-mono font-medium transition-all" onclick="markTaskFinished('notebook-card-1')">
+              COMPLETE &amp; LOG
+            </button>
+<button class="px-3 py-1 rounded bg-[#181B22] text-[#827E77] hover:text-[#EFE9DC] border border-[rgba(220,210,195,0.1)] text-[11px] font-mono transition-colors" onclick="alert('Pushed to Post-Dinner Focus block (20:30 IST)');">
+              DEFER TO 20:30 IST
+            </button>
+</div>
+<span class="font-mono text-[9.5px] text-[#59554E]">TG relay sync active</span>
+</div>
+</div>
+</div>
+<!-- SLIP 2: Hardware Daemon Check (Muted Moss Stamp) -->
+<div class="rounded-xl border border-[rgba(72,115,88,0.3)] bg-[#121518] p-4 flex items-start gap-3.5 hover:bg-[#15191D] transition-colors">
+<button class="mt-0.5 w-4 h-4 rounded border border-[#487358] bg-[#0E1210] flex items-center justify-center shrink-0 hover:border-[#387D7F] transition-colors" onclick="toggleTaskDone(this, 'task-title-2')">
+<span class="hidden check-mark text-[#EFE9DC] text-[11px] font-bold">✓</span>
+</button>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between gap-2">
+<span class="text-[14px] text-[#EFE9DC] tracking-tight font-sans" id="task-title-2">
+            Verify Telegram Daemon Heartbeat
+          </span>
+<span class="font-mono text-[9.5px] text-[#487358] bg-[#487358]/15 px-2 py-0.5 rounded border border-[#487358]/35 font-medium shrink-0 uppercase tracking-wider">
+            SYSTEM · SYNCHRONIZED
+          </span>
+</div>
+<p class="text-[11.5px] text-[#827E77] font-mono mt-0.5">
+          Periodic 60s health ping response from Raspberry Pi relay
+        </p>
+</div>
+</div>
+<!-- SLIP 3: Academy Docket Item (Deep Sea-Glass Teal) -->
+<div class="rounded-xl border border-[rgba(56,125,127,0.3)] bg-[#121519] p-4 flex items-start gap-3.5 hover:bg-[#15191E] transition-colors">
+<button class="mt-0.5 w-4 h-4 rounded border border-[#387D7F]/60 bg-[#0E1214] flex items-center justify-center shrink-0 hover:border-[#387D7F] transition-colors" onclick="toggleTaskDone(this, 'task-title-3')">
+<span class="hidden check-mark text-[#EFE9DC] text-[11px] font-bold">✓</span>
+</button>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between gap-2">
+<span class="text-[14px] text-[#EFE9DC] tracking-tight font-sans" id="task-title-3">
+            Submit Discrete Math Assignment Sheet
+          </span>
+<span class="font-mono text-[9.5px] text-[#387D7F] bg-[#387D7F]/15 px-2 py-0.5 rounded border border-[#387D7F]/35 font-medium shrink-0 uppercase tracking-wider">
+            ACADEMY · 18:00 IST
+          </span>
+</div>
+<p class="text-[11.5px] text-[#827E77] font-mono mt-0.5">
+          Problems 4.1 to 4.7 on Graph Isomorphisms · Hall 304 drop-box
+        </p>
+</div>
+</div>
+</div>
+</section></div>
+<!-- ISLAND 4: NATIVE INTERLEAVED SUGGESTION / WHISPER RIBBON -->
+<section class="periphery-fade"><div class="rounded-lg border border-[rgba(196,164,90,0.2)] bg-[#13161C] py-3 px-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[12.5px] shadow-sm">
+<div class="flex items-start sm:items-center gap-2.5 text-[#D8D1C2] min-w-0">
+<span class="font-mono text-[9.5px] uppercase tracking-[0.14em] text-[#387D7F] bg-[#387D7F]/15 px-1.5 py-0.5 rounded shrink-0 border border-[#387D7F]/30 font-semibold">INCOMING RADAR</span>
+<p class="truncate font-sans">
+      Discrete Math quiz announced on Telegram channel <span class="font-mono text-[#EFE9DC] bg-[#181D24] px-1 py-0.2 rounded border border-[rgba(220,210,195,0.1)]">#cs202</span> for Friday. Stage to Academy docket?
+    </p>
+</div>
+<div class="flex items-center gap-2 shrink-0 self-end sm:self-center font-mono text-[11px]">
+<button class="px-2.5 py-1 rounded bg-[#387D7F] text-[#0E0F12] hover:bg-[#52B4B6] font-semibold transition-colors shadow-sm" onclick="this.closest('section').style.display='none'; alert('Event added to Academy: Fri CS202 Quiz');">
+      ACCEPT TO CALENDAR
+    </button>
+<button class="px-2 py-1 rounded text-[#827E77] hover:text-[#EFE9DC] transition-colors" onclick="this.closest('section').style.display='none';">
+      DISMISS
+    </button>
+</div>
+</div></section>
+</div>
+</main>
+<!-- ISLAND 5: QUICK MEMORY CAPTURE DOCK / SPOTLIGHT COMMAND LAYER (Floating at bottom) -->
+<!-- ISLAND 5: THE INSTRUMENT READOUT COMMAND STRIP (Analog Calibrated Desk Console) -->
+<div class="fixed bottom-5 inset-x-0 z-30 flex justify-center px-4 pointer-events-none">
+<div class="w-full max-w-2xl bg-[#111419]/95 backdrop-blur-xl rounded-xl p-3 border border-[rgba(196,164,90,0.3)] shadow-[0_24px_48px_-12px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.06)] pointer-events-auto flex flex-col gap-2.5">
+<!-- Command Console Header & Prompt Bar -->
+<div class="flex items-center gap-3">
+<!-- Mechanical Needle / Terminal Icon -->
+<div class="w-6 h-6 rounded bg-[#181C22] border border-[rgba(196,164,90,0.25)] flex items-center justify-center shrink-0 shadow-inner">
+<span class="text-[#C4A45A] font-mono text-[11px] font-bold">❯_</span>
+</div>
+<!-- High Precision Command Input -->
+<input class="flex-1 bg-transparent text-[13.5px] text-[#EFE9DC] placeholder:text-[#59554E] outline-none border-none font-mono focus:ring-0 tracking-tight" id="command-input" oninput="handleCommandInput(this.value)" onkeydown="if(event.key === 'Enter') saveCommand();" placeholder="Enter OS directive or note... ('review lab note', 'remind 20:30', '!urgent')" type="text" value="review red-black tree edge cases after lab !urgent"/>
+<!-- Engraved Mechanical Action Keycaps -->
+<div class="flex items-center gap-2 shrink-0">
+<span class="font-mono text-[9.5px] text-[#827E77] px-2 py-1 rounded bg-[#0D0F13] border border-[rgba(220,210,195,0.12)] uppercase tracking-wider">
+          RETURN TO LOG
+        </span>
+<button class="px-3.5 py-1 rounded bg-[#C4A45A] hover:bg-[#D8B66C] text-[#0E0F12] text-[11.5px] font-mono font-bold uppercase tracking-wider transition-all shadow-md active:translate-y-0.5" onclick="saveCommand()">
+          EXEC
+        </button>
+</div>
+</div>
+<!-- Live Calibrated Telemetry Syntax Chips -->
+<div class="flex flex-wrap items-center gap-2 pt-2 border-t border-[rgba(220,210,195,0.08)] font-mono text-[10px]" id="parse-chips">
+<span class="text-[#59554E] uppercase tracking-wider font-semibold">PARSED TOKENS:</span>
+<span class="px-2 py-0.5 rounded bg-[#161A22] border border-[rgba(220,210,195,0.14)] text-[#EFE9DC]">
+        DIR: <span class="text-[#D8D1C2]" id="chip-title">review red-black tree edge cases</span>
+</span>
+<span class="px-2 py-0.5 rounded bg-[#387D7F]/20 border border-[#387D7F]/40 text-[#387D7F] flex items-center gap-1 font-semibold">
+<span>⏰</span>
+<span id="chip-time">Today · After lab (13:30 IST)</span>
+</span>
+<span class="px-2 py-0.5 rounded bg-[#C85A32]/20 border border-[#C85A32]/45 text-[#C85A32] flex items-center gap-1 font-bold tracking-wider uppercase">
+<span>!</span>
+<span id="chip-priority">URGENT</span>
+</span>
+<span class="px-2 py-0.5 rounded bg-[#161A22] border border-[rgba(196,164,90,0.2)] text-[#C4A45A]">
+        TARGET: Academy Docket
+      </span>
+</div>
+</div>
+</div>
+</div>
+<!-- INTERACTION SCRIPTS -->
+<script>
+    // Cmd + K Shortcut Focus
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        const input = document.getElementById('command-input');
+        input.focus();
+        input.select();
+      }
+      if (e.key === 'Escape') {
+        if (document.body.classList.contains('focus-mode-active')) {
+          toggleFocusMode();
+        }
+      }
+    });
+
+    // Enter Focus Mode Toggle
+    function toggleFocusMode() {
+      const isFocused = document.body.classList.toggle('focus-mode-active');
+      const btnText = document.getElementById('focus-btn-text');
+      const card = document.getElementById('hero-focus-card');
+
+      if (isFocused) {
+        btnText.innerText = 'Exit Focus Mode (Esc)';
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        btnText.innerText = 'Enter Focus Mode';
+      }
+    }
+
+    // Toggle Notebook Expand
+    function toggleNotebookExpand(cardId) {
+      const panel = document.getElementById('unfolded-panel-1');
+      const chevron = document.getElementById('chevron-1');
+      if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        chevron.classList.add('rotate-180');
+      } else {
+        panel.classList.add('hidden');
+        chevron.classList.remove('rotate-180');
+      }
+    }
+
+    // Task Done Toggle
+    function toggleTaskDone(btn, titleId) {
+      const title = document.getElementById(titleId);
+      const mark = btn.querySelector('.check-mark');
+      if (!title) return;
+
+      if (title.classList.contains('line-through')) {
+        title.classList.remove('line-through', 'text-app-text-muted');
+        title.classList.add('text-app-text-primary');
+        mark.classList.add('hidden');
+      } else {
+        title.classList.add('line-through', 'text-app-text-muted');
+        title.classList.remove('text-app-text-primary');
+        mark.classList.remove('hidden');
+      }
+    }
+
+    function markTaskFinished(cardId) {
+      const card = document.getElementById(cardId);
+      card.style.opacity = '0.4';
+      const title = document.getElementById('task-title-1');
+      if (title) title.classList.add('line-through');
+      setTimeout(() => {
+        alert('Red-Black Tree task marked completed and synced with Moodle.');
+      }, 50);
+    }
+
+    // Live Command Parser
+    function handleCommandInput(val) {
+      const chipTitle = document.getElementById('chip-title');
+      const chipTime = document.getElementById('chip-time');
+      const chipPri = document.getElementById('chip-priority');
+
+      if (!val.trim()) {
+        chipTitle.innerText = 'Empty command';
+        return;
+      }
+
+      let text = val;
+      let priority = 'Normal';
+
+      if (text.includes('!urgent')) {
+        priority = 'Urgent';
+        text = text.replace('!urgent', '');
+      } else if (text.includes('!high')) {
+        priority = 'High';
+        text = text.replace('!high', '');
+      }
+
+      chipPri.innerText = priority;
+      chipTitle.innerText = text.replace(/after lab|tomorrow|today|\d{1,2}:\d{2}/gi, '').trim() || 'Task note';
+      chipTime.innerText = val.includes('after lab') ? 'Today · After lab (13:30 IST)' : 'Today · Next action';
+    }
+
+    function saveCommand() {
+      const input = document.getElementById('command-input');
+      const text = input.value.trim();
+      if (!text) return;
+      alert(`Instruction captured into OS: "${text}"`);
+      input.value = '';
+      handleCommandInput('');
+    }
+  </script>
+</body></html>

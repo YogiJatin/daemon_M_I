@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal AI OS · Compact Quick Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg: '#0A0C0F',
+          surface: '#11141A',
+          raised: '#171B22',
+          arc: '#62D2E6',
+          ember: '#E8B04A',
+          crimson: '#E5545B',
+          textMain: '#E8ECF1',
+          textMuted: '#9AA4B2',
+          textSub: '#6B7585',
+        },
+        fontFamily: {
+          sans: ['"Instrument Sans"', 'sans-serif'],
+          mono: ['"IBM Plex Mono"', 'monospace'],
+        }
+      }
+    }
+  }
+</script>
+<style>
+  body {
+    background-color: #07080b;
+    color: #E8ECF1;
+    font-family: 'Instrument Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .glass-panel {
+    background: rgba(17, 20, 26, 0.76);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.12) inset, 0 24px 48px -12px rgba(0, 0, 0, 0.65);
+    border-radius: 12px;
+  }
+  .presence-active {
+    stroke-dasharray: 60;
+    stroke-dashoffset: 4;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+  }
+  .hairline-b {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .hairline-t {
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .hairline-l-crimson {
+    border-left: 2px solid #E5545B;
+  }
+  /* Custom scrollbar for compactness */
+  ::-webkit-scrollbar {
+    width: 3px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body class="min-h-screen p-6 md:p-12 flex flex-col items-center justify-center">
+
+  <!-- Desktop Presentation Frame Header -->
+  <header class="w-full max-w-[840px] mb-8 flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-white/[0.07] pb-4">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="inline-block w-2 h-2 rounded-full bg-arc"></span>
+        <span class="font-mono text-xs uppercase tracking-wider text-textSub">Personal AI OS · Windows Launcher Companion</span>
+      </div>
+      <h1 class="text-xl font-semibold text-textMain tracking-tight">Compact Quick Panel <span class="text-textSub font-normal text-sm ml-2">360 × 640 target viewport</span></h1>
+    </div>
+    <div class="font-mono text-xs text-textMuted flex items-center gap-4">
+      <span>Now: Wed 21 Oct · 10:42 IST</span>
+      <span class="text-arc bg-arc/10 px-2 py-0.5 rounded border border-arc/20">Production Specs</span>
+    </div>
+  </header>
+
+  <!-- Side-by-side Panel Windows Grid -->
+  <div class="w-full max-w-[840px] grid grid-cols-1 md:grid-cols-2 gap-8 items-start justify-center">
+
+    <!-- ========================================== -->
+    <!-- FRAME 1: NORMAL STATE (Active / Inline Snooze) -->
+    <!-- ========================================== -->
+    <div class="flex flex-col items-center">
+      <div class="w-full flex items-center justify-between mb-2 px-1">
+        <span class="font-mono text-[11px] text-arc font-medium tracking-wide flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-arc"></span>
+          STATE 01 · NORMAL (LIVE)
+        </span>
+        <span class="font-mono text-[10px] text-textSub">INLINE SNOOZE ACTIVE</span>
+      </div>
+
+      <!-- 360 x 640 Container -->
+      <div class="w-[360px] h-[640px] glass-panel relative flex flex-col overflow-hidden text-[13px] select-none">
+        
+        <!-- Header (Compact 44px) -->
+        <div class="h-11 px-3.5 flex items-center justify-between hairline-b bg-surface/50 shrink-0">
+          <div class="flex items-center gap-2">
+            <!-- Geometric Mark -->
+            <svg class="w-4 h-4 text-arc" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" stroke-width="1.4"/>
+              <circle cx="8" cy="8" r="2.2" fill="currentColor"/>
+            </svg>
+            <span class="font-semibold text-sm text-textMain tracking-tight">Today</span>
+            
+            <!-- Presence Ring -->
+            <div class="relative w-4 h-4 ml-1 flex items-center justify-center" title="Scheduler: 38s ago">
+              <svg class="w-4 h-4" viewBox="0 0 20 20">
+                <circle cx="10" cy="10" r="7.5" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+                <circle cx="10" cy="10" r="7.5" fill="none" stroke="#62D2E6" stroke-width="2" stroke-linecap="round" class="presence-active"/>
+              </svg>
+            </div>
+            <span class="font-mono text-[10px] text-textSub ml-0.5">38s</span>
+          </div>
+
+          <a href="#" class="font-mono text-[11px] text-textMuted hover:text-arc transition-colors flex items-center gap-1 py-1 px-1.5 rounded hover:bg-white/[0.04]">
+            Open full app <span class="text-arc text-xs">↗</span>
+          </a>
+        </div>
+
+        <!-- Scrollable Body Content -->
+        <div class="flex-1 overflow-y-auto px-3.5 py-2.5 space-y-2.5">
+          
+          <!-- 1. Needs Attention (Collapsed 1 row EMBER hairline) -->
+          <div class="bg-ember/[0.06] border border-ember/25 rounded-md px-2.5 py-1.5 flex items-center justify-between text-ember">
+            <div class="flex items-center gap-2 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-ember shrink-0"></span>
+              <span class="font-medium text-xs truncate">1 delivery unconfirmed · 1 failed</span>
+            </div>
+            <button class="font-mono text-[11px] hover:underline shrink-0 ml-2">Review ›</button>
+          </div>
+
+          <!-- 2. Overdue Section (1 row) -->
+          <div>
+            <div class="flex items-center justify-between mb-1 px-0.5">
+              <span class="font-mono text-[10px] uppercase tracking-wider text-crimson font-medium">Overdue (1)</span>
+              <span class="font-mono text-[10px] text-textSub">Critical</span>
+            </div>
+            <div class="bg-surface/80 rounded border border-white/[0.06] hairline-l-crimson p-2 flex items-start gap-2">
+              <!-- Done checkbox hit area -->
+              <button class="mt-0.5 w-4 h-4 rounded border border-crimson/50 hover:bg-crimson/20 flex items-center justify-center shrink-0 transition-colors" title="Mark Done">
+              </button>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline justify-between gap-1">
+                  <span class="font-medium text-xs text-textMain truncate">Submit Digital Logic record book</span>
+                  <span class="font-mono text-[10px] text-crimson shrink-0">1d ago</span>
+                </div>
+                <div class="flex items-center gap-2 mt-0.5 text-[11px] text-textSub font-mono">
+                  <span class="text-textMuted">College</span>
+                  <span>·</span>
+                  <span>Telegram</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Due Today Section (Show 2 of 3, 1 expanded with Inline Snooze chips) -->
+          <div>
+            <div class="flex items-center justify-between mb-1 px-0.5">
+              <span class="font-mono text-[10px] uppercase tracking-wider text-textMuted font-medium">Due Today (3)</span>
+              <span class="font-mono text-[10px] text-textSub">21 Oct</span>
+            </div>
+
+            <div class="space-y-1.5">
+              <!-- Row 1: Normal due row -->
+              <div class="bg-surface/60 rounded border border-white/[0.06] p-2 flex items-center justify-between gap-2 hover:border-white/[0.12] transition-colors">
+                <div class="flex items-center gap-2 min-w-0">
+                  <button class="w-4 h-4 rounded border border-white/20 hover:border-arc hover:bg-arc/10 flex items-center justify-center shrink-0 transition-colors" title="Mark Done"></button>
+                  <div class="truncate">
+                    <span class="text-xs text-textMain truncate block">Pay library fine</span>
+                    <span class="text-[10px] font-mono text-textSub">Personal · manual</span>
+                  </div>
+                </div>
+                <span class="font-mono text-[10px] text-textMuted bg-white/[0.04] px-1.5 py-0.5 rounded shrink-0">all day</span>
+              </div>
+
+              <!-- Row 2: Expanded with inline Snooze Presets chips -->
+              <div class="bg-raised rounded border border-arc/30 p-2 space-y-2 shadow-sm">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <button class="w-4 h-4 rounded border border-white/20 hover:border-arc shrink-0" title="Mark Done"></button>
+                    <div class="truncate">
+                      <span class="text-xs font-medium text-textMain truncate block">Call bank about education loan</span>
+                      <span class="text-[10px] font-mono text-textSub">Personal · 16:30</span>
+                    </div>
+                  </div>
+                  <button class="font-mono text-[10px] text-ember bg-ember/10 border border-ember/30 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
+                    <span>Snooze</span>
+                    <span class="text-[9px]">▴</span>
+                  </button>
+                </div>
+
+                <!-- Inline Snooze Chips (One-tap choose) -->
+                <div class="pt-1 border-t border-white/[0.07]">
+                  <div class="text-[10px] font-mono text-textSub mb-1.5 flex items-center justify-between">
+                    <span>Snooze until:</span>
+                    <span class="text-textMuted">Tap to apply</span>
+                  </div>
+                  <div class="flex flex-wrap gap-1">
+                    <button class="font-mono text-[10px] bg-white/[0.06] hover:bg-arc/20 hover:text-arc hover:border-arc/40 border border-white/[0.08] px-2 py-1 rounded transition-colors text-textMain">1 h (11:42)</button>
+                    <button class="font-mono text-[10px] bg-white/[0.06] hover:bg-arc/20 hover:text-arc hover:border-arc/40 border border-white/[0.08] px-2 py-1 rounded transition-colors text-textMain">Tonight (20:30)</button>
+                    <button class="font-mono text-[10px] bg-white/[0.06] hover:bg-arc/20 hover:text-arc hover:border-arc/40 border border-white/[0.08] px-2 py-1 rounded transition-colors text-textMain">Tomorrow</button>
+                    <button class="font-mono text-[10px] bg-white/[0.06] hover:bg-arc/20 hover:text-arc hover:border-arc/40 border border-white/[0.08] px-2 py-1 rounded transition-colors text-textMain">+2h</button>
+                    <button class="font-mono text-[10px] bg-white/[0.04] hover:bg-white/[0.1] border border-white/[0.08] px-2 py-1 rounded transition-colors text-textSub">Pick…</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- "1 more" toggle link -->
+              <div class="flex justify-end px-1 pt-0.5">
+                <button class="font-mono text-[11px] text-textMuted hover:text-textMain transition-colors flex items-center gap-1">
+                  <span>1 more (Data Structures 18:00)</span>
+                  <span class="text-arc">›</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Next Class Card & Prep trigger -->
+          <div class="bg-surface/80 rounded border border-white/[0.07] p-2.5 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[10px] uppercase tracking-wider text-textSub">Next Class</span>
+              <span class="font-mono text-[10px] text-arc bg-arc/10 px-1.5 py-0.2 rounded border border-arc/20">in 33 min</span>
+            </div>
+            <div class="font-semibold text-xs text-textMain">Discrete Mathematics · 11:15</div>
+            <div class="text-[11px] text-textSub flex items-center justify-between">
+              <span>Room 3-12 · Hall 304</span>
+              <button class="font-mono text-[10px] text-textMuted hover:text-textMain transition-colors flex items-center gap-1">
+                <span>Tomorrow: 5 prep items</span>
+                <span class="text-arc">›</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 5. Rule-based Suggestion Row -->
+          <div class="bg-surface/50 border border-white/[0.07] rounded px-2.5 py-1.5 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-ember shrink-0"></span>
+              <span class="text-textMuted truncate">Deadline cluster · 3 tasks Fri–Mon</span>
+            </div>
+            <button class="text-textSub hover:text-textMain text-xs ml-1 shrink-0" title="Dismiss">✕</button>
+          </div>
+
+        </div>
+
+        <!-- Pinned Bottom Quick-Add Field with Token Parsing -->
+        <div class="hairline-t bg-surface/90 backdrop-blur-md px-3 pt-2 pb-2.5 shrink-0 space-y-1.5">
+          <!-- Active Parse Chip -->
+          <div class="flex items-center gap-1.5">
+            <span class="font-mono text-[9px] text-arc bg-arc/15 border border-arc/30 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <svg class="w-2.5 h-2.5" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="2" width="9" height="8" rx="1.5" stroke="currentColor"/><path d="M4 1v2M8 1v2M1.5 5h9" stroke="currentColor"/></svg>
+              Fri 23 Oct · all day
+            </span>
+            <span class="text-[10px] font-mono text-textSub">parsed from shorthand</span>
+          </div>
+
+          <!-- Input + Send Button -->
+          <div class="relative flex items-center">
+            <input 
+              type="text" 
+              value="fri | Submit record" 
+              class="w-full bg-raised border border-white/[0.12] focus:border-arc/60 rounded-md pl-2.5 pr-8 py-1.5 text-xs text-textMain placeholder-textSub outline-none font-sans transition-colors"
+              placeholder="Add task or type 'fri | task'..."
+            />
+            <button class="absolute right-1.5 w-6 h-6 rounded bg-arc text-bg hover:opacity-90 flex items-center justify-center transition-opacity" title="Submit task">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none">
+                <path d="M8 3.5v9M8 3.5l-3.5 3.5M8 3.5l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ========================================== -->
+    <!-- FRAME 2: PAUSED STATE (Quiet / Suspended)  -->
+    <!-- ========================================== -->
+    <div class="flex flex-col items-center">
+      <div class="w-full flex items-center justify-between mb-2 px-1">
+        <span class="font-mono text-[11px] text-textMuted font-medium tracking-wide flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-textSub"></span>
+          STATE 02 · PAUSED (SUSPENDED)
+        </span>
+        <span class="font-mono text-[10px] text-textSub">QUIET MODE ACTIVE</span>
+      </div>
+
+      <!-- 360 x 640 Container -->
+      <div class="w-[360px] h-[640px] glass-panel relative flex flex-col overflow-hidden text-[13px] select-none">
+        
+        <!-- Header (Hollow Ring in Header) -->
+        <div class="h-11 px-3.5 flex items-center justify-between hairline-b bg-surface/50 shrink-0">
+          <div class="flex items-center gap-2">
+            <!-- Geometric Mark -->
+            <svg class="w-4 h-4 text-textSub" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" stroke-width="1.4"/>
+              <circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.2"/>
+            </svg>
+            <span class="font-semibold text-sm text-textMuted tracking-tight">Today</span>
+            
+            <!-- HOLLOW Presence Ring (Paused status) -->
+            <div class="relative w-4 h-4 ml-1 flex items-center justify-center" title="Scheduler: Paused">
+              <svg class="w-4 h-4" viewBox="0 0 20 20">
+                <circle cx="10" cy="10" r="7.5" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.6" stroke-dasharray="3 3"/>
+              </svg>
+            </div>
+            <span class="font-mono text-[10px] text-textSub ml-0.5">paused</span>
+          </div>
+
+          <a href="#" class="font-mono text-[11px] text-textSub hover:text-textMuted transition-colors flex items-center gap-1 py-1 px-1.5 rounded">
+            Open full app <span class="text-xs">↗</span>
+          </a>
+        </div>
+
+        <!-- Full-width Neutral Banner "Reminders paused by owner since 09:15" with [Resume] -->
+        <div class="bg-surface border-b border-white/[0.08] px-3.5 py-2 flex items-center justify-between shrink-0 shadow-sm">
+          <div class="flex items-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full bg-textSub"></span>
+            <span class="text-xs text-textMuted font-mono">Reminders paused since 09:15</span>
+          </div>
+          <button class="font-mono text-[11px] text-arc bg-arc/10 border border-arc/30 hover:bg-arc/20 px-2 py-0.5 rounded transition-colors font-medium">
+            Resume
+          </button>
+        </div>
+
+        <!-- Dimmed Content Body (Readable but dimmed to 65% opacity) -->
+        <div class="flex-1 overflow-y-auto px-3.5 py-2.5 space-y-2.5 opacity-60">
+          
+          <!-- 1. Needs Attention -->
+          <div class="bg-surface/60 border border-white/[0.06] rounded-md px-2.5 py-1.5 flex items-center justify-between text-textSub">
+            <div class="flex items-center gap-2 truncate">
+              <span class="w-1.5 h-1.5 rounded-full bg-textSub shrink-0"></span>
+              <span class="text-xs truncate font-mono">1 delivery unconfirmed · 1 failed</span>
+            </div>
+            <span class="font-mono text-[11px] text-textSub ml-2">Paused</span>
+          </div>
+
+          <!-- 2. Overdue Section -->
+          <div>
+            <div class="flex items-center justify-between mb-1 px-0.5">
+              <span class="font-mono text-[10px] uppercase tracking-wider text-textSub font-medium">Overdue (1)</span>
+              <span class="font-mono text-[10px] text-textSub">Held</span>
+            </div>
+            <div class="bg-surface/50 rounded border border-white/[0.05] p-2 flex items-start gap-2">
+              <div class="mt-0.5 w-4 h-4 rounded border border-white/20 shrink-0"></div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline justify-between gap-1">
+                  <span class="font-medium text-xs text-textMuted truncate">Submit Digital Logic record book</span>
+                  <span class="font-mono text-[10px] text-textSub shrink-0">1d ago</span>
+                </div>
+                <div class="text-[11px] text-textSub font-mono mt-0.5">College · Telegram</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Due Today Section -->
+          <div>
+            <div class="flex items-center justify-between mb-1 px-0.5">
+              <span class="font-mono text-[10px] uppercase tracking-wider text-textSub font-medium">Due Today (3)</span>
+              <span class="font-mono text-[10px] text-textSub">Notifications off</span>
+            </div>
+
+            <div class="space-y-1.5">
+              <!-- Item 1 -->
+              <div class="bg-surface/40 rounded border border-white/[0.05] p-2 flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="w-4 h-4 rounded border border-white/20 shrink-0"></div>
+                  <div class="truncate">
+                    <span class="text-xs text-textMuted truncate block">Pay library fine</span>
+                    <span class="text-[10px] font-mono text-textSub">Personal</span>
+                  </div>
+                </div>
+                <span class="font-mono text-[10px] text-textSub">all day</span>
+              </div>
+
+              <!-- Item 2 -->
+              <div class="bg-surface/40 rounded border border-white/[0.05] p-2 flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0">
+                  <div class="w-4 h-4 rounded border border-white/20 shrink-0"></div>
+                  <div class="truncate">
+                    <span class="text-xs text-textMuted truncate block">Call bank about education loan</span>
+                    <span class="text-[10px] font-mono text-textSub">Personal · 16:30</span>
+                  </div>
+                </div>
+                <span class="font-mono text-[10px] text-textSub bg-white/[0.02] px-1.5 py-0.5 rounded">16:30</span>
+              </div>
+
+              <div class="flex justify-end px-1 pt-0.5">
+                <span class="font-mono text-[11px] text-textSub">1 more (Data Structures 18:00) ›</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Next Class Card -->
+          <div class="bg-surface/50 rounded border border-white/[0.05] p-2.5 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[10px] uppercase tracking-wider text-textSub">Next Class</span>
+              <span class="font-mono text-[10px] text-textSub bg-white/[0.04] px-1.5 py-0.2 rounded">in 33 min</span>
+            </div>
+            <div class="font-medium text-xs text-textMuted">Discrete Mathematics · 11:15</div>
+            <div class="text-[11px] text-textSub flex items-center justify-between">
+              <span>Room 3-12 · Hall 304</span>
+              <span class="font-mono text-[10px] text-textSub">Tomorrow: 5 prep items ›</span>
+            </div>
+          </div>
+
+          <!-- 5. Suggestion -->
+          <div class="bg-surface/30 border border-white/[0.04] rounded px-2.5 py-1.5 flex items-center justify-between text-xs text-textSub">
+            <span class="truncate">Deadline cluster · 3 tasks Fri–Mon</span>
+            <span class="text-textSub text-xs">✕</span>
+          </div>
+
+        </div>
+
+        <!-- Pinned Bottom Field (Muted) -->
+        <div class="hairline-t bg-surface/90 backdrop-blur-md px-3 pt-2 pb-2.5 shrink-0 opacity-70">
+          <div class="relative flex items-center">
+            <input 
+              type="text" 
+              disabled
+              class="w-full bg-raised/50 border border-white/[0.06] rounded-md pl-2.5 pr-8 py-1.5 text-xs text-textSub placeholder-textSub outline-none font-sans cursor-not-allowed"
+              placeholder="Reminders paused..."
+            />
+            <div class="absolute right-2 text-textSub font-mono text-[11px]">⏸</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Technical Spec & Implementation Footnote -->
+  <footer class="w-full max-w-[840px] mt-8 pt-4 border-t border-white/[0.06] flex flex-col sm:flex-row justify-between text-[11px] font-mono text-textSub gap-2">
+    <div>Windows Launcher Overlay Panel · 360×640 px · 12px radius · 24px blur</div>
+    <div>Tokens: bg #0A0C0F · ARC #62D2E6 · EMBER #E8B04A · CRIMSON #E5545B</div>
+  </footer>
+
+</body>
+</html>

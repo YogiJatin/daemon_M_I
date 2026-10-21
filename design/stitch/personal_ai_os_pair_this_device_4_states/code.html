@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440, initial-scale=1.0">
+<title>Personal AI OS · Pair This Device</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  :root {
+    --bg: #0A0C0F;
+    --surface: #11141A;
+    --raised: #171B22;
+    --hairline: rgba(255, 255, 255, 0.07);
+    --hairline-hover: rgba(255, 255, 255, 0.12);
+    
+    --text-primary: #E8ECF1;
+    --text-secondary: #9AA4B2;
+    --text-tertiary: #6B7585;
+    
+    --arc: #62D2E6;
+    --arc-glow: rgba(98, 210, 230, 0.12);
+    --arc-dim: rgba(98, 210, 230, 0.25);
+    
+    --ember: #E8B04A;
+    --ember-dim: rgba(232, 176, 74, 0.15);
+    
+    --crimson: #E5545B;
+    --crimson-dim: rgba(229, 84, 91, 0.15);
+
+    --font-ui: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    min-height: 100vh;
+    width: 100%;
+    overflow-x: auto;
+    padding: 40px 32px 64px 32px;
+    background-image: 
+      radial-gradient(circle at 50% 0%, rgba(98, 210, 230, 0.02) 0%, transparent 60%);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Header specs banner */
+  .spec-strip {
+    max-width: 1400px;
+    margin: 0 auto 36px auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 16px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+  }
+
+  .spec-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .spec-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    color: var(--text-secondary);
+    font-size: 11px;
+  }
+
+  .spec-pill .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--arc);
+  }
+
+  /* Gallery grid showing 4 states side by side */
+  .frames-grid {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  .state-frame {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .state-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-tertiary);
+    padding: 0 4px;
+  }
+
+  .state-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+  }
+
+  .state-tag.idle .state-indicator { background: var(--text-tertiary); }
+  .state-tag.wrong .state-indicator { background: var(--crimson); }
+  .state-tag.expired .state-indicator { background: var(--ember); }
+  .state-tag.success .state-indicator { background: var(--arc); }
+
+  .state-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  /* Centered Glass Sheet Component */
+  .sheet-card {
+    position: relative;
+    background: rgba(17, 20, 26, 0.72);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--hairline);
+    border-top: 1px solid rgba(255, 255, 255, 0.15); /* Light top edge */
+    border-radius: 12px;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    min-height: 570px;
+  }
+
+  /* Wordmark & Brand */
+  .sheet-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .brand-glyph {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .brand-wordmark {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .brand-sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-tertiary);
+    font-weight: 400;
+  }
+
+  /* Heading & Subline */
+  .sheet-title-block {
+    margin-bottom: 24px;
+  }
+
+  .sheet-title {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  .sheet-subline {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-secondary);
+  }
+
+  /* Steps section */
+  .steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    flex: 1;
+  }
+
+  .step-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .step-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  .step-num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+  }
+
+  /* Step 1: Copy chip */
+  .copy-chip-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  .mono-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 6px 10px 6px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--arc);
+    cursor: pointer;
+    user-select: all;
+    transition: all 0.15s ease;
+  }
+
+  .mono-chip:hover {
+    border-color: var(--hairline-hover);
+    background: var(--raised);
+  }
+
+  .mono-chip svg {
+    color: var(--text-tertiary);
+    transition: color 0.15s ease;
+  }
+
+  .mono-chip:hover svg {
+    color: var(--text-primary);
+  }
+
+  /* Step 2: 6 Code boxes */
+  .code-boxes-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .code-box {
+    aspect-ratio: 1;
+    height: 44px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text-primary);
+    transition: all 0.15s ease;
+  }
+
+  .code-box.focused {
+    border-color: var(--arc);
+    box-shadow: 0 0 0 1px var(--arc-dim);
+  }
+
+  .code-box.error {
+    border-color: var(--crimson);
+    background: var(--crimson-dim);
+    color: var(--crimson);
+  }
+
+  .code-box.disabled {
+    opacity: 0.35;
+    background: rgba(255, 255, 255, 0.02);
+    border-color: var(--hairline);
+    color: var(--text-tertiary);
+  }
+
+  .code-box.success {
+    border-color: var(--arc);
+    background: var(--arc-dim);
+    color: var(--arc);
+  }
+
+  /* Feedback status message below code */
+  .state-feedback {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    min-height: 18px;
+    margin-top: 4px;
+    font-family: var(--font-mono);
+  }
+
+  .state-feedback.error {
+    color: var(--crimson);
+  }
+
+  .state-feedback.expired {
+    color: var(--ember);
+  }
+
+  .state-feedback.success {
+    color: var(--arc);
+  }
+
+  .state-feedback.idle {
+    color: var(--text-tertiary);
+  }
+
+  .state-feedback svg {
+    flex-shrink: 0;
+  }
+
+  /* Step 3: Timer & Presence ring */
+  .timer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-top: 2px;
+  }
+
+  .timer-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .presence-ring-svg {
+    width: 18px;
+    height: 18px;
+    transform: rotate(-90deg);
+  }
+
+  .timer-status-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .timer-value {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .timer-value.expired {
+    color: var(--ember);
+  }
+
+  .timer-value.success {
+    color: var(--arc);
+  }
+
+  /* Action button in expired state */
+  .retry-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--raised);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .retry-btn:hover {
+    border-color: var(--hairline-hover);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  /* Footer */
+  .sheet-footer {
+    border-top: 1px solid var(--hairline);
+    padding-top: 14px;
+    margin-top: 24px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-tertiary);
+    text-align: center;
+  }
+
+  /* Subtle pulsing cursor inside focused empty code box */
+  .cursor-tick {
+    display: inline-block;
+    width: 1.5px;
+    height: 18px;
+    background: var(--arc);
+    animation: blink 1s infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* Responsive hint banner */
+  .spec-bottom {
+    max-width: 1400px;
+    margin: 32px auto 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--hairline);
+    padding-top: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+</style>
+</head>
+<body>
+
+  <!-- Top System Telemetry Strip -->
+  <div class="spec-strip">
+    <div class="spec-left">
+      <div class="spec-pill"><span class="dot"></span> PERSONAL AI OS · AUTH COMPONENT</div>
+      <span>DEVICE PAIRING FLOW</span>
+    </div>
+    <div>Target: 1440 × 900 · 440px Centered Glass Sheet · Zero Private Data · No Nav</div>
+    <div>Wed 21 Oct 2026 · 10:42 IST</div>
+  </div>
+
+  <!-- 4 State Frames Side-by-Side -->
+  <div class="frames-grid">
+
+    <!-- ==============================================
+         STATE (A): IDLE
+         ============================================== -->
+    <div class="state-frame">
+      <div class="state-label">
+        <span class="state-tag idle"><span class="state-indicator"></span> State A · Idle</span>
+        <span>Awaiting code</span>
+      </div>
+
+      <div class="sheet-card">
+        <!-- Header / Wordmark -->
+        <div class="sheet-header">
+          <div class="brand-glyph">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="7.5" stroke="#62D2E6" stroke-width="1.2" stroke-opacity="0.8"/>
+              <circle cx="9" cy="9" r="2.5" fill="#62D2E6"/>
+            </svg>
+          </div>
+          <div class="brand-wordmark">
+            Personal AI OS
+            <span class="brand-sub">DEVICE SETUP</span>
+          </div>
+        </div>
+
+        <!-- Title Block -->
+        <div class="sheet-title-block">
+          <h1 class="sheet-title">Pair this device</h1>
+          <p class="sheet-subline">Sign-in happens through your Telegram account. No password is stored here.</p>
+        </div>
+
+        <!-- 3 Numbered Steps -->
+        <div class="steps-list">
+          
+          <!-- Step 1 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">01</span>
+              <span>Open your bot in Telegram and send</span>
+            </div>
+            <div class="copy-chip-wrapper">
+              <div class="mono-chip" title="Click to copy command">
+                <span>/pair</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">02</span>
+              <span>Enter the one-time code it sends back</span>
+            </div>
+            <div class="code-boxes-grid">
+              <div class="code-box focused"><span class="cursor-tick"></span></div>
+              <div class="code-box"></div>
+              <div class="code-box"></div>
+              <div class="code-box"></div>
+              <div class="code-box"></div>
+              <div class="code-box"></div>
+            </div>
+            <div class="state-feedback idle">
+              <span>Ready for input</span>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">03</span>
+              <span>This code works once and expires in</span>
+            </div>
+            <div class="timer-row">
+              <div class="timer-left">
+                <!-- Dashed neutral Presence Ring -->
+                <svg class="presence-ring-svg" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="var(--hairline)" stroke-width="2"/>
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="var(--text-tertiary)" stroke-width="2" stroke-dasharray="4 3"/>
+                </svg>
+                <span class="timer-status-text">Awaiting code</span>
+              </div>
+              <span class="timer-value">01:48</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="sheet-footer">
+          Private to one owner. Sessions can be revoked in Settings.
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ==============================================
+         STATE (B): WRONG CODE
+         ============================================== -->
+    <div class="state-frame">
+      <div class="state-label">
+        <span class="state-tag wrong"><span class="state-indicator"></span> State B · Wrong code</span>
+        <span>2 attempts left</span>
+      </div>
+
+      <div class="sheet-card">
+        <!-- Header / Wordmark -->
+        <div class="sheet-header">
+          <div class="brand-glyph">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="7.5" stroke="#62D2E6" stroke-width="1.2" stroke-opacity="0.8"/>
+              <circle cx="9" cy="9" r="2.5" fill="#62D2E6"/>
+            </svg>
+          </div>
+          <div class="brand-wordmark">
+            Personal AI OS
+            <span class="brand-sub">DEVICE SETUP</span>
+          </div>
+        </div>
+
+        <!-- Title Block -->
+        <div class="sheet-title-block">
+          <h1 class="sheet-title">Pair this device</h1>
+          <p class="sheet-subline">Sign-in happens through your Telegram account. No password is stored here.</p>
+        </div>
+
+        <!-- 3 Numbered Steps -->
+        <div class="steps-list">
+          
+          <!-- Step 1 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">01</span>
+              <span>Open your bot in Telegram and send</span>
+            </div>
+            <div class="copy-chip-wrapper">
+              <div class="mono-chip">
+                <span>/pair</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">02</span>
+              <span>Enter the one-time code it sends back</span>
+            </div>
+            <div class="code-boxes-grid">
+              <div class="code-box error">7</div>
+              <div class="code-box error">3</div>
+              <div class="code-box error">9</div>
+              <div class="code-box error">4</div>
+              <div class="code-box error">1</div>
+              <div class="code-box error">8</div>
+            </div>
+            <div class="state-feedback error">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <span>Code not recognised. 2 attempts left.</span>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">03</span>
+              <span>This code works once and expires in</span>
+            </div>
+            <div class="timer-row">
+              <div class="timer-left">
+                <!-- Dashed neutral countdown ring -->
+                <svg class="presence-ring-svg" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="var(--hairline)" stroke-width="2"/>
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="var(--crimson)" stroke-width="2" stroke-dasharray="35 60"/>
+                </svg>
+                <span class="timer-status-text">Expires soon</span>
+              </div>
+              <span class="timer-value">01:14</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="sheet-footer">
+          Private to one owner. Sessions can be revoked in Settings.
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ==============================================
+         STATE (C): EXPIRED
+         ============================================== -->
+    <div class="state-frame">
+      <div class="state-label">
+        <span class="state-tag expired"><span class="state-indicator"></span> State C · Expired</span>
+        <span>Re-issue required</span>
+      </div>
+
+      <div class="sheet-card">
+        <!-- Header / Wordmark -->
+        <div class="sheet-header">
+          <div class="brand-glyph">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="7.5" stroke="#62D2E6" stroke-width="1.2" stroke-opacity="0.8"/>
+              <circle cx="9" cy="9" r="2.5" fill="#62D2E6"/>
+            </svg>
+          </div>
+          <div class="brand-wordmark">
+            Personal AI OS
+            <span class="brand-sub">DEVICE SETUP</span>
+          </div>
+        </div>
+
+        <!-- Title Block -->
+        <div class="sheet-title-block">
+          <h1 class="sheet-title">Pair this device</h1>
+          <p class="sheet-subline">Sign-in happens through your Telegram account. No password is stored here.</p>
+        </div>
+
+        <!-- 3 Numbered Steps -->
+        <div class="steps-list">
+          
+          <!-- Step 1 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">01</span>
+              <span>Open your bot in Telegram and send</span>
+            </div>
+            <div class="copy-chip-wrapper">
+              <div class="mono-chip">
+                <span>/pair</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">02</span>
+              <span>Enter the one-time code it sends back</span>
+            </div>
+            <div class="code-boxes-grid">
+              <div class="code-box disabled">·</div>
+              <div class="code-box disabled">·</div>
+              <div class="code-box disabled">·</div>
+              <div class="code-box disabled">·</div>
+              <div class="code-box disabled">·</div>
+              <div class="code-box disabled">·</div>
+            </div>
+            <div class="state-feedback expired">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span>This code has expired. Send /pair again.</span>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">03</span>
+              <span>This code works once and expires in</span>
+            </div>
+            <div class="timer-row">
+              <div class="timer-left">
+                <!-- Dimmed ring with Ember accent -->
+                <svg class="presence-ring-svg" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="var(--hairline)" stroke-width="2"/>
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="var(--ember)" stroke-width="2" stroke-dasharray="1 10"/>
+                </svg>
+                <span class="timer-status-text">Session timed out</span>
+              </div>
+              <span class="timer-value expired">00:00</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="sheet-footer">
+          Private to one owner. Sessions can be revoked in Settings.
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ==============================================
+         STATE (D): SUCCESS
+         ============================================== -->
+    <div class="state-frame">
+      <div class="state-label">
+        <span class="state-tag success"><span class="state-indicator"></span> State D · Success</span>
+        <span>Authenticated</span>
+      </div>
+
+      <div class="sheet-card">
+        <!-- Header / Wordmark -->
+        <div class="sheet-header">
+          <div class="brand-glyph">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="7.5" stroke="#62D2E6" stroke-width="1.2" stroke-opacity="0.8"/>
+              <circle cx="9" cy="9" r="2.5" fill="#62D2E6"/>
+            </svg>
+          </div>
+          <div class="brand-wordmark">
+            Personal AI OS
+            <span class="brand-sub">DEVICE SETUP</span>
+          </div>
+        </div>
+
+        <!-- Title Block -->
+        <div class="sheet-title-block">
+          <h1 class="sheet-title">Pair this device</h1>
+          <p class="sheet-subline">Sign-in happens through your Telegram account. No password is stored here.</p>
+        </div>
+
+        <!-- 3 Numbered Steps -->
+        <div class="steps-list">
+          
+          <!-- Step 1 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">01</span>
+              <span>Open your bot in Telegram and send</span>
+            </div>
+            <div class="copy-chip-wrapper">
+              <div class="mono-chip" style="opacity: 0.7;">
+                <span>/pair</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 6L9 17l-5-5"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">02</span>
+              <span>Enter the one-time code it sends back</span>
+            </div>
+            <div class="code-boxes-grid">
+              <div class="code-box success">5</div>
+              <div class="code-box success">8</div>
+              <div class="code-box success">2</div>
+              <div class="code-box success">0</div>
+              <div class="code-box success">4</div>
+              <div class="code-box success">6</div>
+            </div>
+            <div class="state-feedback success">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>Paired. Opening Today…</span>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step-row">
+            <div class="step-head">
+              <span class="step-num">03</span>
+              <span>This code works once and expires in</span>
+            </div>
+            <div class="timer-row">
+              <div class="timer-left">
+                <!-- Full resolved ARC ring -->
+                <svg class="presence-ring-svg" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="var(--hairline)" stroke-width="2"/>
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="var(--arc)" stroke-width="2.2"/>
+                </svg>
+                <span class="timer-status-text" style="color: var(--arc);">Verified</span>
+              </div>
+              <span class="timer-value success">Done</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="sheet-footer">
+          Private to one owner. Sessions can be revoked in Settings.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Technical Token Specs -->
+  <div class="spec-bottom">
+    <div>Tokens: Surface rgba(17, 20, 26, 0.72) · 24px blur · Top edge rgba(255,255,255,0.15) · Radius 12px</div>
+    <div>Palette: ARC #62D2E6 · EMBER #E8B04A · CRIMSON #E5545B · TEXT #E8ECF1 / #9AA4B2 / #6B7585</div>
+  </div>
+
+</body>
+</html>

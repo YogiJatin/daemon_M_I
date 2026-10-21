@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Personal AI OS — Tasks</title>
+<!-- Tailwind CSS v3 with forms and container queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0A0C0F',
+            surface: {
+              DEFAULT: '#11141A',
+              dim: '#0C0E12',
+              bright: '#1A1D24',
+              raised: '#171B22',
+            },
+            hairline: 'rgba(255, 255, 255, 0.07)',
+            'hairline-bright': 'rgba(255, 255, 255, 0.14)',
+            text: {
+              primary: '#E8ECF1',
+              secondary: '#9AA4B2',
+              muted: '#6B7585',
+            },
+            arc: {
+              DEFAULT: '#62D2E6',
+              dim: 'rgba(98, 210, 230, 0.12)',
+              glow: 'rgba(98, 210, 230, 0.25)'
+            },
+            ember: {
+              DEFAULT: '#E8B04A',
+              dim: 'rgba(232, 176, 74, 0.12)',
+              border: 'rgba(232, 176, 74, 0.28)'
+            },
+            crimson: {
+              DEFAULT: '#E5545B',
+              dim: 'rgba(229, 84, 91, 0.12)',
+              border: 'rgba(229, 84, 91, 0.28)'
+            }
+          },
+          fontFamily: {
+            sans: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'ui-monospace', 'Menlo', 'monospace']
+          },
+          borderRadius: {
+            'custom-sm': '4px',
+            'custom': '8px',
+            'custom-lg': '12px'
+          }
+        }
+      }
+    };
+  </script>
+<!-- Typography: Instrument Sans & IBM Plex Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&amp;family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<style data-purpose="base-styling">
+    body {
+      background-color: #0A0C0F;
+      color: #E8ECF1;
+      font-family: 'Instrument Sans', sans-serif;
+      overflow-x: hidden;
+      letter-spacing: -0.01em;
+    }
+    .font-mono-code {
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    /* Custom clean scrollbars */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0A0C0F;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #232731;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #333846;
+    }
+  </style>
+<style data-purpose="glass-and-borders">
+    .glass-drawer {
+      background: rgba(17, 20, 26, 0.88);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), -6px 0 24px rgba(0, 0, 0, 0.45);
+    }
+    .cell-divider {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .selection-row-active {
+      background: rgba(98, 210, 230, 0.06);
+      box-shadow: inset 2px 0 0 0 #62D2E6;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen flex overflow-hidden select-none text-[13px] antialiased">
+<!-- BEGIN: SidebarNav -->
+<!-- Persistent Left Sidebar Navigation directly matching SCREEN_6 design system -->
+<aside class="w-[230px] flex-shrink-0 bg-[#0A0C0F] border-r border-hairline flex flex-col justify-between py-4 select-none" data-purpose="main-sidebar">
+<div class="flex flex-col">
+<!-- Workspace / Branding Header -->
+<div class="px-5 mb-7 flex items-center space-x-2.5">
+<svg class="w-5 h-5 text-arc" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-dasharray="2 3" stroke-opacity="0.3"></circle>
+<path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" stroke-linecap="round"></path>
+<circle cx="12" cy="12" fill="currentColor" r="3"></circle>
+</svg>
+<span class="font-medium text-[14px] text-text-primary tracking-tight">Personal AI OS</span>
+</div>
+<!-- Nav Section: PRIMARY -->
+<div class="px-3 mb-6">
+<div class="px-2 mb-2 text-[10px] uppercase font-mono-code tracking-wider text-text-muted font-medium">Primary</div>
+<nav class="space-y-0.5">
+<a class="flex items-center px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised rounded-custom transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-text-muted" fill="none" stroke="currentColor" stroke-width="1.75" viewbox="0 0 24 24">
+<rect height="18" rx="2" ry="2" width="18" x="3" y="4"></rect><line x1="16" x2="16" y1="2" y2="6"></line><line x1="8" x2="8" y1="2" y2="6"></line><line x1="3" x2="21" y1="10" y2="10"></line>
+</svg>
+<span>Today</span>
+</a>
+<a class="flex items-center px-2.5 py-1.5 text-text-primary bg-surface-raised rounded-custom font-medium transition-colors border-l-2 border-arc" href="#">
+<svg class="w-4 h-4 mr-2.5 text-arc" fill="none" stroke="currentColor" stroke-width="1.75" viewbox="0 0 24 24">
+<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span>Tasks</span>
+<span class="ml-auto font-mono-code text-[11px] text-text-muted">7</span>
+</a>
+<a class="flex items-center px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised rounded-custom transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-text-muted" fill="none" stroke="currentColor" stroke-width="1.75" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+</svg>
+<span>Timetable</span>
+</a>
+<a class="flex items-center px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised rounded-custom transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-text-muted" fill="none" stroke="currentColor" stroke-width="1.75" viewbox="0 0 24 24">
+<path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+</svg>
+<span>Recurring</span>
+</a>
+</nav>
+</div>
+<!-- Nav Section: SECONDARY -->
+<div class="px-3 mb-6">
+<div class="px-2 mb-2 text-[10px] uppercase font-mono-code tracking-wider text-text-muted font-medium">Secondary</div>
+<nav class="space-y-0.5">
+<a class="flex items-center px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised rounded-custom transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-text-muted" fill="none" stroke="currentColor" stroke-width="1.75" viewbox="0 0 24 24">
+<path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+</svg>
+<span>Suggestions</span>
+</a>
+<a class="flex items-center px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised rounded-custom transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-text-muted" fill="none" stroke="currentColor" stroke-width="1.75" viewbox="0 0 24 24">
+<path d="M22 12h-6l-2 3h-4l-2-3H2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-7z"></path><path d="M5.45 5.11L2 12v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-7l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+</svg>
+<span>Inbox</span>
+</a>
+<a class="flex items-center px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised rounded-custom transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-text-muted" fill="none" stroke="currentColor" stroke-width="1.75" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 8 14"></polyline>
+</svg>
+<span>History</span>
+</a>
+</nav>
+</div>
+<!-- Nav Section: SYSTEM -->
+<div class="px-3">
+<div class="px-2 mb-2 text-[10px] uppercase font-mono-code tracking-wider text-text-muted font-medium">System</div>
+<nav class="space-y-0.5">
+<a class="flex items-center px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised rounded-custom transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-text-muted" fill="none" stroke="currentColor" stroke-width="1.75" viewbox="0 0 24 24">
+<rect height="14" rx="2" ry="2" width="20" x="2" y="3"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line>
+</svg>
+<span>Desktop</span>
+</a>
+<a class="flex items-center px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised rounded-custom transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-text-muted" fill="none" stroke="currentColor" stroke-width="1.75" viewbox="0 0 24 24">
+<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+</svg>
+<span>Health</span>
+</a>
+<a class="flex items-center px-2.5 py-1.5 text-text-secondary hover:text-text-primary hover:bg-surface-raised rounded-custom transition-colors" href="#">
+<svg class="w-4 h-4 mr-2.5 text-text-muted" fill="none" stroke="currentColor" stroke-width="1.75" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+</svg>
+<span>Settings</span>
+</a>
+</nav>
+</div>
+</div>
+<!-- Daemon status card at sidebar footer -->
+<div class="px-3">
+<div class="bg-surface-raised border border-hairline rounded-custom px-3 py-2 flex items-center space-x-2.5">
+<span class="w-2 h-2 rounded-full bg-arc animate-pulse"></span>
+<div class="flex flex-col">
+<span class="font-mono-code text-[11px] text-text-primary leading-tight">rpi-relay-blr</span>
+<span class="font-mono-code text-[10px] text-text-muted leading-tight">synced 14s ago</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- END: SidebarNav -->
+<!-- BEGIN: MainContentArea -->
+<div class="flex-1 flex flex-col min-w-0 bg-bg overflow-hidden">
+<!-- BEGIN: TopBar -->
+<header class="h-12 border-b border-hairline px-6 flex items-center justify-between flex-shrink-0 bg-bg" data-purpose="top-header">
+<div class="flex items-center space-x-3">
+<!-- Section tag badge -->
+<span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded bg-[#162024] border border-[#233f44] text-arc font-mono-code text-[11px] tracking-wide uppercase font-medium">
+<span class="w-1.5 h-1.5 rounded-full bg-arc"></span>
+<span>Tasks</span>
+</span>
+</div>
+<!-- Center & Right system items: Scheduler status, Command line, Profile -->
+<div class="flex items-center space-x-4">
+<!-- Presence Ring & Status Indicator -->
+<div class="flex items-center space-x-2 text-text-secondary font-mono-code text-[11px]">
+<svg class="w-4 h-4 text-arc animate-spin-slow" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.2"></circle>
+<path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" stroke-linecap="round"></path>
+</svg>
+<span>Scheduler <span class="text-text-muted">·</span> 38s ago <span class="text-text-muted">·</span> 96%</span>
+</div>
+<!-- Command Palette Trigger Input -->
+<div class="relative w-72">
+<div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-text-muted">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<input class="w-full bg-surface-raised border border-hairline text-text-muted text-[12px] rounded-custom pl-8 pr-12 py-1 cursor-pointer hover:border-hairline-bright focus:outline-none" readonly="" type="text" value="Add task or type a command…"/>
+<span class="absolute inset-y-0 right-0 pr-2 flex items-center font-mono-code text-[10px] text-text-muted pointer-events-none">Ctrl K</span>
+</div>
+<!-- User profile icon button -->
+<button class="w-7 h-7 rounded-custom bg-surface-bright border border-hairline flex items-center justify-center text-text-primary hover:border-hairline-bright transition-colors" title="Account profile">
+<svg class="w-4 h-4 text-arc" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+</svg>
+</button>
+</div>
+</header>
+<!-- END: TopBar -->
+<!-- Content Workspace Layout: Split between Table View and Right Inspection Drawers -->
+<div class="flex-1 flex overflow-hidden">
+<!-- BEGIN: TaskListPanel -->
+<main class="flex-1 flex flex-col overflow-y-auto border-r border-hairline" data-purpose="task-table-view">
+<!-- Header & Filter Toolbar -->
+<div class="p-6 pb-3 border-b border-hairline space-y-4 flex-shrink-0 bg-bg">
+<div class="flex items-center justify-between">
+<div class="flex items-baseline space-x-3">
+<h1 class="text-xl font-semibold text-text-primary tracking-tight">Tasks</h1>
+<span class="font-mono-code text-[12px] text-text-muted">7 active items</span>
+</div>
+<!-- Quick New Task Button -->
+<button class="px-3 py-1.5 rounded-custom bg-arc text-[#071619] font-medium text-[12px] hover:bg-[#7ce0f2] transition-colors flex items-center space-x-1.5 shadow-sm">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span>Capture Task</span>
+</button>
+</div>
+<!-- Controls row: Segmented Status tabs + Filters + Search -->
+<div class="flex items-center justify-between pt-1 gap-2 flex-wrap">
+<!-- Segmented control tabs -->
+<div class="inline-flex p-0.5 rounded-custom bg-surface-dim border border-hairline">
+<button class="px-2.5 py-1 rounded-[6px] bg-surface-bright text-text-primary text-[12px] font-medium flex items-center space-x-1.5 shadow-sm">
+<span>Open</span>
+<span class="font-mono-code text-[10px] px-1.5 py-0.2 rounded-full bg-arc text-[#0A0C0F] font-semibold">7</span>
+</button>
+<button class="px-2.5 py-1 text-text-muted hover:text-text-secondary text-[12px] flex items-center space-x-1.5 transition-colors">
+<span>Snoozed</span>
+<span class="font-mono-code text-[10px] px-1.5 py-0.2 rounded bg-surface-bright text-text-muted">1</span>
+</button>
+<button class="px-2.5 py-1 text-text-muted hover:text-text-secondary text-[12px] flex items-center space-x-1.5 transition-colors">
+<span>Done</span>
+<span class="font-mono-code text-[10px] px-1.5 py-0.2 rounded bg-surface-bright text-text-muted">12</span>
+</button>
+<button class="px-2.5 py-1 text-text-muted hover:text-text-secondary text-[12px] flex items-center space-x-1.5 transition-colors">
+<span>Dismissed</span>
+<span class="font-mono-code text-[10px] px-1.5 py-0.2 rounded bg-surface-bright text-text-muted">2</span>
+</button>
+</div>
+<!-- Filters & Sort -->
+<div class="flex items-center space-x-2">
+<!-- Search Input -->
+<div class="relative w-40">
+<input class="w-full bg-surface-raised border border-hairline text-text-primary text-[12px] rounded-custom pl-7 pr-2 py-1 placeholder-text-muted focus:outline-none focus:border-arc" placeholder="Filter tasks..." type="text"/>
+<svg class="w-3.5 h-3.5 text-text-muted absolute left-2 top-2" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<!-- Filter dropdowns -->
+<button class="px-2.5 py-1 bg-surface-raised border border-hairline rounded-custom text-[12px] text-text-secondary hover:text-text-primary flex items-center space-x-1">
+<span>All Projects</span>
+<svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="px-2.5 py-1 bg-surface-raised border border-hairline rounded-custom text-[12px] text-text-secondary hover:text-text-primary flex items-center space-x-1">
+<span>Priority</span>
+<svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="px-2.5 py-1 bg-surface-raised border border-hairline rounded-custom font-mono-code text-[11px] text-text-secondary hover:text-text-primary flex items-center space-x-1">
+<span>Deadline ▾</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Structured Tasks Table -->
+<div class="flex-1 overflow-x-auto divide-y divide-hairline">
+<!-- Table Column Titles -->
+<div class="grid grid-cols-12 px-6 py-2 bg-surface-dim font-mono-code text-[11px] text-text-muted uppercase tracking-wider sticky top-0 z-10 border-b border-hairline">
+<div class="col-span-5">Title &amp; Meta</div>
+<div class="col-span-3">Deadline</div>
+<div class="col-span-2">Priority</div>
+<div class="col-span-1">Status</div>
+<div class="col-span-1 text-right">Source</div>
+</div>
+<!-- Section: OVERDUE -->
+<div class="bg-bg">
+<div class="px-6 py-2 bg-[#170e10]/40 flex items-center space-x-2 border-b border-crimson/20">
+<span class="w-1.5 h-1.5 rounded-full bg-crimson"></span>
+<span class="font-mono-code text-[11px] font-semibold text-crimson tracking-wider uppercase">Overdue (1)</span>
+</div>
+<!-- Overdue Row 1 -->
+<div class="grid grid-cols-12 px-6 py-3 items-center cell-divider hover:bg-surface-raised/60 transition-colors group cursor-pointer">
+<div class="col-span-5 flex items-center space-x-3 pr-2">
+<input class="rounded-[3px] border-hairline bg-surface text-crimson focus:ring-0 w-3.5 h-3.5 cursor-pointer" type="checkbox"/>
+<div class="flex flex-col">
+<span class="text-text-primary font-medium group-hover:text-white">Submit Digital Logic record book</span>
+<div class="flex items-center space-x-2 text-[11px] text-text-muted mt-0.5">
+<span class="px-1.5 py-0.2 rounded bg-surface-bright text-text-secondary">College</span>
+<span>·</span>
+<span class="text-crimson/90 font-mono-code">1 day late</span>
+</div>
+</div>
+</div>
+<div class="col-span-3 font-mono-code text-crimson text-[12px] font-medium">Overdue · 1 day</div>
+<div class="col-span-2 flex items-center space-x-1 text-crimson">
+<span class="font-mono-code text-[11px] tracking-tight">///</span>
+<span class="text-[11px] text-text-secondary">High</span>
+</div>
+<div class="col-span-1">
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono-code bg-surface-raised text-text-secondary border border-hairline">OPEN</span>
+</div>
+<div class="col-span-1 text-right font-mono-code text-text-muted text-[11px]">Telegram</div>
+</div>
+</div>
+<!-- Section: TODAY -->
+<div class="bg-bg">
+<div class="px-6 py-2 bg-surface-dim/70 flex items-center space-x-2 border-b border-hairline">
+<span class="w-1.5 h-1.5 rounded-full bg-arc"></span>
+<span class="font-mono-code text-[11px] font-semibold text-arc tracking-wider uppercase">Due Today (3 items)</span>
+</div>
+<!-- Today Row 1: Pay library fine -->
+<div class="grid grid-cols-12 px-6 py-3 items-center cell-divider hover:bg-surface-raised/60 transition-colors group cursor-pointer">
+<div class="col-span-5 flex items-center space-x-3 pr-2">
+<input class="rounded-[3px] border-hairline bg-surface text-arc focus:ring-0 w-3.5 h-3.5 cursor-pointer" type="checkbox"/>
+<div class="flex flex-col">
+<span class="text-text-primary font-medium group-hover:text-white">Pay library fine</span>
+<div class="flex items-center space-x-2 text-[11px] text-text-muted mt-0.5">
+<span class="px-1.5 py-0.2 rounded bg-surface-bright text-text-secondary">Personal</span>
+<span>·</span>
+<span class="font-mono-code text-text-muted">₹140 overdue fee</span>
+</div>
+</div>
+</div>
+<div class="col-span-3 font-mono-code text-text-secondary text-[12px]">Wed 21 Oct · all day</div>
+<div class="col-span-2 flex items-center space-x-1 text-text-muted">
+<span class="font-mono-code text-[11px] text-text-secondary">//</span>
+<span class="text-[11px] text-text-secondary">Normal</span>
+</div>
+<div class="col-span-1">
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono-code bg-surface-raised text-text-secondary border border-hairline">OPEN</span>
+</div>
+<div class="col-span-1 text-right font-mono-code text-text-muted text-[11px]">manual</div>
+</div>
+<!-- Today Row 2: Call bank about education loan -->
+<div class="grid grid-cols-12 px-6 py-3 items-center cell-divider hover:bg-surface-raised/60 transition-colors group cursor-pointer">
+<div class="col-span-5 flex items-center space-x-3 pr-2">
+<input class="rounded-[3px] border-hairline bg-surface text-arc focus:ring-0 w-3.5 h-3.5 cursor-pointer" type="checkbox"/>
+<div class="flex flex-col">
+<span class="text-text-primary font-medium group-hover:text-white">Call bank about education loan</span>
+<div class="flex items-center space-x-2 text-[11px] text-text-muted mt-0.5">
+<span class="px-1.5 py-0.2 rounded bg-surface-bright text-text-secondary">Personal</span>
+<span>·</span>
+<span class="font-mono-code text-text-muted">Branch manager #0484</span>
+</div>
+</div>
+</div>
+<div class="col-span-3 font-mono-code text-text-primary text-[12px]">Wed 21 Oct · 16:30</div>
+<div class="col-span-2 flex items-center space-x-1 text-ember">
+<span class="font-mono-code text-[11px]">///</span>
+<span class="text-[11px] text-text-secondary">High</span>
+</div>
+<div class="col-span-1">
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono-code bg-surface-raised text-text-secondary border border-hairline">OPEN</span>
+</div>
+<div class="col-span-1 text-right font-mono-code text-text-muted text-[11px]">from app</div>
+</div>
+<!-- Today Row 3: Data Structures assignment 4 upload [SELECTED ACTIVE ROW] -->
+<div class="grid grid-cols-12 px-6 py-3 items-center selection-row-active cell-divider transition-colors cursor-pointer relative">
+<div class="col-span-5 flex items-center space-x-3 pr-2">
+<input class="rounded-[3px] border-hairline bg-surface text-arc focus:ring-0 w-3.5 h-3.5 cursor-pointer" type="checkbox"/>
+<div class="flex flex-col">
+<div class="flex items-center space-x-2">
+<span class="text-text-primary font-medium text-[13px] text-arc">Data Structures assignment 4 upload</span>
+<span class="w-1.5 h-1.5 rounded-full bg-arc inline-block" title="Viewing in drawer"></span>
+</div>
+<div class="flex items-center space-x-2 text-[11px] text-text-muted mt-0.5">
+<span class="px-1.5 py-0.2 rounded bg-surface-raised border border-hairline text-text-secondary">College</span>
+<span>·</span>
+<span class="font-mono-code text-arc/90">CS-201 · portal deadline</span>
+</div>
+</div>
+</div>
+<div class="col-span-3 font-mono-code text-arc font-medium text-[12px]">Wed 21 Oct · 18:00</div>
+<div class="col-span-2 flex items-center space-x-1.5 text-crimson font-medium">
+<span class="font-mono-code text-[11px] tracking-tighter">////</span>
+<span class="text-[11px] text-crimson uppercase tracking-wider font-semibold">Urgent</span>
+</div>
+<div class="col-span-1">
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono-code bg-arc-dim text-arc border border-arc/30 font-medium">ACTIVE</span>
+</div>
+<div class="col-span-1 text-right font-mono-code text-arc text-[11px] flex items-center justify-end space-x-1">
+<svg class="w-3 h-3 text-arc" fill="currentColor" viewbox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H8l5-7v4h3l-5 7z"></path></svg>
+<span>Telegram</span>
+</div>
+</div>
+</div>
+<!-- Section: THIS WEEK -->
+<div class="bg-bg">
+<div class="px-6 py-2 bg-surface-dim/40 flex items-center space-x-2 border-b border-hairline">
+<span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
+<span class="font-mono-code text-[11px] text-text-muted tracking-wider uppercase font-medium">This Week (2)</span>
+</div>
+<!-- Week Row 1: Gym membership -->
+<div class="grid grid-cols-12 px-6 py-3 items-center cell-divider hover:bg-surface-raised/60 transition-colors group cursor-pointer">
+<div class="col-span-5 flex items-center space-x-3 pr-2">
+<input class="rounded-[3px] border-hairline bg-surface text-arc focus:ring-0 w-3.5 h-3.5 cursor-pointer" type="checkbox"/>
+<div class="flex flex-col">
+<span class="text-text-primary font-medium group-hover:text-white">Renew gym membership</span>
+<div class="flex items-center space-x-2 text-[11px] text-text-muted mt-0.5">
+<span class="px-1.5 py-0.2 rounded bg-surface-bright text-text-secondary">Personal</span>
+</div>
+</div>
+</div>
+<div class="col-span-3 font-mono-code text-text-secondary text-[12px]">Fri 23 Oct · all day</div>
+<div class="col-span-2 flex items-center space-x-1 text-text-muted">
+<span class="font-mono-code text-[11px]">//</span>
+<span class="text-[11px] text-text-secondary">Normal</span>
+</div>
+<div class="col-span-1">
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono-code bg-surface-raised text-text-secondary border border-hairline">OPEN</span>
+</div>
+<div class="col-span-1 text-right font-mono-code text-text-muted text-[11px]">manual</div>
+</div>
+<!-- Week Row 2: Train tickets -->
+<div class="grid grid-cols-12 px-6 py-3 items-center cell-divider hover:bg-surface-raised/60 transition-colors group cursor-pointer">
+<div class="col-span-5 flex items-center space-x-3 pr-2">
+<input class="rounded-[3px] border-hairline bg-surface text-arc focus:ring-0 w-3.5 h-3.5 cursor-pointer" type="checkbox"/>
+<div class="flex flex-col">
+<span class="text-text-primary font-medium group-hover:text-white">Book train tickets for Diwali</span>
+<div class="flex items-center space-x-2 text-[11px] text-text-muted mt-0.5">
+<span class="px-1.5 py-0.2 rounded bg-surface-bright text-text-secondary">Travel</span>
+<span>·</span>
+<span class="text-text-muted">IRCTC opens 08:00</span>
+</div>
+</div>
+</div>
+<div class="col-span-3 font-mono-code text-text-secondary text-[12px]">Mon 26 Oct · all day</div>
+<div class="col-span-2 flex items-center space-x-1 text-text-muted">
+<span class="font-mono-code text-[11px]">//</span>
+<span class="text-[11px] text-text-secondary">Normal</span>
+</div>
+<div class="col-span-1">
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono-code bg-surface-raised text-text-secondary border border-hairline">OPEN</span>
+</div>
+<div class="col-span-1 text-right font-mono-code text-text-muted text-[11px]">manual</div>
+</div>
+</div>
+<!-- Section: LATER / NO DATE -->
+<div class="bg-bg">
+<div class="px-6 py-2 bg-surface-dim/40 flex items-center space-x-2 border-b border-hairline">
+<span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>
+<span class="font-mono-code text-[11px] text-text-muted tracking-wider uppercase font-medium">Later / No Date (1)</span>
+</div>
+<!-- Row 1: Discrete math -->
+<div class="grid grid-cols-12 px-6 py-3 items-center cell-divider hover:bg-surface-raised/60 transition-colors group cursor-pointer">
+<div class="col-span-5 flex items-center space-x-3 pr-2">
+<input class="rounded-[3px] border-hairline bg-surface text-arc focus:ring-0 w-3.5 h-3.5 cursor-pointer" type="checkbox"/>
+<div class="flex flex-col">
+<span class="text-text-primary font-medium group-hover:text-white">Read Discrete Math ch. 6</span>
+<div class="flex items-center space-x-2 text-[11px] text-text-muted mt-0.5">
+<span class="px-1.5 py-0.2 rounded bg-surface-bright text-text-secondary">College</span>
+</div>
+</div>
+</div>
+<div class="col-span-3 font-mono-code text-text-muted text-[12px]">No date</div>
+<div class="col-span-2 flex items-center space-x-1 text-text-muted">
+<span class="font-mono-code text-[11px]">/</span>
+<span class="text-[11px] text-text-muted">Low</span>
+</div>
+<div class="col-span-1">
+<span class="px-1.5 py-0.5 rounded text-[10px] font-mono-code bg-surface-raised text-text-secondary border border-hairline">OPEN</span>
+</div>
+<div class="col-span-1 text-right font-mono-code text-text-muted text-[11px]">manual</div>
+</div>
+</div>
+</div>
+<!-- Table Summary / Footer Bar matching SCREEN_6 style -->
+<div class="px-6 py-3 border-t border-hairline bg-surface-dim flex items-center justify-between text-text-muted text-[11px] font-mono-code">
+<span>Individual reminders today 1 of 3 · Quiet hours 22:00–06:30 · Next digest 20:30</span>
+<span>Personal AI OS v4.12.8-rel</span>
+</div>
+</main>
+<!-- END: TaskListPanel -->
+<!-- BEGIN: InspectionDrawersContainer -->
+<!-- Houses the Primary Selected Task Drawer alongside the Edge Case Comparative Drawer -->
+<aside class="w-[780px] flex-shrink-0 flex divide-x divide-hairline bg-surface-dim overflow-y-auto" data-purpose="drawers-dual-pane">
+<!-- ============================================== -->
+<!-- DRAWER FRAME 1: ACTIVE INSPECTION (400px wide) -->
+<!-- ============================================== -->
+<div class="w-[400px] flex-shrink-0 flex flex-col glass-drawer h-full overflow-y-auto" data-purpose="primary-task-drawer">
+<!-- Drawer Header -->
+<div class="p-5 border-b border-hairline">
+<div class="flex items-center justify-between mb-3">
+<div class="flex items-center space-x-2">
+<span class="px-2 py-0.5 rounded font-mono-code text-[11px] bg-arc-dim text-arc border border-arc/20 uppercase font-semibold">Open</span>
+<span class="flex items-center space-x-1 font-mono-code text-[11px] text-crimson font-medium bg-crimson-dim px-1.5 py-0.5 rounded border border-crimson/20">
+<span class="tracking-tight">////</span>
+<span class="uppercase tracking-wider">Urgent</span>
+</span>
+</div>
+<div class="flex items-center space-x-1">
+<button class="p-1 text-text-muted hover:text-text-primary rounded hover:bg-surface-bright" title="Close Drawer">
+<svg class="w-4 h-4" fill="none" stroke="currentColor" viewbox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+</div>
+</div>
+<!-- Task Title -->
+<h2 class="text-base font-semibold text-text-primary leading-snug">Data Structures assignment 4 upload</h2>
+<div class="text-[12px] text-text-muted mt-1 font-mono-code">ID: task_982bf · College / CS-201</div>
+<!-- Actions Toolbar -->
+<div class="grid grid-cols-4 gap-1.5 mt-4">
+<button class="py-1.5 px-2 bg-surface-raised border border-hairline hover:border-hairline-bright hover:bg-[#1E232D] text-text-primary rounded-custom text-[11px] font-medium text-center transition-colors">Done</button>
+<button class="py-1.5 px-2 bg-surface-raised border border-hairline hover:border-hairline-bright hover:bg-[#1E232D] text-text-primary rounded-custom text-[11px] font-medium text-center transition-colors">Snooze ▾</button>
+<button class="py-1.5 px-2 bg-surface-raised border border-hairline hover:border-hairline-bright hover:bg-[#1E232D] text-text-primary rounded-custom text-[11px] font-medium text-center transition-colors">Edit</button>
+<button class="py-1.5 px-2 bg-surface-raised border border-hairline hover:border-crimson/30 hover:text-crimson text-text-muted rounded-custom text-[11px] font-medium text-center transition-colors">Dismiss</button>
+</div>
+</div>
+<!-- Section: "Why am I being reminded?" (Calm Intelligence Styling) -->
+<div class="p-5 border-b border-hairline space-y-4">
+<div class="flex items-center space-x-2">
+<div class="w-2 h-2 rounded-full bg-arc"></div>
+<h3 class="text-[12px] font-mono-code uppercase font-semibold text-text-primary tracking-wider">Why am I being reminded?</h3>
+</div>
+<!-- Explanation Points -->
+<div class="bg-surface-raised/80 rounded-custom p-3.5 border border-hairline space-y-3">
+<!-- Point 1: Source -->
+<div class="space-y-1">
+<div class="text-[11px] font-mono-code text-text-muted uppercase">1. Origin &amp; Capture</div>
+<div class="text-[12px] text-text-secondary flex items-start space-x-2">
+<svg class="w-3.5 h-3.5 text-arc mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+<span>Telegram · captured <span class="text-text-primary font-medium">Wed 09:10</span> · saved exactly as typed</span>
+</div>
+</div>
+<!-- Point 2: Deadline -->
+<div class="space-y-1 pt-1 border-t border-hairline">
+<div class="text-[11px] font-mono-code text-text-muted uppercase">2. Target Deadline</div>
+<div class="text-[12px] text-text-secondary flex items-start space-x-2">
+<svg class="w-3.5 h-3.5 text-crimson mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+<span><span class="text-text-primary font-mono-code font-medium">Wed 21 Oct · 18:00 IST</span> · version 1</span>
+</div>
+</div>
+<!-- Point 3: Plan (Horizontal Stage Timeline) -->
+<div class="space-y-2 pt-1 border-t border-hairline">
+<div class="text-[11px] font-mono-code text-text-muted uppercase">3. Delivery Schedule Plan</div>
+<div class="bg-surface-dim rounded border border-hairline p-3">
+<!-- Stage Timeline Nodes -->
+<div class="relative flex items-center justify-between">
+<div class="absolute left-3 right-3 top-2.5 h-[2px] bg-[#272B35] z-0"></div>
+<!-- Node 1 -->
+<div class="relative z-10 flex flex-col items-start">
+<div class="w-5 h-5 rounded-full bg-surface-bright border-2 border-arc flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-arc"></div>
+</div>
+<div class="mt-1.5">
+<div class="font-mono-code text-[11px] text-text-primary font-medium">16:00</div>
+<div class="text-[10px] text-arc leading-tight font-mono-code">2h advance · pending</div>
+</div>
+</div>
+<!-- Node 2 -->
+<div class="relative z-10 flex flex-col items-end">
+<div class="w-5 h-5 rounded-full bg-surface-bright border-2 border-crimson flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-crimson"></div>
+</div>
+<div class="mt-1.5 text-right">
+<div class="font-mono-code text-[11px] text-text-primary font-medium">18:00</div>
+<div class="text-[10px] text-text-muted leading-tight font-mono-code">deadline</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Point 4: Notification State & History Glyphs -->
+<div class="space-y-1 pt-1 border-t border-hairline">
+<div class="text-[11px] font-mono-code text-text-muted uppercase">4. Delivery History</div>
+<div class="flex items-center space-x-2 text-[11px] font-mono-code text-text-muted bg-surface-dim/60 px-2.5 py-1.5 rounded border border-hairline">
+<span class="w-2 h-2 rounded-full border border-arc/70"></span>
+<span class="text-text-secondary">(Nothing sent yet · queued for 16:00 IST)</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Section: Audit Log / History -->
+<div class="p-5 space-y-2">
+<div class="text-[11px] font-mono-code uppercase font-semibold text-text-muted tracking-wider">Audit Log &amp; History</div>
+<div class="font-mono-code text-[11px] space-y-1.5 bg-surface-dim p-3 rounded-custom border border-hairline">
+<div class="flex items-center justify-between text-text-secondary">
+<span class="text-text-muted">09:10</span>
+<span class="text-text-primary">created</span>
+<span class="text-text-muted">owner:telegram</span>
+</div>
+<div class="flex items-center justify-between text-text-secondary">
+<span class="text-text-muted">09:14</span>
+<span class="text-crimson font-medium">priority normal → urgent</span>
+<span class="text-text-muted">owner:web</span>
+</div>
+<div class="flex items-center justify-between text-text-muted">
+<span>09:14</span>
+<span>schedule calculated: 16:00</span>
+<span>daemon:scheduler</span>
+</div>
+</div>
+</div>
+</div>
+<!-- ============================================================== -->
+<!-- DRAWER FRAME 2: EDGE-CASE INSPECTION PANEL (380px wide)        -->
+<!-- "Task created 20 minutes before its deadline (EMBER note state)"-->
+<!-- ============================================================== -->
+<div class="w-[380px] flex-shrink-0 flex flex-col bg-surface-dim/95 h-full overflow-y-auto" data-purpose="edge-case-drawer">
+<!-- Frame Label Banner -->
+<div class="px-4 py-2 bg-surface-bright/70 border-b border-hairline flex items-center justify-between">
+<div class="flex items-center space-x-1.5">
+<span class="w-2 h-2 rounded-full bg-ember"></span>
+<span class="font-mono-code text-[10px] text-ember uppercase tracking-wider font-semibold">Edge-Case Comparison</span>
+</div>
+<span class="font-mono-code text-[10px] text-text-muted">Late-Capture State</span>
+</div>
+<!-- Drawer Top -->
+<div class="p-4 border-b border-hairline">
+<div class="flex items-center space-x-2 mb-2">
+<span class="px-2 py-0.5 rounded font-mono-code text-[10px] bg-ember/15 text-ember border border-ember/30 uppercase font-semibold">Late Entry</span>
+<span class="font-mono-code text-[10px] text-text-muted">task_711a · captured 17:40</span>
+</div>
+<h3 class="text-[14px] font-semibold text-text-primary leading-tight">Physics Lab Pre-Quiz Submission</h3>
+<div class="text-[11px] font-mono-code text-crimson mt-0.5">Deadline: Today · 18:00 IST (in 19m)</div>
+</div>
+<!-- Drawer Body Content -->
+<div class="p-4 space-y-3.5">
+<div class="flex items-center space-x-2">
+<span class="w-1.5 h-1.5 rounded-full bg-ember"></span>
+<span class="text-[11px] font-mono-code uppercase font-semibold text-text-primary tracking-wider">Why am I being reminded?</span>
+</div>
+<!-- Callout: EMBER Note as explicitly required in prompt -->
+<div class="bg-ember-dim border border-ember-border rounded-custom p-3 space-y-1.5">
+<div class="flex items-center space-x-2 text-ember">
+<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="font-mono-code text-[11px] font-semibold uppercase tracking-wide">Schedule Compensation</span>
+</div>
+<p class="text-[12px] text-[#F3D59B] leading-relaxed font-sans">
+                “Created 20 min before the deadline. A 2 h advance reminder isn’t possible; next reminder 17:41.”
+              </p>
+</div>
+<!-- Compensated Stage Timeline -->
+<div class="bg-surface-raised rounded-custom p-3 border border-hairline space-y-2.5">
+<div class="text-[10px] font-mono-code text-text-muted uppercase">Adapted Fast-Track Timeline</div>
+<div class="relative flex items-center justify-between px-1">
+<div class="absolute left-2 right-2 top-2 h-[2px] bg-[#272B35] z-0"></div>
+<!-- T0: Capture -->
+<div class="relative z-10 flex flex-col items-start">
+<div class="w-4 h-4 rounded-full bg-surface-bright border border-text-muted flex items-center justify-center">
+<div class="w-1 h-1 rounded-full bg-text-muted"></div>
+</div>
+<span class="font-mono-code text-[10px] text-text-muted mt-1">17:40</span>
+<span class="font-mono-code text-[9px] text-text-muted">created</span>
+</div>
+<!-- T1: Immediate Emergency Reminder -->
+<div class="relative z-10 flex flex-col items-center">
+<div class="w-4 h-4 rounded-full bg-ember border-2 border-[#11141A] flex items-center justify-center animate-ping-slow">
+<div class="w-1 h-1 rounded-full bg-[#11141A]"></div>
+</div>
+<span class="font-mono-code text-[10px] text-ember font-semibold mt-1">17:41</span>
+<span class="font-mono-code text-[9px] text-ember">immediate</span>
+</div>
+<!-- T2: Final Deadline -->
+<div class="relative z-10 flex flex-col items-end">
+<div class="w-4 h-4 rounded-full bg-surface-bright border border-crimson flex items-center justify-center">
+<div class="w-1 h-1 rounded-full bg-crimson"></div>
+</div>
+<span class="font-mono-code text-[10px] text-crimson font-medium mt-1">18:00</span>
+<span class="font-mono-code text-[9px] text-text-muted">deadline</span>
+</div>
+</div>
+</div>
+<!-- Detailed Edge Conditions -->
+<div class="space-y-1.5 font-mono-code text-[11px]">
+<div class="text-[10px] uppercase text-text-muted">Policy Details</div>
+<div class="p-2.5 rounded bg-surface border border-hairline space-y-1 text-text-secondary text-[11px]">
+<div class="flex justify-between">
+<span class="text-text-muted">Standard lead:</span>
+<span>120 min</span>
+</div>
+<div class="flex justify-between">
+<span class="text-text-muted">Available lead:</span>
+<span class="text-ember font-semibold">20 min (&lt; threshold)</span>
+</div>
+<div class="flex justify-between">
+<span class="text-text-muted">Fallback mode:</span>
+<span>Immediate (T+60s)</span>
+</div>
+</div>
+</div>
+<!-- Edge Case Actions -->
+<div class="pt-2 flex items-center space-x-2">
+<button class="flex-1 py-1 px-2 rounded bg-surface-raised border border-hairline text-text-primary text-[11px] font-mono-code hover:border-hairline-bright transition-colors">
+                Override Schedule
+              </button>
+<button class="py-1 px-3 rounded bg-ember/20 border border-ember/40 text-ember text-[11px] font-mono-code hover:bg-ember/30 transition-colors">
+                Mute
+              </button>
+</div>
+</div>
+</div>
+<!-- END: EdgeCaseDrawer -->
+</aside>
+<!-- END: InspectionDrawersContainer -->
+</div>
+</div>
+<!-- END: MainContentArea -->
+</body></html>

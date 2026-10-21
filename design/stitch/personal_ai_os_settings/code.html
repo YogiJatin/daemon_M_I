@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-primary-fixed-variant": "#004f51",
+          "on-surface-variant": "#bfc8c8",
+          "primary": "#90d2d3",
+          "on-error": "#690005",
+          "surface-container-high": "#282a2e",
+          "inverse-primary": "#216869",
+          "on-primary": "#003738",
+          "primary-fixed": "#aceeef",
+          "on-secondary-fixed-variant": "#5a4309",
+          "on-background": "#e2e2e8",
+          "on-surface": "#e2e2e8",
+          "on-secondary": "#402d00",
+          "primary-fixed-dim": "#90d2d3",
+          "on-tertiary-container": "#fff9f7",
+          "surface-bright": "#37393e",
+          "inverse-on-surface": "#2f3035",
+          "on-primary-fixed": "#002020",
+          "secondary-fixed": "#ffdf9f",
+          "primary-container": "#3a7d7e",
+          "on-secondary-container": "#d5b470",
+          "inverse-surface": "#e2e2e8",
+          "on-tertiary-fixed": "#3b0900",
+          "tertiary-container": "#bd5234",
+          "surface-container-lowest": "#0c0e12",
+          "surface-container-highest": "#333539",
+          "surface-variant": "#333539",
+          "secondary-fixed-dim": "#e4c27d",
+          "on-tertiary": "#601400",
+          "outline-variant": "#3f4948",
+          "surface-dim": "#111317",
+          "error-container": "#93000a",
+          "surface-container-low": "#1a1c20",
+          "tertiary-fixed": "#ffdbd1",
+          "outline": "#899392",
+          "surface": "#111317",
+          "on-primary-container": "#e5ffff",
+          "surface-tint": "#90d2d3",
+          "tertiary-fixed-dim": "#ffb5a0",
+          "background": "#111317",
+          "tertiary": "#ffb5a0",
+          "error": "#ffb4ab",
+          "on-error-container": "#ffdad6",
+          "on-tertiary-fixed-variant": "#82270c",
+          "secondary-container": "#5d450b",
+          "on-secondary-fixed": "#261a00",
+          "secondary": "#e4c27d",
+          "surface-container": "#1e2024"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "gutter-mobile": "0.75rem",
+          "space-sm": "0.5rem",
+          "space-xs": "0.25rem",
+          "gutter": "1rem",
+          "margin": "2rem",
+          "space-xl": "2.5rem",
+          "space-lg": "1.5rem",
+          "margin-mobile": "1rem",
+          "space-md": "1rem"
+        },
+        "fontFamily": {
+          "body-lg": [
+            "IBM Plex Sans"
+          ],
+          "display-lg-mobile": [
+            "IBM Plex Sans"
+          ],
+          "label-md": [
+            "Space Mono"
+          ],
+          "headline-sm": [
+            "IBM Plex Sans"
+          ],
+          "code-md": [
+            "Space Mono"
+          ],
+          "body-md": [
+            "IBM Plex Sans"
+          ],
+          "headline-lg": [
+            "IBM Plex Sans"
+          ],
+          "display-lg": [
+            "IBM Plex Sans"
+          ],
+          "title-md": [
+            "IBM Plex Sans"
+          ],
+          "label-sm": [
+            "Space Mono"
+          ]
+        },
+        "fontSize": {
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0.01em",
+              "fontWeight": "400"
+            }
+          ],
+          "display-lg-mobile": [
+            "30px",
+            {
+              "lineHeight": "38px",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "label-md": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0.04em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "20px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.005em",
+              "fontWeight": "500"
+            }
+          ],
+          "code-md": [
+            "13px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0.01em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "28px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "500"
+            }
+          ],
+          "display-lg": [
+            "40px",
+            {
+              "lineHeight": "48px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "600"
+            }
+          ],
+          "title-md": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "label-sm": [
+            "10px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "400"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-low z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex flex-col"><div class="h-14 px-gutter flex items-center justify-between bg-surface-container-lowest/60"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-primary text-[20px]">terminal</span><span class="font-label-md text-label-md text-on-surface font-bold tracking-tight uppercase">Personal AI OS</span></div><span class="w-1.5 h-1.5 rounded-full bg-primary ring-2 ring-primary/20"></span></div><div class="px-gutter pt-space-md pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Workspace</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="today" href="#">Today</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="tasks" href="#">Tasks</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="timetable" href="#">Timetable</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="recurring" href="#">Recurring</a></nav><div class="px-gutter pt-space-lg pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Intelligence</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="suggestions" href="#">Suggestions</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="inbox" href="#">Inbox</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="history" href="#">History</a></nav><div class="px-gutter pt-space-lg pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">System</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="desktop" href="#">Desktop</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="health" href="#">Health</a><a class="flex items-center px-space-sm py-1.5 rounded bg-surface-container-high text-on-surface font-title-md hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="settings" href="#">Settings</a></nav></div><div class="p-space-sm bg-surface-container-lowest/80 m-space-xs rounded flex flex-col gap-1"><div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Node Relay</span><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span></div><div class="flex items-center gap-1.5 font-code-md text-code-md text-on-surface"><span class="text-primary">rpi-relay-blr</span></div><span class="font-label-sm text-label-sm text-outline">synced 14s ago</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-14 bg-surface-container-low/95 backdrop-blur-xl z-40 px-gutter flex items-center justify-between gap-space-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-2"><div class="relative flex items-center justify-center w-5 h-5"><span class="absolute inline-flex w-full h-full rounded-full opacity-30 bg-primary animate-ping"></span><span class="relative inline-flex w-2.5 h-2.5 rounded-full bg-primary"></span></div><div class="flex items-center gap-2 font-code-md text-code-md text-on-surface-variant"><span class="text-on-surface font-medium">Scheduler</span><span class="text-outline">·</span><span>38s ago</span><span class="text-outline">·</span><span class="text-primary font-medium">96%</span></div></div><div class="relative w-80 lg:w-96"><span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-outline">search</span><input class="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline font-body-md text-body-md pl-8 pr-16 py-1 rounded focus:outline-none focus:ring-1 focus:ring-primary/40" placeholder="Add task or type a command..." readonly="" type="text"/><kbd class="absolute right-2 top-1/2 -translate-y-1/2 font-label-sm text-label-sm text-outline bg-surface-container-high px-1.5 py-0.5 rounded">Ctrl K</kbd></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-1.5 font-code-md text-code-md text-on-surface-variant"><span class="material-symbols-outlined text-[16px] text-outline">schedule</span><span>Wed 21 Oct 2026, 10:42 IST</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="relative pt-14 w-full px-gutter bg-surface min-h-screen"><div class="flex flex-col w-full pb-28">
+<div class="flex flex-col lg:flex-row gap-space-lg w-full max-w-7xl mx-auto pt-space-md">
+<!-- Left Sub-navigation Column -->
+<aside class="w-full lg:w-60 flex-shrink-0">
+<div class="sticky top-20 flex flex-col gap-space-xs bg-surface-container-low/70 p-space-sm rounded-lg backdrop-blur-md">
+<div class="px-space-xs py-1 flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-widest text-outline">Configuration</span>
+<span class="font-code-md text-[11px] text-primary">SYS-CFG::v4.2</span>
+</div>
+<nav class="flex flex-col space-y-1">
+<a class="flex items-center justify-between px-space-sm py-2 rounded bg-surface-container-high text-on-surface shadow-[inset_2px_0_0_0_#90d2d3] transition-all" href="#reminders">
+<span class="font-title-md text-body-md text-primary">Reminders</span>
+<span class="font-code-md text-[10px] text-primary/80 bg-primary/10 px-1 rounded">24H</span>
+</a>
+<a class="flex items-center justify-between px-space-sm py-2 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" href="#timetable">
+<span class="font-body-md text-body-md">Timetable</span>
+<span class="font-code-md text-[10px] text-outline">CRON</span>
+</a>
+<a class="flex items-center justify-between px-space-sm py-2 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" href="#privacy">
+<span class="font-body-md text-body-md">Privacy &amp; AI</span>
+<span class="font-code-md text-[10px] text-error bg-error-container/20 px-1 rounded">RESTRICTED</span>
+</a>
+<a class="flex items-center justify-between px-space-sm py-2 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" href="#data">
+<span class="font-body-md text-body-md">Data &amp; Backups</span>
+<span class="font-code-md text-[10px] text-outline">FS</span>
+</a>
+<a class="flex items-center justify-between px-space-sm py-2 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" href="#devices">
+<span class="font-body-md text-body-md">Devices &amp; Sessions</span>
+<span class="font-code-md text-[10px] text-secondary">3 NODE</span>
+</a>
+</nav>
+<div class="mt-space-md pt-space-sm bg-surface-container-lowest/60 p-space-xs rounded flex flex-col gap-1">
+<span class="font-label-sm text-[10px] uppercase tracking-wider text-outline">Registry Sync</span>
+<div class="flex items-center gap-1.5 font-code-md text-[11px] text-on-surface">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span>rpi-relay-blr.local</span>
+</div>
+<span class="font-code-md text-[10px] text-outline">state: synced (0x7e81fa)</span>
+</div>
+</div>
+</aside>
+<!-- Right Content Column -->
+<div class="flex-1 min-w-0 flex flex-col space-y-space-xl">
+<!-- 1. Header & Timezone -->
+<section class="flex flex-col gap-space-sm">
+<div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Settings</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-0.5">System operational parameters, dispatch boundaries, and data governance.</p>
+</div>
+<span class="font-code-md text-label-md text-outline">INSTANCE: 0x48A-NODE-PRIMARY</span>
+</div>
+<!-- Timezone Row -->
+<div class="flex items-center justify-between p-space-sm rounded bg-surface-container-low text-on-surface">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-outline text-[18px]">lock</span>
+<div class="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+<span class="font-body-md text-body-md text-on-surface">India Standard Time (Asia/Kolkata)</span>
+<span class="hidden sm:inline text-outline">·</span>
+<span class="font-code-md text-label-md text-outline">UTC+05:30 · hardware clock master</span>
+</div>
+</div>
+<span class="font-code-md text-label-sm uppercase tracking-wider bg-surface-container-highest px-2 py-0.5 rounded text-on-surface-variant">
+            Locked
+          </span>
+</div>
+</section>
+<!-- 2. Reminders & Daily Budget -->
+<section class="flex flex-col gap-space-md pt-space-xs" id="reminders">
+<div class="flex items-center justify-between">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Reminders &amp; Daily Budget</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Time-gated window constraints and dispatch limits.</p>
+</div>
+<span class="font-code-md text-label-sm text-primary uppercase">Active Spectrum</span>
+</div>
+<!-- 24-hour strip container -->
+<div class="bg-surface-container-low p-space-md rounded flex flex-col gap-space-sm">
+<div class="flex justify-between items-center text-outline font-code-md text-[11px]">
+<span>00:00</span>
+<span>04:00</span>
+<span>08:00</span>
+<span>12:00</span>
+<span>16:00</span>
+<span>20:00</span>
+<span>24:00</span>
+</div>
+<!-- Chrono bar -->
+<div class="relative w-full h-11 bg-surface-container-lowest rounded overflow-hidden select-none">
+<!-- Quiet band 1: 00:00 to 06:30 (0% to 27.08%) -->
+<div class="absolute inset-y-0 left-0 w-[27.08%] bg-surface-container-high/60 flex items-center justify-center">
+<span class="font-code-md text-[9px] uppercase tracking-wider text-outline/60">Quiet Band</span>
+</div>
+<!-- Quiet band 2: 22:00 to 24:00 (91.66% to 100%) -->
+<div class="absolute inset-y-0 right-0 w-[8.33%] bg-surface-container-high/60 flex items-center justify-center">
+<span class="font-code-md text-[9px] uppercase tracking-wider text-outline/60">Quiet</span>
+</div>
+<!-- Daytime active window background accent -->
+<div class="absolute inset-y-0 left-[27.08%] right-[8.33%] bg-surface-container/40"></div>
+<!-- Morning Overview Marker: 06:45 (28.125%) -->
+<div class="absolute inset-y-0 left-[28.125%] w-px bg-primary z-10 flex flex-col justify-between items-center">
+<span class="w-2 h-2 rounded-full bg-primary -mt-0.5"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary/40 mb-0.5"></span>
+</div>
+<!-- Current Time: 10:42 IST (44.58%) -->
+<div class="absolute inset-y-0 left-[44.58%] w-0.5 bg-secondary z-20 flex flex-col justify-between items-center">
+<span class="w-2 h-2 rounded-full bg-secondary -mt-0.5 shadow-sm"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-secondary/50 mb-0.5"></span>
+</div>
+<!-- Prep Digest Marker: 20:30 (85.41%) -->
+<div class="absolute inset-y-0 left-[85.41%] w-px bg-primary z-10 flex flex-col justify-between items-center">
+<span class="w-2 h-2 rounded-full bg-primary -mt-0.5"></span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary/40 mb-0.5"></span>
+</div>
+</div>
+<!-- Chrono Legend / Labels -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-sm pt-space-xs font-code-md text-label-md">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="text-on-surface">06:45 Morning overview</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="text-on-surface">10:42 Current IST (Now)</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="text-on-surface">20:30 Prep digest</span>
+</div>
+</div>
+</div>
+<!-- Inputs and Stepper -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md bg-surface-container-low p-space-md rounded">
+<div class="flex flex-col gap-1.5">
+<label class="font-label-sm text-label-sm uppercase text-outline">Morning overview</label>
+<div class="flex items-center bg-surface-container-lowest px-3 py-1.5 rounded shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]">
+<span class="material-symbols-outlined text-outline text-[16px] mr-2">alarm</span>
+<input class="bg-transparent font-code-md text-code-md text-on-surface focus:outline-none w-full" type="text" value="06:45"/>
+<span class="font-code-md text-[10px] text-outline">IST</span>
+</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-label-sm text-label-sm uppercase text-outline">Prep digest</label>
+<div class="flex items-center bg-surface-container-lowest px-3 py-1.5 rounded shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]">
+<span class="material-symbols-outlined text-outline text-[16px] mr-2">schedule_send</span>
+<input class="bg-transparent font-code-md text-code-md text-on-surface focus:outline-none w-full" type="text" value="20:30"/>
+<span class="font-code-md text-[10px] text-outline">IST</span>
+</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-label-sm text-label-sm uppercase text-outline">Individual reminders per day</label>
+<div class="flex items-center justify-between bg-surface-container-lowest px-2 py-1 rounded shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]">
+<button class="w-7 h-7 flex items-center justify-center rounded bg-surface-container-high text-on-surface hover:bg-surface-container transition-colors active:translate-y-0.5">
+<span class="material-symbols-outlined text-[16px]">remove</span>
+</button>
+<span class="font-code-md text-title-md text-primary font-bold px-3">3</span>
+<button class="w-7 h-7 flex items-center justify-center rounded bg-surface-container-high text-on-surface hover:bg-surface-container transition-colors active:translate-y-0.5">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</button>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2 px-1">
+<span class="material-symbols-outlined text-outline text-[16px]">info</span>
+<span class="font-code-md text-label-sm text-outline">Digests don't count toward this limit. Emergency interrupt triggers override the budget.</span>
+</div>
+</section>
+<!-- 3. Timetable Defaults -->
+<section class="flex flex-col gap-space-md pt-space-xs" id="timetable">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Timetable Defaults</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Scheduled academic dispatch profiles and automated batch tracking.</p>
+</div>
+<div class="flex flex-col divide-y divide-surface-container-highest/20 bg-surface-container-low rounded overflow-hidden">
+<!-- Switch 1 -->
+<div class="flex items-center justify-between p-space-md hover:bg-surface-container transition-colors">
+<div class="flex flex-col pr-space-md">
+<span class="font-title-md text-body-md text-on-surface">Prep digest</span>
+<span class="font-body-md text-label-md text-on-surface-variant">Send checklist 20:30 the evening before scheduled labs</span>
+</div>
+<button aria-checked="true" class="w-11 h-6 rounded-full bg-primary p-0.5 flex items-center justify-end transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]" role="switch">
+<span class="w-5 h-5 rounded-full bg-on-primary shadow-sm"></span>
+</button>
+</div>
+<!-- Switch 2 -->
+<div class="flex items-center justify-between p-space-md hover:bg-surface-container transition-colors">
+<div class="flex flex-col pr-space-md">
+<span class="font-title-md text-body-md text-on-surface">Morning-of reminder</span>
+<span class="font-body-md text-label-md text-on-surface-variant">Notify at 07:15 on days with practical classes</span>
+</div>
+<button aria-checked="true" class="w-11 h-6 rounded-full bg-primary p-0.5 flex items-center justify-end transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]" role="switch">
+<span class="w-5 h-5 rounded-full bg-on-primary shadow-sm"></span>
+</button>
+</div>
+<!-- Field: Lab batch label -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between p-space-md gap-space-sm bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-title-md text-body-md text-on-surface">Lab batch label</span>
+<span class="font-body-md text-label-md text-on-surface-variant">Defines rotation subset for laboratory assignments</span>
+</div>
+<div class="w-full sm:w-48 bg-surface-container-lowest px-3 py-1.5 rounded flex items-center shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]">
+<input class="bg-transparent font-code-md text-code-md text-on-surface focus:outline-none w-full" type="text" value="Batch 2"/>
+<span class="font-code-md text-[10px] text-primary">FIXED</span>
+</div>
+</div>
+</div>
+</section>
+<!-- 4. Privacy & Cloud AI Boundary -->
+<section class="flex flex-col gap-space-md pt-space-xs" id="privacy">
+<div class="flex items-center justify-between">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Privacy &amp; Cloud AI Boundary</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Strict data sovereignty controls and zero-retention routing policy.</p>
+</div>
+<span class="font-code-md text-label-sm text-error bg-error-container/20 px-2 py-0.5 rounded">FIREWALL ENGAGED</span>
+</div>
+<!-- Master Switch Card -->
+<div class="bg-surface-container-low p-space-md rounded flex items-center justify-between">
+<div class="flex flex-col gap-1 pr-space-md">
+<div class="flex items-center gap-2">
+<span class="font-title-md text-body-md text-on-surface">AI assistance</span>
+<span class="font-code-md text-[10px] bg-error-container/30 text-error px-1.5 py-0.5 rounded">OFF / BLOCKED BY OWNER</span>
+</div>
+<span class="font-body-md text-label-md text-on-surface-variant">Cloud inference bridge is severed. Local tasks continue running on rpi-relay-blr.</span>
+</div>
+<!-- Switch: OFF state -->
+<button aria-checked="false" class="w-11 h-6 rounded-full bg-surface-container-highest p-0.5 flex items-center justify-start transition-all shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)] flex-shrink-0" role="switch">
+<span class="w-5 h-5 rounded-full bg-outline shadow-sm"></span>
+</button>
+</div>
+<!-- Inspection Container -->
+<div class="bg-surface-container-low/80 p-space-md rounded flex flex-col gap-space-md">
+<p class="font-body-md text-body-md text-on-surface-variant">
+            Selected text is sent to the configured cloud provider. Free tiers that train on prompts are blocked for personal data by default.
+          </p>
+<!-- Matrix Table -->
+<div class="w-full overflow-x-auto rounded bg-surface-container-lowest">
+<table class="w-full text-left font-code-md text-label-md">
+<thead class="bg-surface-container-high/60 text-outline uppercase font-label-sm text-[10px]">
+<tr>
+<th class="py-2.5 px-3">Provider</th>
+<th class="py-2.5 px-3">synthetic_test</th>
+<th class="py-2.5 px-3">low_sensitivity</th>
+<th class="py-2.5 px-3">personal</th>
+<th class="py-2.5 px-3">restricted</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-high/30">
+<!-- Row 1: Local Daemon -->
+<tr class="hover:bg-surface-container-low/50">
+<td class="py-2.5 px-3 text-on-surface flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span>Local Daemon (rpi-relay-blr)</span>
+</td>
+<td class="py-2.5 px-3 text-primary">Allowed</td>
+<td class="py-2.5 px-3 text-primary">Allowed</td>
+<td class="py-2.5 px-3 text-primary">Allowed</td>
+<td class="py-2.5 px-3 text-primary">Allowed</td>
+</tr>
+<!-- Row 2: Anthropic API -->
+<tr class="hover:bg-surface-container-low/50">
+<td class="py-2.5 px-3 text-on-surface">Anthropic API (Claude 3.5 / Direct)</td>
+<td class="py-2.5 px-3 text-primary">Allowed</td>
+<td class="py-2.5 px-3 text-primary">Allowed</td>
+<td class="py-2.5 px-3 text-error">Blocked</td>
+<td class="py-2.5 px-3 text-error">Blocked</td>
+</tr>
+<!-- Row 3: OpenAI API -->
+<tr class="hover:bg-surface-container-low/50">
+<td class="py-2.5 px-3 text-on-surface">OpenAI API (GPT-4o / Direct Key)</td>
+<td class="py-2.5 px-3 text-primary">Allowed</td>
+<td class="py-2.5 px-3 text-primary">Allowed</td>
+<td class="py-2.5 px-3 text-error">Blocked</td>
+<td class="py-2.5 px-3 text-error">Blocked</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="flex items-center justify-between text-label-md">
+<a class="text-primary hover:underline flex items-center gap-1 font-body-md text-body-md" href="#">
+<span>Review a provider's terms</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</a>
+<span class="font-code-md text-[10px] text-outline">DPA: Zero-retention confirmed</span>
+</div>
+</div>
+</section>
+<!-- 5. Data Management & Backups -->
+<section class="flex flex-col gap-space-md pt-space-xs" id="data">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Data Management &amp; Backups</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Local archive dumps, cryptographic snapshots, and purging operations.</p>
+</div>
+<div class="bg-surface-container-low p-space-md rounded flex flex-col gap-space-md">
+<div class="flex flex-wrap items-center gap-space-sm">
+<button class="flex items-center gap-2 px-3.5 py-2 rounded bg-surface-container-high text-on-surface font-body-md text-body-md hover:bg-surface-container-highest transition-colors active:translate-y-0.5">
+<span class="material-symbols-outlined text-[18px]">download</span>
+<span>Export JSON</span>
+</button>
+<button class="flex items-center gap-2 px-3.5 py-2 rounded bg-surface-container-high text-on-surface font-body-md text-body-md hover:bg-surface-container-highest transition-colors active:translate-y-0.5">
+<span class="material-symbols-outlined text-[18px]">table_view</span>
+<span>Export CSV</span>
+</button>
+<span class="font-code-md text-[11px] text-outline ml-auto">FORMAT: UTF-8 ATOMIC TARBALL</span>
+</div>
+<p class="font-body-md text-label-md text-on-surface-variant">
+            Includes tasks, rules, timetable, materials, settings and history. No secrets or private encryption keys are exported in plaintext.
+          </p>
+<div class="flex items-center gap-2 bg-surface-container-lowest px-3 py-2 rounded">
+<span class="material-symbols-outlined text-primary text-[18px]">verified</span>
+<span class="font-code-md text-label-md text-on-surface">
+              Last encrypted backup: 3 days ago · 142 MB · SHA-256 integrity verified
+            </span>
+</div>
+</div>
+<!-- Danger Zone -->
+<div class="bg-error-container/10 p-space-md rounded flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-1.5 text-error">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+<span class="font-label-sm text-label-sm uppercase tracking-wider font-bold">Danger Zone</span>
+</div>
+<p class="font-body-md text-label-md text-on-surface-variant">
+              Irreversibly scrubs all indexed logs, embeddings, and scheduler state.
+            </p>
+<span class="font-code-md text-[10px] text-outline">Requires typing system passphrase and node identity confirmation</span>
+</div>
+<button class="px-4 py-2 rounded bg-error-container/30 text-error hover:bg-error-container/50 font-body-md text-body-md font-medium transition-all active:translate-y-0.5 flex-shrink-0 self-start sm:self-center">
+            Delete all data…
+          </button>
+</div>
+</section>
+<!-- 6. Active Devices & Sessions -->
+<section class="flex flex-col gap-space-md pt-space-xs" id="devices">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Active Devices &amp; Sessions</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Nodes, bridges, and authorized browser tokens associated with this workspace.</p>
+</div>
+<div class="flex flex-col space-y-2">
+<!-- Device 1: Current Session -->
+<div class="p-space-md rounded bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary text-[22px] mt-0.5">laptop_windows</span>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-title-md text-body-md text-on-surface font-medium">Chrome on Windows</span>
+<span class="font-code-md text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">Active now · Current session</span>
+</div>
+<span class="font-code-md text-label-md text-outline">192.168.1.42 · Bengaluru, IN · TLS 1.3 Edwards-Curve ECDSA</span>
+</div>
+</div>
+<button class="px-3 py-1.5 rounded bg-surface-container-high/40 text-outline font-body-md text-label-md cursor-not-allowed self-start sm:self-center" disabled="">
+              Revoke
+            </button>
+</div>
+<!-- Device 2: Pixel 8 Pro -->
+<div class="p-space-md rounded bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline text-[22px] mt-0.5">smartphone</span>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-title-md text-body-md text-on-surface">Pixel 8 Pro (Android)</span>
+<span class="font-code-md text-[10px] bg-surface-container-highest px-1.5 py-0.5 rounded text-outline">Encrypted Channel</span>
+</div>
+<span class="font-code-md text-label-md text-outline">Last active 12 m ago via Telegram webhook / companion PWA</span>
+</div>
+</div>
+<button class="px-3 py-1.5 rounded bg-surface-container-high text-on-surface hover:bg-surface-container-highest font-body-md text-label-md transition-colors active:translate-y-0.5 self-start sm:self-center">
+              Revoke
+            </button>
+</div>
+<!-- Device 3: Study-PC Desktop Agent -->
+<div class="p-space-md rounded bg-surface-container-low flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-outline text-[22px] mt-0.5">dns</span>
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-title-md text-body-md text-on-surface">Study-PC desktop agent</span>
+<span class="font-code-md text-[10px] bg-surface-container-highest text-secondary px-1.5 py-0.5 rounded">HEARTBEAT OK</span>
+</div>
+<span class="font-code-md text-label-md text-outline">Daemon node v2.4 · last seen 8 s ago · PID 19448</span>
+</div>
+</div>
+<button class="px-3 py-1.5 rounded bg-surface-container-high text-on-surface hover:bg-surface-container-highest font-body-md text-label-md transition-colors active:translate-y-0.5 self-start sm:self-center">
+              Revoke
+            </button>
+</div>
+</div>
+</section>
+</div>
+</div>
+<!-- 7. Docked Floating Unsaved Changes Bar -->
+<div class="fixed bottom-5 left-64 right-0 flex justify-center z-50 pointer-events-none px-gutter">
+<div class="pointer-events-auto bg-surface-container-high/90 backdrop-blur-2xl px-6 py-3 rounded-full flex items-center justify-between gap-space-lg shadow-2xl max-w-xl w-full">
+<div class="flex items-center gap-2.5">
+<span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+<span class="font-body-md text-body-md text-on-surface font-medium">2 changes pending dispatch</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors px-3 py-1">
+          Discard
+        </button>
+<button class="bg-primary text-on-primary font-title-md text-body-md px-5 py-1.5 rounded-full font-bold hover:bg-primary-fixed transition-all active:scale-95 shadow-md">
+          Save
+        </button>
+</div>
+</div>
+</div>
+</div></main></div></body></html>

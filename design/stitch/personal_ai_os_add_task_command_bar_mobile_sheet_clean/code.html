@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Personal AI OS · Add Task Command Bar & Mobile Sheet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    :root {
+      --bg: #0A0C0F;
+      --surface: #11141A;
+      --raised: #171B22;
+      --hairline: rgba(255, 255, 255, 0.07);
+      --hairline-strong: rgba(255, 255, 255, 0.12);
+      --glass-bg: rgba(17, 20, 26, 0.82);
+      --glass-top: rgba(255, 255, 255, 0.15);
+      --text-pri: #E8ECF1;
+      --text-sec: #9AA4B2;
+      --text-ter: #6B7585;
+      --arc: #62D2E6;
+      --arc-dim: rgba(98, 210, 230, 0.12);
+      --arc-border: rgba(98, 210, 230, 0.35);
+      --ember: #E8B04A;
+      --ember-dim: rgba(232, 176, 74, 0.12);
+      --ember-border: rgba(232, 176, 74, 0.4);
+      --crimson: #E5545B;
+      --crimson-dim: rgba(229, 84, 91, 0.12);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --font-sans: 'Instrument Sans', -apple-system, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text-pri);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+    .mono { font-family: var(--font-mono); }
+    
+    /* Layout */
+    .app-viewport {
+      display: flex;
+      min-height: 100vh;
+      width: 100%;
+    }
+    
+    /* Left persistent sidebar */
+    .sidebar {
+      width: 240px;
+      background: #0E1015;
+      border-right: 1px solid var(--hairline);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 8px 24px 8px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .brand-ring {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--arc);
+      position: relative;
+    }
+    .brand-ring::after {
+      content: '';
+      position: absolute;
+      inset: 2px;
+      background: var(--arc);
+      border-radius: 50%;
+    }
+    .brand-title {
+      font-weight: 600;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+      color: var(--text-pri);
+    }
+    .nav-group {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-ter);
+      padding: 0 8px 8px 8px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      color: var(--text-sec);
+      text-decoration: none;
+      font-size: 13px;
+      transition: all 0.15s ease;
+    }
+    .nav-item:hover {
+      background: var(--surface);
+      color: var(--text-pri);
+    }
+    .nav-item.active {
+      background: var(--raised);
+      color: var(--text-pri);
+      font-weight: 500;
+    }
+    .nav-item.active::before {
+      content: '';
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--arc);
+      margin-right: 8px;
+    }
+    .nav-count {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-ter);
+    }
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid var(--hairline);
+    }
+    .node-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-ter);
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--arc);
+    }
+
+    /* Main Container */
+    .main-surface {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      position: relative;
+    }
+
+    /* Header */
+    .topbar {
+      height: 56px;
+      border-bottom: 1px solid var(--hairline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      background: rgba(10, 12, 15, 0.7);
+      backdrop-filter: blur(12px);
+    }
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .section-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--arc);
+      background: var(--arc-dim);
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--arc-border);
+    }
+    .topbar-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-sec);
+    }
+    .presence-ring {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1.5px solid var(--arc);
+      border-top-color: transparent;
+      animation: spin 3s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .hotkey-trigger {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-ter);
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      padding: 6px 12px;
+      border-radius: 6px;
+    }
+
+    /* Workspace Content Area */
+    .content-area {
+      flex: 1;
+      padding: 32px;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 36px;
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Modality Column: Desktop 640px Command Bars */
+    .desktop-column {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+    .column-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--hairline);
+      padding-bottom: 12px;
+    }
+    .col-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text-pri);
+    }
+    .col-subtitle {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-ter);
+    }
+
+    /* Command Bar Container (640px) */
+    .cmd-bar-card {
+      width: 100%;
+      max-width: 640px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--hairline);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+      position: relative;
+      overflow: hidden;
+    }
+    .cmd-bar-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--glass-top), transparent);
+    }
+
+    .cmd-bar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px 8px 18px;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid var(--hairline);
+    }
+    .cmd-state-tag {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    .cmd-state-tag.valid { color: var(--arc); }
+    .cmd-state-tag.invalid { color: var(--ember); }
+    .cmd-state-tag.plain { color: var(--text-sec); }
+    .cmd-state-tag.pc { color: #A78BFA; }
+
+    .cmd-input-row {
+      padding: 16px 18px 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .cmd-prompt-glyph {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      color: var(--arc);
+    }
+    .cmd-input-text {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: 15px;
+      color: var(--text-pri);
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+    }
+    .cmd-cursor {
+      display: inline-block;
+      width: 2px;
+      height: 18px;
+      background: var(--arc);
+      margin-left: 3px;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Chips Row */
+    .cmd-chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 0 18px 14px 18px;
+    }
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid transparent;
+    }
+    .chip-arc {
+      background: var(--arc-dim);
+      color: var(--arc);
+      border-color: var(--arc-border);
+      font-weight: 500;
+    }
+    .chip-ember {
+      background: var(--ember-dim);
+      color: var(--ember);
+      border-color: var(--ember-border);
+      font-weight: 500;
+    }
+    .chip-neutral {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-sec);
+      border-color: var(--hairline);
+    }
+    .chip-tier {
+      background: rgba(167, 139, 250, 0.12);
+      color: #C4B5FD;
+      border-color: rgba(167, 139, 250, 0.35);
+      font-weight: 500;
+    }
+
+    /* Actions inside chips/prompt */
+    .btn-inline-fix {
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 500;
+      background: var(--raised);
+      color: var(--text-pri);
+      border: 1px solid var(--hairline-strong);
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-inline-fix.primary {
+      background: var(--arc);
+      color: #0A0C0F;
+      border-color: var(--arc);
+      font-weight: 600;
+    }
+
+    /* Shorthand reference bar */
+    .cmd-shorthand-row {
+      padding: 8px 18px;
+      background: rgba(255, 255, 255, 0.015);
+      border-top: 1px solid var(--hairline);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-ter);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .syntax-tokens {
+      display: flex;
+      gap: 6px;
+    }
+    .token-item {
+      padding: 1px 4px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 3px;
+    }
+
+    /* Command Bar Footer */
+    .cmd-bar-footer {
+      padding: 10px 18px;
+      background: rgba(0, 0, 0, 0.25);
+      border-top: 1px solid var(--hairline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: var(--text-ter);
+    }
+    .footer-rule {
+      max-width: 420px;
+      line-height: 1.35;
+    }
+    .footer-keys {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .key-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--text-sec);
+      border: 1px solid var(--hairline);
+    }
+
+    /* Toast Notification Strip */
+    .toast-sequence-card {
+      margin-top: 8px;
+      padding: 14px 18px;
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-ter);
+    }
+    .toast-items {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .toast-bubble {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--raised);
+      border: 1px solid var(--hairline-strong);
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12.5px;
+    }
+    .toast-bubble.fact-one {
+      border-color: var(--arc-border);
+      color: var(--text-pri);
+    }
+    .toast-bubble.fact-two {
+      border-color: var(--hairline-strong);
+      color: var(--text-sec);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .toast-arrow {
+      color: var(--text-ter);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    /* Right Column: Mobile Sheet Frame (360 x 800) */
+    .mobile-column {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+    }
+    .mobile-frame {
+      width: 360px;
+      height: 780px;
+      background: #0A0C0F;
+      border-radius: 36px;
+      border: 6px solid #1C2029;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Mobile Status Bar */
+    .mobile-status-bar {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-sec);
+      z-index: 10;
+    }
+    /* Dimmed underlying mobile app background */
+    .mobile-scrim-bg {
+      position: absolute;
+      inset: 0;
+      background: #0E1015;
+      opacity: 0.4;
+      display: flex;
+      flex-direction: column;
+      padding: 44px 16px 16px 16px;
+      gap: 12px;
+      filter: blur(2px);
+    }
+    .mock-row {
+      height: 52px;
+      background: var(--surface);
+      border-radius: 8px;
+      border: 1px solid var(--hairline);
+    }
+
+    /* Bottom Sheet Modal */
+    .mobile-sheet-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--glass-bg);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border-top-left-radius: 20px;
+      border-top-right-radius: 20px;
+      border-top: 1px solid var(--glass-top);
+      border-left: 1px solid var(--hairline);
+      border-right: 1px solid var(--hairline);
+      padding: 16px 20px 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 20;
+    }
+    .sheet-handle {
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.2);
+      margin: 0 auto 4px auto;
+    }
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sheet-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text-pri);
+    }
+    .sheet-close-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--hairline);
+      color: var(--text-sec);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    /* Form Elements */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-ter);
+    }
+    .input-field-44 {
+      min-height: 44px;
+      background: var(--surface);
+      border: 1px solid var(--hairline-strong);
+      border-radius: var(--radius-sm);
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      font-size: 13.5px;
+      color: var(--text-pri);
+    }
+    .input-field-44.active-title {
+      border-color: var(--arc-border);
+      font-weight: 500;
+    }
+
+    /* Date row with chips */
+    .date-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 44px;
+      background: var(--surface);
+      border: 1px solid var(--hairline-strong);
+      border-radius: var(--radius-sm);
+      padding: 0 12px;
+      font-size: 13px;
+    }
+    .date-val {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: var(--text-pri);
+    }
+    .quick-date-chips {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .q-chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 5px;
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      color: var(--text-sec);
+    }
+    .q-chip.active {
+      background: var(--arc-dim);
+      border-color: var(--arc-border);
+      color: var(--arc);
+      font-weight: 500;
+    }
+
+    /* Time & All Day row */
+    .time-toggle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 44px;
+      background: var(--surface);
+      border: 1px solid var(--hairline-strong);
+      border-radius: var(--radius-sm);
+      padding: 0 12px;
+      font-size: 13px;
+      color: var(--text-sec);
+    }
+    .switch-ui {
+      width: 34px;
+      height: 18px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.12);
+      position: relative;
+    }
+    .switch-ui::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #E8ECF1;
+    }
+
+    /* Priority Segmented */
+    .segmented-control {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--hairline);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+      min-height: 44px;
+    }
+    .segment-opt {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--text-ter);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .segment-opt.active {
+      background: var(--raised);
+      color: var(--text-pri);
+      border: 1px solid var(--hairline-strong);
+      font-weight: 500;
+    }
+    .seg-glyph {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+
+    /* Project row */
+    .project-select-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 44px;
+      background: var(--surface);
+      border: 1px solid var(--hairline-strong);
+      border-radius: var(--radius-sm);
+      padding: 0 12px;
+      font-size: 13px;
+    }
+    .proj-tag {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--hairline);
+      padding: 3px 8px;
+      border-radius: 4px;
+      color: var(--text-pri);
+    }
+
+    /* Helper mono */
+    .sheet-helper {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-ter);
+      text-align: center;
+      margin-top: -4px;
+    }
+
+    /* Primary Save Button */
+    .btn-save-mobile {
+      min-height: 48px;
+      background: var(--arc);
+      color: #0A0C0F;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-sans);
+      font-size: 14.5px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease;
+    }
+    .btn-save-mobile:hover {
+      background: #7be1f3;
+    }
+
+    .disabled-spec-note {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-ter);
+      padding: 4px 8px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 4px;
+      border: 1px dashed var(--hairline);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-viewport">
+    
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-ring"></div>
+        <span class="brand-title">Personal AI OS</span>
+      </div>
+
+      <nav class="nav-group">
+        <span class="nav-label">Primary</span>
+        <a href="#" class="nav-item">
+          <span>Today</span>
+        </a>
+        <a href="#" class="nav-item active">
+          <span>Tasks</span>
+          <span class="nav-count">7</span>
+        </a>
+        <a href="#" class="nav-item">
+          <span>Timetable</span>
+        </a>
+        <a href="#" class="nav-item">
+          <span>Recurring</span>
+        </a>
+      </nav>
+
+      <nav class="nav-group">
+        <span class="nav-label">Secondary</span>
+        <a href="#" class="nav-item">
+          <span>Suggestions</span>
+        </a>
+        <a href="#" class="nav-item">
+          <span>Inbox</span>
+        </a>
+        <a href="#" class="nav-item">
+          <span>History</span>
+        </a>
+      </nav>
+
+      <nav class="nav-group">
+        <span class="nav-label">System</span>
+        <a href="#" class="nav-item">
+          <span>Desktop</span>
+        </a>
+        <a href="#" class="nav-item">
+          <span>Health</span>
+        </a>
+        <a href="#" class="nav-item">
+          <span>Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="node-status">
+          <div class="status-dot"></div>
+          <span>rpi-relay-blr</span>
+        </div>
+        <div class="mono" style="font-size: 10px; color: var(--text-ter); margin-top: 4px;">synced 14s ago</div>
+      </div>
+    </aside>
+
+    <!-- MAIN SURFACE -->
+    <main class="main-surface">
+      <!-- TOP BAR -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <span class="section-badge">Tasks · Input Modalities</span>
+          <span class="mono" style="font-size: 12px; color: var(--text-ter);">Modalities: Desktop CMD-Bar + Mobile Sheet</span>
+        </div>
+        <div class="topbar-center">
+          <div class="presence-ring"></div>
+          <span>Scheduler · 38s ago · 96%</span>
+        </div>
+        <div class="topbar-right">
+          <div class="hotkey-trigger">⌘K / Ctrl K</div>
+          <span class="mono" style="font-size: 12px; color: var(--text-sec);">Wed 21 Oct 2026, 10:42 IST</span>
+        </div>
+      </header>
+
+      <!-- CONTENT SPLIT: DESKTOP MODALS & MOBILE SHEET -->
+      <div class="content-area">
+        
+        <!-- LEFT: DESKTOP COMMAND BAR (640px) IN THREE STATES + PC MODE -->
+        <div class="desktop-column">
+          <div class="column-header">
+            <div>
+              <h2 class="col-title">Desktop Glass Command Bar (640px)</h2>
+              <span class="col-subtitle">Centered overlay over dimmed Tasks screen · Shorthand Deterministic Parser</span>
+            </div>
+            <span class="mono" style="font-size: 11px; color: var(--text-ter);">Buffer width: 640px</span>
+          </div>
+
+          <!-- STATE A: VALID SHORTHAND PARSE -->
+          <div class="cmd-bar-card">
+            <div class="cmd-bar-header">
+              <span class="cmd-state-tag valid">● State (a) · Valid Shorthand Parse</span>
+              <span class="mono" style="font-size: 10px; color: var(--text-ter);">SYNTAX: &lt;WHEN&gt; | &lt;WHAT&gt;</span>
+            </div>
+            <div class="cmd-input-row">
+              <span class="cmd-prompt-glyph">›</span>
+              <div class="cmd-input-text">
+                fri 18:00 | Submit Digital Logic record book
+                <span class="cmd-cursor"></span>
+              </div>
+            </div>
+            <div class="cmd-chips-row">
+              <span class="chip chip-arc">✓ Fri 23 Oct · 18:00 IST</span>
+              <span class="chip chip-neutral">Priority normal</span>
+              <span class="chip chip-neutral">No project</span>
+            </div>
+            <div class="cmd-shorthand-row">
+              <span style="color: var(--text-sec); font-size: 10.5px;">Shorthand tokens:</span>
+              <div class="syntax-tokens">
+                <span class="token-item">today</span>
+                <span class="token-item">tomorrow</span>
+                <span class="token-item">fri</span>
+                <span class="token-item">18:00</span>
+                <span class="token-item">+2h</span>
+                <span class="token-item">2026-10-25 08:00</span>
+                <span class="token-item">no-date</span>
+              </div>
+            </div>
+            <div class="cmd-bar-footer">
+              <span class="footer-rule">Dates are read only from the shorthand before the |. Everything else is saved exactly as typed.</span>
+              <div class="footer-keys">
+                <span class="key-badge">↵ Enter to save</span>
+                <span class="key-badge">Esc close</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STATE B: INVALID / PAST TIME PARSED -->
+          <div class="cmd-bar-card">
+            <div class="cmd-bar-header">
+              <span class="cmd-state-tag invalid">● State (b) · Temporal Conflict / Past Elapsed Time</span>
+              <span class="mono" style="font-size: 10px; color: var(--ember);">Typed at 19:30 IST today</span>
+            </div>
+            <div class="cmd-input-row">
+              <span class="cmd-prompt-glyph" style="color: var(--ember);">›</span>
+              <div class="cmd-input-text">
+                18:00 | Call bank about education loan
+              </div>
+            </div>
+            <div class="cmd-chips-row">
+              <span class="chip chip-ember">18:00 has already passed today</span>
+              <button class="btn-inline-fix primary">Tomorrow 18:00</button>
+              <button class="btn-inline-fix">Pick another date</button>
+            </div>
+            <div class="cmd-bar-footer">
+              <span class="footer-rule">Past timestamp detected. System requires non-retrograde scheduling affirmation.</span>
+              <div class="footer-keys">
+                <span class="key-badge">↵ Accept Tomorrow</span>
+                <span class="key-badge">Esc</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STATE C: PLAIN TEXT (NO SHORTHAND) -->
+          <div class="cmd-bar-card">
+            <div class="cmd-bar-header">
+              <span class="cmd-state-tag plain">● State (c) · Plain Text (Zero Delimiters)</span>
+              <span class="mono" style="font-size: 10px; color: var(--text-ter);">No pipe '|' detected</span>
+            </div>
+            <div class="cmd-input-row">
+              <span class="cmd-prompt-glyph" style="color: var(--text-sec);">›</span>
+              <div class="cmd-input-text">
+                Buy milk and return library books
+              </div>
+            </div>
+            <div class="cmd-chips-row">
+              <span class="chip chip-neutral">No date · saved as typed</span>
+              <span class="chip chip-neutral">Priority normal</span>
+              <span class="chip chip-neutral">Personal inbox</span>
+            </div>
+            <div class="cmd-bar-footer">
+              <span class="footer-rule">Verbatim capture. Task placed into general holding backlog with no active push alarm.</span>
+              <div class="footer-keys">
+                <span class="key-badge">↵ Enter save</span>
+                <span class="key-badge">Esc</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STATE D & POST-ACTION: DESKTOP COMMAND (/pc) & CONFIRMATION TOAST -->
+          <div style="display: grid; grid-template-columns: 1fr; gap: 16px;">
+            <!-- /pc Mode -->
+            <div class="cmd-bar-card">
+              <div class="cmd-bar-header">
+                <span class="cmd-state-tag pc">● Desktop Command Mode · Triggered via '/pc'</span>
+                <span class="chip chip-tier" style="padding: 2px 6px; font-size: 10px;">Tier 1 Command</span>
+              </div>
+              <div class="cmd-input-row" style="padding: 12px 18px;">
+                <span class="cmd-prompt-glyph" style="color: #A78BFA;">#</span>
+                <div class="cmd-input-text">
+                  /pc lock-screen
+                  <span class="cmd-cursor" style="background: #A78BFA;"></span>
+                </div>
+              </div>
+              <div class="cmd-chips-row" style="padding-bottom: 10px;">
+                <span class="mono" style="font-size: 11px; color: #C4B5FD;">Desktop command</span>
+                <span class="mono" style="font-size: 11px; color: var(--text-ter);">· Dispatch payload directly to local daemon rpi-relay-blr</span>
+              </div>
+            </div>
+
+            <!-- TWO-STEP CONFIRMATION TOAST SEQUENCE -->
+            <div class="toast-sequence-card">
+              <div class="toast-title">Post-Save Two-Step Confirmation Toast (Two Independent Facts)</div>
+              <div class="toast-items">
+                <div class="toast-bubble fact-one">
+                  <span style="color: var(--arc);">✓</span>
+                  <span style="font-weight: 500;">Saved</span>
+                </div>
+                <div class="toast-arrow">→ followed by →</div>
+                <div class="toast-bubble fact-two">
+                  <span style="color: var(--text-sec); font-family: var(--font-sans);">ℹ</span>
+                  <span>Reminder scheduled for 16:00</span>
+                </div>
+                <div class="mono" style="font-size: 11px; color: var(--text-ter); margin-left: auto;">
+                  (2h advance policy calculated)
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT: MOBILE SHEET VIEWPORT (360×800) -->
+        <div class="mobile-column">
+          <div class="column-header" style="width: 360px;">
+            <div>
+              <h2 class="col-title">Mobile Sheet Viewport</h2>
+              <span class="col-subtitle">360 × 800 viewport · 44px+ hit targets</span>
+            </div>
+            <span class="mono" style="font-size: 11px; color: var(--arc);">Modality Beta</span>
+          </div>
+
+          <div class="mobile-frame">
+            <!-- Simulated Status Bar -->
+            <div class="mobile-status-bar">
+              <span>10:42</span>
+              <span>5G · 96%</span>
+            </div>
+
+            <!-- Background Screen (Dimmed Tasks context) -->
+            <div class="mobile-scrim-bg">
+              <div class="mock-row" style="opacity: 0.6;"></div>
+              <div class="mock-row" style="opacity: 0.4;"></div>
+              <div class="mock-row" style="opacity: 0.3;"></div>
+              <div class="mock-row" style="opacity: 0.2;"></div>
+            </div>
+
+            <!-- SLIDE-UP BOTTOM SHEET: NEW TASK -->
+            <div class="mobile-sheet-overlay">
+              <div class="sheet-handle"></div>
+              
+              <div class="sheet-header">
+                <span class="sheet-title">New task</span>
+                <button class="sheet-close-btn" aria-label="Close">✕</button>
+              </div>
+
+              <!-- FIELD 1: TITLE -->
+              <div class="form-group">
+                <label class="form-label">Task Definition</label>
+                <div class="input-field-44 active-title">
+                  Submit Digital Logic record book
+                </div>
+              </div>
+
+              <!-- FIELD 2: DATE PICKER & QUICK CHIPS -->
+              <div class="form-group">
+                <label class="form-label">Date Specification</label>
+                <div class="date-row">
+                  <div class="date-val">
+                    <span style="color: var(--arc);">📅</span>
+                    <span>Fri, 23 Oct 2026</span>
+                  </div>
+                  <span class="mono" style="font-size: 11px; color: var(--text-ter);">Picker ▾</span>
+                </div>
+                <div class="quick-date-chips">
+                  <div class="q-chip">Today</div>
+                  <div class="q-chip">Tomorrow</div>
+                  <div class="q-chip active">Fri</div>
+                  <div class="q-chip">+2h</div>
+                </div>
+              </div>
+
+              <!-- FIELD 3: TIME PICKER & ALL DAY TOGGLE -->
+              <div class="form-group">
+                <label class="form-label">Time & Cadence</label>
+                <div class="time-toggle-grid">
+                  <div class="input-field-44" style="font-family: var(--font-mono); font-size: 13px;">
+                    <span style="color: var(--text-ter); margin-right: 6px;">🕒</span>
+                    <span>18:00</span>
+                  </div>
+                  <div class="toggle-row">
+                    <span>All day</span>
+                    <div class="switch-ui" title="Toggle hides time input"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- FIELD 4: PRIORITY SEGMENTED -->
+              <div class="form-group">
+                <label class="form-label">Priority Level</label>
+                <div class="segmented-control">
+                  <div class="segment-opt">
+                    <span class="seg-glyph">/</span>
+                    <span>Low</span>
+                  </div>
+                  <div class="segment-opt active">
+                    <span class="seg-glyph" style="color: var(--arc);">//</span>
+                    <span>Normal</span>
+                  </div>
+                  <div class="segment-opt">
+                    <span class="seg-glyph">///</span>
+                    <span>High</span>
+                  </div>
+                  <div class="segment-opt">
+                    <span class="seg-glyph" style="color: var(--crimson);">////</span>
+                    <span>Urgent</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- FIELD 5: PROJECT SELECTOR -->
+              <div class="form-group">
+                <label class="form-label">Project Context</label>
+                <div class="project-select-row">
+                  <span class="proj-tag">College</span>
+                  <span class="mono" style="font-size: 11px; color: var(--text-ter);">Change ▾</span>
+                </div>
+              </div>
+
+              <!-- HELPER TEXT: FIXED TIMEZONE -->
+              <div class="sheet-helper">
+                IST (Asia/Kolkata) · fixed
+              </div>
+
+              <!-- CTA: SAVE TASK (ACTIVE) -->
+              <button class="btn-save-mobile">
+                Save task
+              </button>
+
+              <div class="disabled-spec-note">
+                Disabled state: opacity 0.35 & pointer-events none until Title is entered.
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+</body>
+</html>

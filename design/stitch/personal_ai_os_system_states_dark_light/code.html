@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440, initial-scale=1.0">
+<title>Personal AI OS · System States</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: #07090C;
+    font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #E8ECF1;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+    min-height: 100vh;
+  }
+
+  .mono {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Header */
+  .board-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .header-left h1 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #E8ECF1;
+    margin-bottom: 6px;
+  }
+
+  .header-left p {
+    font-size: 13px;
+    color: #9AA4B2;
+  }
+
+  .header-telemetry {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: #6B7585;
+  }
+
+  .header-telemetry span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .presence-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #62D2E6;
+  }
+
+  /* Theme Section Container */
+  .theme-block {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .theme-label-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .theme-title {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9AA4B2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .theme-pill {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  /* Grid Layout: 3x3 */
+  .states-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+
+  /* Mini-Frame Container */
+  .state-card {
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 184px;
+    position: relative;
+    border: 1px solid;
+    transition: transform 0.15s ease;
+  }
+
+  .state-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .state-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .state-index {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+  }
+
+  .state-name {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .state-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .state-card-footer {
+    margin-top: 14px;
+    padding-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    border-top: 1px solid;
+  }
+
+  /* Rings & Glyphs */
+  .status-ring {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .ring-hollow {
+    border: 1.5px solid #9AA4B2;
+    background: transparent;
+  }
+
+  .ring-dashed {
+    border: 1.5px dashed #9AA4B2;
+    background: transparent;
+  }
+
+  .ring-crimson {
+    border: 1.5px solid #E5545B;
+    background: transparent;
+  }
+
+  .ring-ember-dashed {
+    border: 1.5px dashed #E8B04A;
+    background: transparent;
+  }
+
+  .ring-arc {
+    border: 1.5px solid #62D2E6;
+    background: #62D2E6;
+  }
+
+  /* ----------------- DARK THEME STYLES ----------------- */
+  .dark-block .state-card {
+    background-color: #11141A;
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .dark-block .state-index { color: #6B7585; }
+  .dark-block .state-name { color: #E8ECF1; }
+  .dark-block .state-card-footer { border-color: rgba(255, 255, 255, 0.06); color: #6B7585; }
+  
+  .dark-block .theme-pill {
+    background: #171B22;
+    color: #9AA4B2;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  /* Component: Paused Banner */
+  .dark-block .paused-banner {
+    background: #171B22;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12.5px;
+    color: #9AA4B2;
+    gap: 12px;
+  }
+
+  .dark-block .paused-banner .left-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .dark-block .action-link {
+    color: #62D2E6;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: 12.5px;
+    padding: 2px 4px;
+  }
+  .dark-block .action-link:hover { text-decoration: underline; }
+
+  /* Component: Offline Banner */
+  .dark-block .offline-banner {
+    background: #171B22;
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+    color: #9AA4B2;
+  }
+
+  /* Component: Degraded Banner */
+  .dark-block .degraded-banner {
+    background: rgba(229, 84, 91, 0.08);
+    border: 1px solid rgba(229, 84, 91, 0.3);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+    color: #E8ECF1;
+  }
+  .dark-block .degraded-banner .msg {
+    color: #F87171;
+  }
+
+  /* Component: API Error */
+  .dark-block .api-error-box {
+    background: #171B22;
+    border: 1px solid rgba(229, 84, 91, 0.3);
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dark-block .error-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+    color: #E8ECF1;
+  }
+
+  .dark-block .error-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #6B7585;
+    background: #0A0C0F;
+    padding: 5px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .dark-block .copy-btn {
+    background: transparent;
+    border: none;
+    color: #9AA4B2;
+    font-size: 10px;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  .dark-block .copy-btn:hover { color: #E8ECF1; }
+
+  .dark-block .retry-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #E8ECF1;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .dark-block .retry-btn:hover { background: rgba(255, 255, 255, 0.1); }
+
+  /* Component: Optimistic Toast */
+  .dark-block .toast-surface {
+    background: rgba(23, 27, 34, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #E8ECF1;
+    gap: 12px;
+  }
+
+  /* Component: Uncertain Delivery */
+  .dark-block .uncertain-delivery-card {
+    background: #171B22;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dark-block .task-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+    color: #E8ECF1;
+  }
+
+  .dark-block .ember-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(232, 176, 74, 0.08);
+    border: 1px solid rgba(232, 176, 74, 0.25);
+    color: #E8B04A;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    width: fit-content;
+  }
+
+  /* Component: Skeleton Shimmer */
+  .dark-block .skeleton-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dark-block .skeleton-row {
+    background: #171B22;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dark-block .shimmer-box {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    height: 10px;
+    position: relative;
+  }
+
+  .dark-block .shimmer-circle {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+  }
+
+  /* Component: Empty Today */
+  .dark-block .empty-today-box {
+    background: #171B22;
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 16px 14px;
+    text-align: left;
+    font-size: 13px;
+    color: #9AA4B2;
+  }
+
+  /* Component: AI Unavailable Chip */
+  .dark-block .ai-unavailable-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #171B22;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 12px;
+    color: #9AA4B2;
+  }
+
+  .dark-block .ai-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #6B7585;
+  }
+
+  /* ----------------- LIGHT THEME STYLES ----------------- */
+  .light-block {
+    background: #F4F6F8;
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid #E1E4EA;
+  }
+
+  .light-block .theme-title {
+    color: #4B5565;
+  }
+
+  .light-block .theme-pill {
+    background: #FFFFFF;
+    color: #4B5565;
+    border: 1px solid #D0D5DD;
+  }
+
+  .light-block .state-card {
+    background-color: #FFFFFF;
+    border-color: #E2E6EC;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  }
+
+  .light-block .state-index { color: #8F9AA7; }
+  .light-block .state-name { color: #101828; }
+  .light-block .state-card-footer { border-color: #EDF0F4; color: #8F9AA7; }
+
+  /* Light: Paused Banner */
+  .light-block .paused-banner {
+    background: #F8F9FA;
+    border: 1px solid #DCE1E8;
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12.5px;
+    color: #4B5565;
+    gap: 12px;
+  }
+
+  .light-block .paused-banner .left-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .light-block .action-link {
+    color: #0E7490;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: 12.5px;
+    padding: 2px 4px;
+  }
+  .light-block .action-link:hover { text-decoration: underline; }
+
+  /* Light: Offline Banner */
+  .light-block .offline-banner {
+    background: #F8F9FA;
+    border: 1px dashed #CBD5E1;
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+    color: #4B5565;
+  }
+
+  .light-block .ring-hollow {
+    border-color: #64748B;
+  }
+
+  .light-block .ring-dashed {
+    border-color: #64748B;
+  }
+
+  /* Light: Degraded Banner */
+  .light-block .degraded-banner {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+    color: #991B1B;
+  }
+  .light-block .ring-crimson {
+    border-color: #DC2626;
+  }
+
+  /* Light: API Error */
+  .light-block .api-error-box {
+    background: #FFFFFF;
+    border: 1px solid #FCA5A5;
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .light-block .error-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+    color: #991B1B;
+    font-weight: 500;
+  }
+
+  .light-block .error-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #64748B;
+    background: #F8FAFC;
+    padding: 5px 8px;
+    border-radius: 4px;
+    border: 1px solid #E2E8F0;
+  }
+
+  .light-block .copy-btn {
+    background: transparent;
+    border: none;
+    color: #64748B;
+    font-size: 10px;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  .light-block .copy-btn:hover { color: #0F172A; }
+
+  .light-block .retry-btn {
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .light-block .retry-btn:hover { background: #E2E8F0; }
+
+  /* Light: Optimistic Toast */
+  .light-block .toast-surface {
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid #D0D5DD;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.1);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #1E293B;
+    gap: 12px;
+  }
+
+  /* Light: Uncertain Delivery */
+  .light-block .uncertain-delivery-card {
+    background: #F8F9FA;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .light-block .task-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+    color: #1E293B;
+  }
+
+  .light-block .ember-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #FEF3C7;
+    border: 1px solid #FCD34D;
+    color: #B45309;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    width: fit-content;
+  }
+
+  .light-block .ring-ember-dashed {
+    border: 1.5px dashed #D97706;
+  }
+
+  /* Light: Skeleton */
+  .light-block .skeleton-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .light-block .skeleton-row {
+    background: #F8FAFC;
+    border: 1px solid #EDF2F7;
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .light-block .shimmer-box {
+    background: #E2E8F0;
+    border-radius: 3px;
+    height: 10px;
+  }
+
+  .light-block .shimmer-circle {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: #E2E8F0;
+    flex-shrink: 0;
+  }
+
+  /* Light: Empty Today */
+  .light-block .empty-today-box {
+    background: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    border-radius: 6px;
+    padding: 16px 14px;
+    text-align: left;
+    font-size: 13px;
+    color: #475569;
+  }
+
+  /* Light: AI Unavailable */
+  .light-block .ai-unavailable-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #F8FAFC;
+    border: 1px solid #D0D5DD;
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 12px;
+    color: #475569;
+  }
+
+  .light-block .ai-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #94A3B8;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Master Page Header -->
+  <header class="board-header">
+    <div class="header-left">
+      <h1>Personal AI OS · System States Specification</h1>
+      <p>Nine truthful system states, boundaries, and failure modes across dark default and light theme layers.</p>
+    </div>
+    <div class="header-telemetry mono">
+      <span><i class="presence-dot"></i> SCHEDULER: OK</span>
+      <span>NODE: study-pc.local</span>
+      <span>TIME: 21 Oct 2026 10:42 IST</span>
+    </div>
+  </header>
+
+  <!-- ==================== SECTION 1: DARK THEME ==================== -->
+  <section class="theme-block dark-block">
+    <div class="theme-label-bar">
+      <div class="theme-title">
+        <span>Dark Theme (Default)</span>
+        <span class="theme-pill mono">#0A0C0F / #11141A / #171B22</span>
+      </div>
+      <div class="mono" style="font-size: 11px; color: #6B7585;">Grid 3×3 · Strict 1px hairlines · Instrument Sans & Plex Mono</div>
+    </div>
+
+    <div class="states-grid">
+
+      <!-- 1. Paused banner -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 01 · PERSISTENT</span>
+            <span class="state-name">Paused Banner</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="paused-banner">
+            <div class="left-wrap">
+              <span class="status-ring ring-hollow" title="Paused (Hollow Ring)"></span>
+              <span>Reminders paused by owner since <span class="mono">09:15</span></span>
+            </div>
+            <button class="action-link">[Resume]</button>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Target: Header sub-bar</span>
+          <span>Scope: All outbounds</span>
+        </div>
+      </div>
+
+      <!-- 2. Offline banner -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 02 · PERSISTENT</span>
+            <span class="state-name">Offline Banner</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="offline-banner">
+            <span class="status-ring ring-dashed" title="Offline (Dashed Ring)"></span>
+            <span>You’re offline. Showing data from <span class="mono">10:41</span>. Changes won’t be saved.</span>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Target: Viewport top</span>
+          <span>Cache: Local snapshot</span>
+        </div>
+      </div>
+
+      <!-- 3. Degraded banner -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 03 · CRITICAL</span>
+            <span class="state-name">Degraded Banner</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="degraded-banner">
+            <span class="status-ring ring-crimson" title="Degraded (Crimson Ring)"></span>
+            <span class="msg">Scheduler hasn’t succeeded for <span class="mono">22 min</span>. Reminders may be late.</span>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Signal: Crimson (#E5545B)</span>
+          <span>Alert: Email fallback</span>
+        </div>
+      </div>
+
+      <!-- 4. API error with request ID -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 04 · FAULT LEDGER</span>
+            <span class="state-name">API Error with Request ID</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="api-error-box">
+            <div class="error-title-row">
+              <span style="display:flex; align-items:center; gap:6px;">
+                <span class="status-ring ring-crimson" style="width:10px; height:10px;"></span>
+                Couldn’t save. Service unavailable (503).
+              </span>
+              <button class="retry-btn">[Retry]</button>
+            </div>
+            <div class="error-meta-row mono">
+              <span>request_id 7f3a-91c2</span>
+              <button class="copy-btn">[Copy ID]</button>
+            </div>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Deterministic HTTP 503</span>
+          <span>Zero payload leakage</span>
+        </div>
+      </div>
+
+      <!-- 5. Optimistic-rollback toast -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 05 · REVERSION</span>
+            <span class="state-name">Optimistic-Rollback Toast</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="toast-surface">
+            <span>Couldn’t mark ‘Pay library fine’ done — restored.</span>
+            <button class="action-link">[Try again]</button>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Glass: 72% / 24px blur</span>
+          <span>Docked viewport bottom</span>
+        </div>
+      </div>
+
+      <!-- 6. Uncertain-delivery chip and row -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 06 · UNCERTAINTY</span>
+            <span class="state-name">Uncertain-Delivery Row</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="uncertain-delivery-card">
+            <div class="task-line">
+              <span>Gym slot booking</span>
+              <span class="mono" style="color:#9AA4B2; font-size:11px;">08:02</span>
+            </div>
+            <div class="ember-chip mono">
+              <span class="status-ring ring-ember-dashed" style="width:10px; height:10px;"></span>
+              <span>delivery unconfirmed · retry queued 10:48</span>
+            </div>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Signal: Ember (#E8B04A)</span>
+          <span>Transport: Telegram ACK</span>
+        </div>
+      </div>
+
+      <!-- 7. Loading skeleton -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 07 · TRANSITION</span>
+            <span class="state-name">Loading Skeleton</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="skeleton-wrap">
+            <div class="skeleton-row">
+              <div class="shimmer-circle"></div>
+              <div class="shimmer-box" style="width: 55%;"></div>
+              <div class="shimmer-box mono" style="width: 18%; margin-left: auto;"></div>
+            </div>
+            <div class="skeleton-row">
+              <div class="shimmer-circle"></div>
+              <div class="shimmer-box" style="width: 42%;"></div>
+              <div class="shimmer-box mono" style="width: 22%; margin-left: auto;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Flat subtle shimmer</span>
+          <span>No spinning glyphs</span>
+        </div>
+      </div>
+
+      <!-- 8. Empty Today -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 08 · ZERO-DATA</span>
+            <span class="state-name">Empty Today</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="empty-today-box">
+            Nothing due. Next: Discrete Mathematics <span class="mono">11:15</span>.
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Calm single line</span>
+          <span>No empty-state art</span>
+        </div>
+      </div>
+
+      <!-- 9. AI-unavailable chip -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 09 · ISOLATION</span>
+            <span class="state-name">AI-Unavailable Chip</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div>
+            <div class="ai-unavailable-chip">
+              <span class="ai-dot"></span>
+              <span>AI unavailable — manual tasks and reminders continue.</span>
+            </div>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Sub-system decoupled</span>
+          <span>Heuristics unaffected</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ==================== SECTION 2: LIGHT THEME ==================== -->
+  <section class="theme-block light-block">
+    <div class="theme-label-bar">
+      <div class="theme-title">
+        <span>Light Theme Variant</span>
+        <span class="theme-pill mono">#F4F6F8 / #FFFFFF / #EDF0F4</span>
+      </div>
+      <div class="mono" style="font-size: 11px; color: #64748B;">Identical layout & semantics · Restrained contrast & hairline fidelity</div>
+    </div>
+
+    <div class="states-grid">
+
+      <!-- 1. Paused banner -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 01 · PERSISTENT</span>
+            <span class="state-name">Paused Banner</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="paused-banner">
+            <div class="left-wrap">
+              <span class="status-ring ring-hollow" title="Paused (Hollow Ring)"></span>
+              <span>Reminders paused by owner since <span class="mono">09:15</span></span>
+            </div>
+            <button class="action-link">[Resume]</button>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Target: Header sub-bar</span>
+          <span>Scope: All outbounds</span>
+        </div>
+      </div>
+
+      <!-- 2. Offline banner -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 02 · PERSISTENT</span>
+            <span class="state-name">Offline Banner</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="offline-banner">
+            <span class="status-ring ring-dashed" title="Offline (Dashed Ring)"></span>
+            <span>You’re offline. Showing data from <span class="mono">10:41</span>. Changes won’t be saved.</span>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Target: Viewport top</span>
+          <span>Cache: Local snapshot</span>
+        </div>
+      </div>
+
+      <!-- 3. Degraded banner -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 03 · CRITICAL</span>
+            <span class="state-name">Degraded Banner</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="degraded-banner">
+            <span class="status-ring ring-crimson" title="Degraded (Crimson Ring)"></span>
+            <span>Scheduler hasn’t succeeded for <span class="mono">22 min</span>. Reminders may be late.</span>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Signal: Crimson (#DC2626)</span>
+          <span>Alert: Email fallback</span>
+        </div>
+      </div>
+
+      <!-- 4. API error with request ID -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 04 · FAULT LEDGER</span>
+            <span class="state-name">API Error with Request ID</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="api-error-box">
+            <div class="error-title-row">
+              <span style="display:flex; align-items:center; gap:6px;">
+                <span class="status-ring ring-crimson" style="width:10px; height:10px;"></span>
+                Couldn’t save. Service unavailable (503).
+              </span>
+              <button class="retry-btn">[Retry]</button>
+            </div>
+            <div class="error-meta-row mono">
+              <span>request_id 7f3a-91c2</span>
+              <button class="copy-btn">[Copy ID]</button>
+            </div>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Deterministic HTTP 503</span>
+          <span>Zero payload leakage</span>
+        </div>
+      </div>
+
+      <!-- 5. Optimistic-rollback toast -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 05 · REVERSION</span>
+            <span class="state-name">Optimistic-Rollback Toast</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="toast-surface">
+            <span>Couldn’t mark ‘Pay library fine’ done — restored.</span>
+            <button class="action-link">[Try again]</button>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Elevated card + 8px shadow</span>
+          <span>Docked viewport bottom</span>
+        </div>
+      </div>
+
+      <!-- 6. Uncertain-delivery chip and row -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 06 · UNCERTAINTY</span>
+            <span class="state-name">Uncertain-Delivery Row</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="uncertain-delivery-card">
+            <div class="task-line">
+              <span>Gym slot booking</span>
+              <span class="mono" style="color:#64748B; font-size:11px;">08:02</span>
+            </div>
+            <div class="ember-chip mono">
+              <span class="status-ring ring-ember-dashed" style="width:10px; height:10px;"></span>
+              <span>delivery unconfirmed · retry queued 10:48</span>
+            </div>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Signal: Amber (#D97706)</span>
+          <span>Transport: Telegram ACK</span>
+        </div>
+      </div>
+
+      <!-- 7. Loading skeleton -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 07 · TRANSITION</span>
+            <span class="state-name">Loading Skeleton</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="skeleton-wrap">
+            <div class="skeleton-row">
+              <div class="shimmer-circle"></div>
+              <div class="shimmer-box" style="width: 55%;"></div>
+              <div class="shimmer-box mono" style="width: 18%; margin-left: auto;"></div>
+            </div>
+            <div class="skeleton-row">
+              <div class="shimmer-circle"></div>
+              <div class="shimmer-box" style="width: 42%;"></div>
+              <div class="shimmer-box mono" style="width: 22%; margin-left: auto;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Flat subtle tint</span>
+          <span>No spinning glyphs</span>
+        </div>
+      </div>
+
+      <!-- 8. Empty Today -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 08 · ZERO-DATA</span>
+            <span class="state-name">Empty Today</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div class="empty-today-box">
+            Nothing due. Next: Discrete Mathematics <span class="mono">11:15</span>.
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Calm single line</span>
+          <span>No empty-state art</span>
+        </div>
+      </div>
+
+      <!-- 9. AI-unavailable chip -->
+      <div class="state-card">
+        <div class="state-card-header">
+          <div class="state-meta">
+            <span class="state-index mono">STATE 09 · ISOLATION</span>
+            <span class="state-name">AI-Unavailable Chip</span>
+          </div>
+        </div>
+        <div class="state-content">
+          <div>
+            <div class="ai-unavailable-chip">
+              <span class="ai-dot"></span>
+              <span>AI unavailable — manual tasks and reminders continue.</span>
+            </div>
+          </div>
+        </div>
+        <div class="state-card-footer mono">
+          <span>Sub-system decoupled</span>
+          <span>Heuristics unaffected</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</body>
+</html>

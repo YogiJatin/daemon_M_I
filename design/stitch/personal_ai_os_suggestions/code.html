@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "on-primary-fixed-variant": "#004f51",
+          "on-surface-variant": "#bfc8c8",
+          "primary": "#90d2d3",
+          "on-error": "#690005",
+          "surface-container-high": "#282a2e",
+          "inverse-primary": "#216869",
+          "on-primary": "#003738",
+          "primary-fixed": "#aceeef",
+          "on-secondary-fixed-variant": "#5a4309",
+          "on-background": "#e2e2e8",
+          "on-surface": "#e2e2e8",
+          "on-secondary": "#402d00",
+          "primary-fixed-dim": "#90d2d3",
+          "on-tertiary-container": "#fff9f7",
+          "surface-bright": "#37393e",
+          "inverse-on-surface": "#2f3035",
+          "on-primary-fixed": "#002020",
+          "secondary-fixed": "#ffdf9f",
+          "primary-container": "#3a7d7e",
+          "on-secondary-container": "#d5b470",
+          "inverse-surface": "#e2e2e8",
+          "on-tertiary-fixed": "#3b0900",
+          "tertiary-container": "#bd5234",
+          "surface-container-lowest": "#0c0e12",
+          "surface-container-highest": "#333539",
+          "surface-variant": "#333539",
+          "secondary-fixed-dim": "#e4c27d",
+          "on-tertiary": "#601400",
+          "outline-variant": "#3f4948",
+          "surface-dim": "#111317",
+          "error-container": "#93000a",
+          "surface-container-low": "#1a1c20",
+          "tertiary-fixed": "#ffdbd1",
+          "outline": "#899392",
+          "surface": "#111317",
+          "on-primary-container": "#e5ffff",
+          "surface-tint": "#90d2d3",
+          "tertiary-fixed-dim": "#ffb5a0",
+          "background": "#111317",
+          "tertiary": "#ffb5a0",
+          "error": "#ffb4ab",
+          "on-error-container": "#ffdad6",
+          "on-tertiary-fixed-variant": "#82270c",
+          "secondary-container": "#5d450b",
+          "on-secondary-fixed": "#261a00",
+          "secondary": "#e4c27d",
+          "surface-container": "#1e2024"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "gutter-mobile": "0.75rem",
+          "space-sm": "0.5rem",
+          "space-xs": "0.25rem",
+          "gutter": "1rem",
+          "margin": "2rem",
+          "space-xl": "2.5rem",
+          "space-lg": "1.5rem",
+          "margin-mobile": "1rem",
+          "space-md": "1rem"
+        },
+        "fontFamily": {
+          "body-lg": [
+            "IBM Plex Sans"
+          ],
+          "display-lg-mobile": [
+            "IBM Plex Sans"
+          ],
+          "label-md": [
+            "Space Mono"
+          ],
+          "headline-sm": [
+            "IBM Plex Sans"
+          ],
+          "code-md": [
+            "Space Mono"
+          ],
+          "body-md": [
+            "IBM Plex Sans"
+          ],
+          "headline-lg": [
+            "IBM Plex Sans"
+          ],
+          "display-lg": [
+            "IBM Plex Sans"
+          ],
+          "title-md": [
+            "IBM Plex Sans"
+          ],
+          "label-sm": [
+            "Space Mono"
+          ]
+        },
+        "fontSize": {
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0.01em",
+              "fontWeight": "400"
+            }
+          ],
+          "display-lg-mobile": [
+            "30px",
+            {
+              "lineHeight": "38px",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "label-md": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0.04em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "20px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.005em",
+              "fontWeight": "500"
+            }
+          ],
+          "code-md": [
+            "13px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0.01em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "28px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "500"
+            }
+          ],
+          "display-lg": [
+            "40px",
+            {
+              "lineHeight": "48px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "600"
+            }
+          ],
+          "title-md": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "label-sm": [
+            "10px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "400"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-low z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex flex-col"><div class="h-14 px-gutter flex items-center justify-between bg-surface-container-lowest/60"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-primary text-[20px]">terminal</span><span class="font-label-md text-label-md text-on-surface font-bold tracking-tight uppercase">Personal AI OS</span></div><span class="w-1.5 h-1.5 rounded-full bg-primary ring-2 ring-primary/20"></span></div><div class="px-gutter pt-space-md pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Workspace</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="today" href="#"><span class="material-symbols-outlined text-[18px]">wb_sunny</span><span>Today</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="tasks" href="#"><span class="material-symbols-outlined text-[18px]">check_box</span><span>Tasks</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="timetable" href="#"><span class="material-symbols-outlined text-[18px]">calendar_month</span><span>Timetable</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="recurring" href="#"><span class="material-symbols-outlined text-[18px]">sync</span><span>Recurring</span></a></nav><div class="px-gutter pt-space-lg pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Intelligence</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a aria-current="page" class="flex items-center gap-space-sm px-space-sm py-1.5 rounded transition-colors bg-surface-container-high text-on-surface font-title-md" data-path="suggestions" href="#"><span class="material-symbols-outlined text-[18px]">smart_toy</span><span>Suggestions</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="inbox" href="#"><span class="material-symbols-outlined text-[18px]">inbox</span><span>Inbox</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="history" href="#"><span class="material-symbols-outlined text-[18px]">history</span><span>History</span></a></nav><div class="px-gutter pt-space-lg pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">System</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="desktop" href="#"><span class="material-symbols-outlined text-[18px]">laptop_mac</span><span>Desktop</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="health" href="#"><span class="material-symbols-outlined text-[18px]">monitor_heart</span><span>Health</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="settings" href="#"><span class="material-symbols-outlined text-[18px]">settings</span><span>Settings</span></a></nav></div><div class="p-space-sm bg-surface-container-lowest/80 m-space-xs rounded flex flex-col gap-1"><div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Node Relay</span><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span></div><div class="flex items-center gap-1.5 font-code-md text-code-md text-on-surface"><span class="text-primary">rpi-relay-blr</span></div><span class="font-label-sm text-label-sm text-outline">synced 14s ago</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-14 bg-surface-container-low/95 backdrop-blur-xl z-40 px-gutter flex items-center justify-between gap-space-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-2"><div class="relative flex items-center justify-center w-5 h-5"><span class="absolute inline-flex w-full h-full rounded-full opacity-30 bg-primary animate-ping"></span><span class="relative inline-flex w-2.5 h-2.5 rounded-full bg-primary"></span></div><div class="flex items-center gap-2 font-code-md text-code-md text-on-surface-variant"><span class="text-on-surface font-medium">Scheduler</span><span class="text-outline">·</span><span>38s ago</span><span class="text-outline">·</span><span class="text-primary font-medium">96%</span></div></div><div class="relative w-80 lg:w-96"><span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-outline">search</span><input class="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline font-body-md text-body-md pl-8 pr-16 py-1 rounded focus:outline-none focus:ring-1 focus:ring-primary/40" placeholder="Add task or type a command..." readonly="" type="text"/><kbd class="absolute right-2 top-1/2 -translate-y-1/2 font-label-sm text-label-sm text-outline bg-surface-container-high px-1.5 py-0.5 rounded">Ctrl K</kbd></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-1.5 font-code-md text-code-md text-on-surface-variant"><span class="material-symbols-outlined text-[16px] text-outline">schedule</span><span>Wed 21 Oct 2026, 10:42 IST</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="relative pt-14 w-full px-gutter bg-surface min-h-screen"><div class="flex flex-col w-full">
+<div class="max-w-[840px] w-full mx-auto py-8">
+<!-- Top System Context / Evaluation Indicator -->
+<div class="flex items-center justify-between pb-6 border-b border-surface-container-highest/40">
+<div class="flex flex-col gap-1">
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Suggestions</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Rule-based. Each one cites the records it used.</p>
+</div>
+<div class="flex items-center gap-2 px-2.5 py-1 rounded bg-surface-container-lowest border border-outline-variant/30">
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-outline tracking-wider uppercase">4 ACTIVE RULES EVALUATED · SYNCED 38S AGO</span>
+</div>
+</div>
+<!-- Active Inference Rules Feed -->
+<div class="flex flex-col gap-4 mt-6" id="rule-deck">
+<!-- Card 1: Missing Prep Material -->
+<article class="group relative flex flex-col p-5 bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-outline-variant/60 transition-all duration-150" data-rule-id="RULE-019">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-label-md text-label-md tracking-wider text-secondary uppercase font-semibold">PREPARATION CHECK · RULE-019</span>
+</div>
+<span class="font-code-md text-code-md text-outline">Raised 08:15</span>
+</div>
+<div class="mt-3">
+<p class="font-title-md text-title-md text-on-surface leading-snug">
+            No items are attached to Python Programming Lab <span class="text-on-surface-variant font-code-md text-code-md">(Fri 23 Oct · 14:00)</span>.
+          </p>
+</div>
+<!-- Evidence Tags -->
+<div class="mt-4 pt-3 border-t border-surface-container-high/60 flex flex-wrap items-center gap-2">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Based on:</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/30 font-code-md text-code-md text-on-surface-variant">
+<span class="material-symbols-outlined text-[13px] text-outline">schedule</span>
+            timetable: python_lab_fri_1400
+          </span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-secondary-container/20 border border-secondary/30 font-code-md text-code-md text-secondary">
+<span class="material-symbols-outlined text-[13px] text-secondary">warning</span>
+            0 materials attached
+          </span>
+</div>
+<!-- Action Row -->
+<div class="mt-4 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<button class="px-3.5 py-1.5 rounded bg-primary text-on-primary font-title-md text-body-md font-medium hover:bg-primary-fixed transition-colors active:translate-y-px" type="button">
+              Add items
+            </button>
+<button class="px-3 py-1.5 rounded bg-transparent hover:bg-surface-container text-outline hover:text-on-surface font-body-md text-body-md transition-colors" onclick="dismissRule('RULE-019')" type="button">
+              Dismiss
+            </button>
+</div>
+<span class="font-code-md text-code-md text-outline/60">ID: inf_9a82</span>
+</div>
+</article>
+<!-- Card 2: Temporal Deadline Cluster -->
+<article class="group relative flex flex-col p-5 bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-outline-variant/60 transition-all duration-150" data-rule-id="RULE-042">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="font-label-md text-label-md tracking-wider text-primary uppercase font-semibold">TEMPORAL HEURISTIC · RULE-042</span>
+</div>
+<span class="font-code-md text-code-md text-outline">Raised 07:00</span>
+</div>
+<div class="mt-3">
+<p class="font-title-md text-title-md text-on-surface leading-snug">
+            3 tasks fall between <span class="font-code-md text-code-md text-primary">Fri 23</span> and <span class="font-code-md text-code-md text-primary">Mon 26 Oct</span>.
+          </p>
+</div>
+<!-- Evidence Tags -->
+<div class="mt-4 pt-3 border-t border-surface-container-high/60 flex flex-wrap items-center gap-2">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Based on:</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/30 font-code-md text-code-md text-on-surface-variant">
+            Renew gym membership · Fri 23 Oct
+          </span>
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/30 font-code-md text-code-md text-on-surface-variant">
+            Submit Digital Logic record book · Fri 23 Oct
+          </span>
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/30 font-code-md text-code-md text-on-surface-variant">
+            Book train tickets for Diwali · Mon 26 Oct
+          </span>
+</div>
+<!-- Action Row -->
+<div class="mt-4 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<button class="px-3.5 py-1.5 rounded bg-primary text-on-primary font-title-md text-body-md font-medium hover:bg-primary-fixed transition-colors active:translate-y-px" type="button">
+              View tasks
+            </button>
+<button class="px-3 py-1.5 rounded bg-transparent hover:bg-surface-container text-outline hover:text-on-surface font-body-md text-body-md transition-colors" onclick="dismissRule('RULE-042')" type="button">
+              Dismiss
+            </button>
+</div>
+<span class="font-code-md text-code-md text-outline/60">ID: inf_41bb</span>
+</div>
+</article>
+<!-- Card 3: Overdue SLA Breach -->
+<article class="group relative flex flex-col p-5 bg-surface-container-low rounded-xl border border-error/30 hover:border-error/60 transition-all duration-150" data-rule-id="RULE-003">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-label-md text-label-md tracking-wider text-error uppercase font-semibold">SLA BREACH · RULE-003</span>
+</div>
+<span class="font-code-md text-code-md text-outline">Raised Wed 00:01</span>
+</div>
+<div class="mt-3">
+<p class="font-title-md text-title-md text-on-surface leading-snug">
+            Submit Digital Logic record book is <span class="text-error font-medium">1 day overdue</span>.
+          </p>
+</div>
+<!-- Evidence Tags -->
+<div class="mt-4 pt-3 border-t border-surface-container-high/60 flex flex-wrap items-center gap-2">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Based on:</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/30 font-code-md text-code-md text-on-surface-variant">
+            task_711a: Submit Digital Logic record book
+          </span>
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-error-container/20 border border-error/30 font-code-md text-code-md text-error">
+            deadline: Tue 20 Oct 18:00 IST · +24h elapsed
+          </span>
+</div>
+<!-- Action Row with Snooze Dropdown -->
+<div class="mt-4 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<button class="px-3.5 py-1.5 rounded bg-primary text-on-primary font-title-md text-body-md font-medium hover:bg-primary-fixed transition-colors active:translate-y-px" type="button">
+              Open task
+            </button>
+<div class="relative inline-block text-left">
+<button class="flex items-center gap-1 px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-body-md text-body-md border border-outline-variant/30 transition-colors" id="snooze-btn" onclick="toggleSnoozeMenu()" type="button">
+<span>Snooze</span>
+<span class="material-symbols-outlined text-[16px] text-outline">expand_more</span>
+</button>
+<div class="hidden absolute left-0 bottom-full mb-1 w-44 rounded bg-surface-container-high border border-outline-variant/40 shadow-xl py-1 z-20" id="snooze-dropdown">
+<button class="w-full text-left px-3 py-1.5 font-code-md text-code-md text-on-surface hover:bg-surface-container transition-colors" onclick="selectSnooze('4h')" type="button">Until 14:00 (+4h)</button>
+<button class="w-full text-left px-3 py-1.5 font-code-md text-code-md text-on-surface hover:bg-surface-container transition-colors" onclick="selectSnooze('eve')" type="button">This evening (20:00)</button>
+<button class="w-full text-left px-3 py-1.5 font-code-md text-code-md text-on-surface hover:bg-surface-container transition-colors" onclick="selectSnooze('tmrw')" type="button">Tomorrow morning</button>
+</div>
+</div>
+<button class="px-3 py-1.5 rounded bg-transparent hover:bg-surface-container text-outline hover:text-on-surface font-body-md text-body-md transition-colors" onclick="dismissRule('RULE-003')" type="button">
+              Dismiss
+            </button>
+</div>
+<span class="font-code-md text-code-md text-outline/60">ID: inf_11ef</span>
+</div>
+</article>
+<!-- Card 4: Evening Digest Pipeline -->
+<article class="group relative flex flex-col p-5 bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-outline-variant/60 transition-all duration-150" data-rule-id="RULE-088">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="font-label-md text-label-md tracking-wider text-primary uppercase font-semibold">EVENING DIGEST PIPELINE · RULE-088</span>
+</div>
+<span class="font-code-md text-code-md text-outline">Raised 09:30</span>
+</div>
+<div class="mt-3">
+<p class="font-title-md text-title-md text-on-surface leading-snug">
+            Physics Lab tomorrow at 09:00 needs 5 items. The prep digest sends at 20:30.
+          </p>
+</div>
+<!-- Evidence Tags -->
+<div class="mt-4 pt-3 border-t border-surface-container-high/60 flex flex-wrap items-center gap-2">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Based on:</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/30 font-code-md text-code-md text-on-surface-variant">
+            timetable: phys_lab_thu_0900 · Batch 2
+          </span>
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/30 font-code-md text-code-md text-on-surface-variant">
+            manifest: 5 items required · 2 verified
+          </span>
+<span class="inline-flex items-center px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/30 font-code-md text-code-md text-on-surface-variant">
+            digest_queue: 20:30 IST
+          </span>
+</div>
+<!-- Action Row -->
+<div class="mt-4 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<button class="px-3.5 py-1.5 rounded bg-primary text-on-primary font-title-md text-body-md font-medium hover:bg-primary-fixed transition-colors active:translate-y-px" type="button">
+              Review checklist
+            </button>
+<button class="px-3 py-1.5 rounded bg-transparent hover:bg-surface-container text-outline hover:text-on-surface font-body-md text-body-md transition-colors" onclick="dismissRule('RULE-088')" type="button">
+              Dismiss
+            </button>
+</div>
+<span class="font-code-md text-code-md text-outline/60">ID: inf_780c</span>
+</div>
+</article>
+</div>
+<!-- Footnote on Retention -->
+<div class="mt-4 flex items-center gap-2 text-outline">
+<span class="material-symbols-outlined text-[15px]">lock_clock</span>
+<p class="font-body-md text-body-md text-outline">
+        Dismissed suggestions stay hidden until the schedule or deadline behind them changes.
+      </p>
+</div>
+<!-- Locked Autonomous Pipeline Boundary (Strict Local Rules Guarantee) -->
+<section class="mt-8 p-6 rounded-xl bg-surface-container-low/40 border border-dashed border-outline-variant/40 flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">lock</span>
+<span class="font-title-md text-title-md font-semibold text-on-surface-variant">AI suggestions · Off</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="font-label-sm text-label-sm text-outline px-2 py-0.5 rounded bg-surface-container-lowest border border-outline-variant/20 tracking-wider">DISABLED BY OWNER</span>
+<!-- Physical toggle state: OFF -->
+<div class="w-8 h-4 rounded-full bg-surface-container-highest relative flex items-center px-0.5 cursor-not-allowed">
+<div class="w-3 h-3 rounded-full bg-outline"></div>
+</div>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl leading-relaxed">
+        Turn on in Settings › Privacy &amp; AI. Selected text is sent to your configured cloud provider. Manual tasks and reminders never depend on it.
+      </p>
+<div class="pt-1">
+<a class="font-code-md text-code-md text-primary hover:underline inline-flex items-center gap-1" href="#">
+<span>Configure privacy policy</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</a>
+</div>
+</section>
+</div>
+</div>
+<script>
+  function dismissRule(ruleId) {
+    const card = document.querySelector(`[data-rule-id="${ruleId}"]`);
+    if (card) {
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(-4px)';
+      card.style.transition = 'all 160ms cubic-bezier(0.4, 0, 0.2, 1)';
+      setTimeout(() => {
+        card.remove();
+        checkEmptyDeck();
+      }, 160);
+    }
+  }
+
+  function toggleSnoozeMenu() {
+    const menu = document.getElementById('snooze-dropdown');
+    if (menu) {
+      menu.classList.toggle('hidden');
+    }
+  }
+
+  function selectSnooze(interval) {
+    toggleSnoozeMenu();
+    dismissRule('RULE-003');
+  }
+
+  function checkEmptyDeck() {
+    const deck = document.getElementById('rule-deck');
+    if (deck && deck.children.length === 0) {
+      const emptyState = document.createElement('div');
+      emptyState.className = 'p-8 text-center rounded-xl bg-surface-container-low border border-outline-variant/20 font-body-md text-on-surface-variant';
+      emptyState.innerText = 'No rule breaches or preparation triggers currently active.';
+      deck.appendChild(emptyState);
+    }
+  }
+
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('snooze-dropdown');
+    const snoozeBtn = document.getElementById('snooze-btn');
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+      if (!dropdown.contains(e.target) && (!snoozeBtn || !snoozeBtn.contains(e.target))) {
+        dropdown.classList.add('hidden');
+      }
+    }
+  });
+</script></main></div></body></html>
