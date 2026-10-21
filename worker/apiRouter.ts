@@ -57,6 +57,7 @@ import {
 } from "./inboxService";
 import { InputRouter } from "./inputRouter";
 import { handleMemoryApi } from "./memoryApi";
+import { handleDesktopApi } from "./desktopApi";
 
 // ---------------------------------------------------------------------------
 // Standard Envelopes & Error Helpers
@@ -1681,6 +1682,14 @@ export async function handleApiRequest(
     const memoryResponse = await handleMemoryApi(request, env, now);
     if (memoryResponse) {
       return memoryResponse;
+    }
+
+    // =======================================================================
+    // 14D. DESKTOP INTELLIGENCE, TEACH MODE & SAFE BROWSER (Block 9)
+    // =======================================================================
+    const desktopResponse = await handleDesktopApi(request, env, now);
+    if (desktopResponse) {
+      return desktopResponse;
     }
 
     // GET /api/v1/assistant

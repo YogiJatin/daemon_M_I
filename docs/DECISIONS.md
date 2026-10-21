@@ -359,3 +359,45 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 **Context**: Both the audit ledger (Block 6.2) and the memory timeline record events over time, creating potential confusion over their roles.
 **Decision**: Kept the cryptographic audit ledger (`audit_chain`) strictly focused on tamper-evident compliance ("Did this operation execute?"), while `MemoryTimelineEngine` synthesizes understanding evolution ("How did our knowledge evolve?"). The Memory timeline aggregates object creation, summaries, tagging, and relationship links.
 **Consequences**: Audit ledger remains append-only and immutable for compliance. Memory timeline remains domain-rich and semantic for owner comprehension.
+
+## ADR-042 - Block 9: Teach Mode as the Core Learning Primitive
+**Date**: 2026-10-21
+**Context**: Desktop automation often relies on brittle coordinates or unconstrained AI agents that guess how tasks should be done.
+**Decision**: Built Teach Mode as the primary workflow learning primitive: Observe → Trace → Graph → Recipe → Approval → Skill. Teach Mode is explicit and owner-armed (no silent surveillance). Traces are sanitized at ingress (stripping passwords, cards, and secret tokens) and compiled into intent-based definitions.
+**Consequences**: The system learns by observing the owner once. Brittle coordinate clicking is eliminated. Zero unredacted credentials stored.
+
+## ADR-043 - Block 9: Workflow Graphs and Approved Recipes
+**Date**: 2026-10-21
+**Context**: Compiled interaction traces must be reusable without mutating live business entities or executing autonomously.
+**Decision**: Traces compile into draft `workflow_recipes` with confidence ratings. Recipes cannot be replayed or executed until explicit owner approval. On approval, recipes become reusable skills canonicalized into the Memory OS (`memory_objects` with tag `skill`).
+**Consequences**: Strict human-in-the-loop control over learned procedures. Memory OS owns the canonical workflow record.
+
+## ADR-044 - Block 9: Safe Browser Isolation and Policy Boundaries
+**Date**: 2026-10-21
+**Context**: Streaming, mirror, ad-heavy, and untrusted sites present security, redirect, and tracking risks if opened in the primary browser profile.
+**Decision**: Created `BrowserPolicyEngine` and `SafeBrowserService`. Targets are evaluated against policy rules (`trusted`, `restricted`, `safe-browser-only`, `blocked`). Risky destinations launch in dedicated isolated sandboxes (`--user-data-dir` in %TEMP%, `--incognito`, notifications blocked, zero shared cookies).
+**Consequences**: Protects personal browsing state and passwords from untrusted sites. Boundary enforcement happens at the browser process level, not via AI heuristics.
+
+## ADR-045 - Block 9: Camera Capture as a First-Class Ingress Surface
+**Date**: 2026-10-21
+**Context**: Physical artifacts (paper documents, whiteboard diagrams, book pages) needed an explicit input channel.
+**Decision**: Built permission-gated camera snapshot capture supporting still, document, and whiteboard modes. Camera frames convert to content-addressed attachments and enter the standard Multimodal Ingress pipeline (`InputRouter`), producing proposals for owner review. Continuous video streaming is explicitly avoided.
+**Consequences**: Physical-world capture enters the same uniform governance path as text, voice, and uploaded documents.
+
+## ADR-046 - Block 9: Obsidian as a Human-Readable Workflow Mirror
+**Date**: 2026-10-21
+**Context**: The owner needs a human-readable, external archive of learned workflows that can be viewed and organized in Obsidian without risking database corruption or vendor lock-in.
+**Decision**: Created `ObsidianMirror` and `ObsidianExportService`. Approved teach recipes are exported to Obsidian as Markdown notes, but the Personal AI OS database remains the canonical source of truth for workflow state, versions, and approvals. Notes contain metadata, summaries, sequential procedures, safety policies, and backlinks. Zero passwords or raw recordings are exported.
+**Consequences**: External human readability and backup portability achieved. Zero live runtime dependency on Obsidian.
+
+## ADR-047 - Block 9: Execution Plans Separate from AI Reasoning
+**Date**: 2026-10-21
+**Context**: Allowing an AI model to directly invoke local execution tools creates high-impact prompt injection and excessive agency risks.
+**Decision**: Decoupled reasoning from execution. AI produces only execution proposals. Execution proposals compile into deterministic `execution_plans` with classified risk tiers (Tier 1 safe, Tier 2 moderate, Tier 3 restricted). Tier 3 actions (elevated commands, raw eval, payments) have no adapter and are blocked at planning time.
+**Consequences**: Model cannot directly touch the PC. All execution steps are deterministic, inspectable, and auditable.
+
+## ADR-048 - Block 9: Human Approval Required for Non-Trivial Actions
+**Date**: 2026-10-21
+**Context**: Execution requests could be swapped or replayed maliciously if approvals were generic boolean flags.
+**Decision**: Tier 2 execution plans require owner approval cryptographically bound to the SHA-256 hash of the canonical step payload. Approval hashes are single-use and expire. Execution router verifies the exact hash before dispatching steps through typed adapters.
+**Consequences**: Prevents approval-swap attacks (approving A and executing B). Guarantees that only what the owner reviewed can execute.

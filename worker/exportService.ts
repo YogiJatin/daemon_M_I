@@ -55,6 +55,10 @@ export interface ExportDataPayload {
     memory_objects: any[];
     memory_relationships: any[];
     memory_tags: any[];
+    teach_sessions: any[];
+    workflow_recipes: any[];
+    browser_policies: any[];
+    execution_plans: any[];
   };
 }
 
@@ -269,6 +273,27 @@ export async function getExportData(
     memoryTags = [];
   }
 
+  // 15. Block 9: Teach Mode, Recipes, Policies & Execution Plans
+  let teachSessions: any[] = [];
+  let workflowRecipes: any[] = [];
+  let browserPolicies: any[] = [];
+  let executionPlans: any[] = [];
+  try {
+    const tsRes = await db.prepare("SELECT * FROM teach_sessions ORDER BY started_at ASC").all<any>();
+    teachSessions = tsRes.results || [];
+    const wrRes = await db.prepare("SELECT * FROM workflow_recipes ORDER BY created_at ASC").all<any>();
+    workflowRecipes = wrRes.results || [];
+    const bpRes = await db.prepare("SELECT * FROM browser_policies ORDER BY created_at ASC").all<any>();
+    browserPolicies = bpRes.results || [];
+    const epRes = await db.prepare("SELECT * FROM execution_plans ORDER BY created_at ASC").all<any>();
+    executionPlans = epRes.results || [];
+  } catch {
+    teachSessions = [];
+    workflowRecipes = [];
+    browserPolicies = [];
+    executionPlans = [];
+  }
+
   return {
     export_version: "1.0",
     exported_at: nowIso,
@@ -290,6 +315,10 @@ export async function getExportData(
       memory_objects: memoryObjects.length,
       memory_relationships: memoryRelationships.length,
       memory_tags: memoryTags.length,
+      teach_sessions: teachSessions.length,
+      workflow_recipes: workflowRecipes.length,
+      browser_policies: browserPolicies.length,
+      execution_plans: executionPlans.length,
     },
     data: {
       tasks,
@@ -308,6 +337,10 @@ export async function getExportData(
       memory_objects: memoryObjects,
       memory_relationships: memoryRelationships,
       memory_tags: memoryTags,
+      teach_sessions: teachSessions,
+      workflow_recipes: workflowRecipes,
+      browser_policies: browserPolicies,
+      execution_plans: executionPlans,
     },
   };
 }

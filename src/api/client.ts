@@ -300,4 +300,104 @@ export const api = {
       body: JSON.stringify({ from_object: fromObject, to_object: toObject, relationship_type: relationshipType, confidence }),
     });
   },
+
+  // Desktop Intelligence & Teach Mode (Block 9)
+  async startTeachSession(title: string, appContext?: string): Promise<{ session: any }> {
+    return request('/api/v1/teach/start', {
+      method: 'POST',
+      body: JSON.stringify({ title, appContext }),
+    });
+  },
+
+  async recordTeachStep(sessionId: string, actionType: string, intentSummary: string, targetSelector?: string, rawInput?: string): Promise<{ step: any }> {
+    return request('/api/v1/teach/step', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, actionType, intentSummary, targetSelector, rawInput }),
+    });
+  },
+
+  async compileTeachSession(sessionId: string, title?: string, intent?: string, triggerType: string = 'manual'): Promise<{ recipe: any }> {
+    return request('/api/v1/teach/compile', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId, title, intent, triggerType }),
+    });
+  },
+
+  async approveTeachRecipe(recipeId: string): Promise<{ recipe: any; approved: boolean }> {
+    return request(`/api/v1/teach/${encodeURIComponent(recipeId)}/approve`, {
+      method: 'POST',
+    });
+  },
+
+  async rejectTeachRecipe(recipeId: string, reason?: string): Promise<{ rejected: boolean }> {
+    return request(`/api/v1/teach/${encodeURIComponent(recipeId)}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  async getTeachRecipes(status?: string): Promise<{ recipes: any[]; count: number }> {
+    const sp = status ? `?status=${encodeURIComponent(status)}` : '';
+    return request(`/api/v1/teach/recipes${sp}`);
+  },
+
+  async openSafeBrowser(url: string): Promise<{ launchPlan: any; allowed: boolean }> {
+    return request('/api/v1/browser/open', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+  },
+
+  async observeBrowserUrl(url: string): Promise<{ evaluation: any }> {
+    return request('/api/v1/browser/observe', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+  },
+
+  async getBrowserPolicies(): Promise<{ policies: any[]; count: number }> {
+    return request('/api/v1/browser/policies');
+  },
+
+  async captureCamera(mode: string = 'still', permission: boolean = true, title?: string): Promise<{ capture: any }> {
+    return request('/api/v1/camera/capture', {
+      method: 'POST',
+      body: JSON.stringify({ mode, permission, title }),
+    });
+  },
+
+  async createExecutionPlan(intent: string, steps: any[]): Promise<{ plan: any }> {
+    return request('/api/v1/execution/plan', {
+      method: 'POST',
+      body: JSON.stringify({ intent, steps }),
+    });
+  },
+
+  async approveExecutionPlan(planId: string, approvalHash: string): Promise<{ plan: any; approved: boolean }> {
+    return request(`/api/v1/execution/${encodeURIComponent(planId)}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ approvalHash }),
+    });
+  },
+
+  async executeExecutionPlan(planId: string): Promise<{ execution: any }> {
+    return request(`/api/v1/execution/${encodeURIComponent(planId)}/execute`, {
+      method: 'POST',
+    });
+  },
+
+  async getExecutionPlan(planId: string): Promise<{ plan: any }> {
+    return request(`/api/v1/execution/${encodeURIComponent(planId)}`);
+  },
+
+  async exportObsidianWorkflows(vaultName?: string): Promise<any> {
+    return request('/api/v1/obsidian/export', {
+      method: 'POST',
+      body: JSON.stringify({ vaultName }),
+    });
+  },
+
+  async getObsidianWorkflows(): Promise<{ workflows: any[]; count: number; canonicalNotice: string }> {
+    return request('/api/v1/obsidian/workflows');
+  },
 };

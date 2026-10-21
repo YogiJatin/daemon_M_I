@@ -74,12 +74,24 @@ export type AuditEventType =
   | "MEMORY_UPDATED"
   | "SUMMARY_GENERATED"
   | "RELATIONSHIP_CREATED"
-  | "MEMORY_LINKED";
+  | "MEMORY_LINKED"
+  // Block 9 Desktop Intelligence & Teach Mode Events
+  | "TEACH_MODE_STARTED"
+  | "TEACH_STEP_RECORDED"
+  | "TEACH_RECIPE_COMPILED"
+  | "TEACH_RECIPE_APPROVED"
+  | "SAFE_BROWSER_OPENED"
+  | "BROWSER_POLICY_APPLIED"
+  | "CAMERA_CAPTURE_STARTED"
+  | "CAMERA_CAPTURE_COMPLETED"
+  | "EXECUTION_PLAN_CREATED"
+  | "EXECUTION_VERIFIED"
+  | "EXECUTION_ROLLED_BACK";
 
 export interface AuditEventInput {
   eventType: AuditEventType;
   eventVersion?: string; // Default: '1.0.0'
-  entityType: "task" | "proposal" | "timetable" | "recurrence" | "auth" | "export" | "ai" | "desktop" | "system" | "attachment" | "input_session" | "memory_object" | "memory_relationship";
+  entityType: "task" | "proposal" | "timetable" | "recurrence" | "auth" | "export" | "ai" | "desktop" | "system" | "attachment" | "input_session" | "memory_object" | "memory_relationship" | "teach_session" | "teach_step" | "workflow_recipe" | "browser_policy" | "browser_session" | "camera_capture" | "execution_plan";
   entityId: string;
   actor?: string; // Default: 'system'
   payload: Record<string, any>;
