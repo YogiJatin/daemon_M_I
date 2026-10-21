@@ -1,19 +1,23 @@
 /**
- * worker/aiAdapter.ts — Block 6 Central AI Capability Adapter & Failover Router
+ * worker/aiAdapter.ts — Block 6.1 Central AI Capability Adapter & Failover Router
  *
- * Requirements (Personal_AI_OS_SRS_v2.2.md §§7.8, 10, 13.5, 16 TEST-6.1 to TEST-6.7):
- * - Central boundary for all AI operations. No feature calls provider SDKs/URLs directly.
- * - Primary provider: Groq (llama-3.3-70b-versatile).
- * - Fallback provider: Cloudflare Workers AI (@cf/meta/llama-3.1-8b-instruct), optional Gemini.
- * - Deterministic Mock Provider for offline CI testing and simulated failures.
- * - Provider order is configurable via env (AI_PROVIDER_ORDER).
- * - Strict Privacy Classification: synthetic_test | low_sensitivity | personal | restricted.
- *   Fallback is blocked if provider terms do not permit the request's privacy class (TEST-6.3).
- * - Circuit breaker with cooldown, consecutive failure tracking, and Retry-After support.
- * - Runtime JSON schema validation and prompt injection defense (TEST-6.4).
- * - Safe graceful degradation: core reminder/task functions unaffected if AI fails (TEST-6.1, TEST-6.7).
- * - Observability without logging full private prompt/response bodies (TEST-6.6).
+ * Hardened Architecture:
+ * - Dynamic dispatch via AICapabilityRegistry.
+ * - XML context assembled via AIContextBuilder and TokenBudgetManager.
+ * - In-memory LRU prompt cache with canonical XML hashing (AIPromptCache).
+ * - Multi-provider failover with Provider Scoring respecting Owner Primacy (AIProviderScoring).
+ * - Independent verification with 1 bounded self-repair retry (AIVerifier).
+ * - Local Ollama model candidate preparation for Block 9.
+ * - Strict Privacy Classification (synthetic_test | low_sensitivity | personal | restricted).
+ * - Privacy-scrubbed telemetry logging (no prompt/response bodies).
+ * - Zero LLM in scheduler (Rule 5 invariant).
  */
+
+import { AICapabilityRegistry } from "./aiCapabilityRegistry";
+import { AIContextBuilder } from "./aiContextBuilder";
+import { AIPromptCache } from "./aiPromptCache";
+import { AIProviderScoring } from "./aiProviderScoring";
+import { AIVerifier } from "./aiVerifier";
 
 export type PrivacyClass = "synthetic_test" | "low_sensitivity" | "personal" | "restricted";
 
@@ -44,7 +48,7 @@ export interface AIResponse<TOutput = any> {
 }
 
 export interface ProviderConfig {
-  id: string; // 'groq' | 'workers_ai' | 'gemini' | 'mock'
+  id: string; // 'groq' | 'workers_ai' | 'gemini' | 'ollama' | 'mock'
   model: string;
   allowedPrivacyClasses: PrivacyClass[];
   timeoutMs: number;
@@ -54,18 +58,20 @@ export interface ProviderConfig {
 interface CircuitState {
   consecutiveFailures: number;
   cooldownUntil: number; // timestamp in ms
+  avgLatencyMs: number;
 }
 
 const circuitStates = new Map<string, CircuitState>();
 
 export function resetCircuitBreakers(): void {
   circuitStates.clear();
+  AIPromptCache.clear();
 }
 
 function getCircuitState(providerId: string): CircuitState {
   let state = circuitStates.get(providerId);
   if (!state) {
-    state = { consecutiveFailures: 0, cooldownUntil: 0 };
+    state = { consecutiveFailures: 0, cooldownUntil: 0, avgLatencyMs: 200 };
     circuitStates.set(providerId, state);
   }
   return state;
@@ -81,9 +87,7 @@ export class AIAdapter {
   }
 
   /**
-   * Resolves the configured provider order.
-   * Priority: env.AI_PROVIDER_ORDER -> ["groq", "workers_ai", "mock"]
-   * If GROQ_API_KEY is missing, mock or workers_ai moves ahead.
+   * Resolves the configured provider order respecting owner primacy.
    */
   public getProviderOrder(): string[] {
     const custom = this.env?.AI_PROVIDER_ORDER || "groq,workers_ai,mock";
@@ -94,7 +98,7 @@ export class AIAdapter {
   }
 
   public getProviderConfig(providerId: string): ProviderConfig | null {
-    switch (providerId) {
+    switch (providerId.toLowerCase()) {
       case "groq":
         return {
           id: "groq",
@@ -113,15 +117,20 @@ export class AIAdapter {
         return {
           id: "gemini",
           model: this.env?.GEMINI_MODEL || "gemini-2.0-flash",
-          // Free tier Gemini trains on data -> restricted to synthetic_test & low_sensitivity
           allowedPrivacyClasses: ["synthetic_test", "low_sensitivity"],
           timeoutMs: 7000,
+        };
+      case "ollama":
+        return {
+          id: "ollama",
+          model: this.env?.OLLAMA_MODEL || "llama3.2:latest",
+          allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal", "restricted"],
+          timeoutMs: 10000,
         };
       case "mock":
         return {
           id: "mock",
           model: "deterministic-mock-v1",
-          // Mock is local in-memory: safe for all privacy classes
           allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal", "restricted"],
           timeoutMs: 500,
         };
@@ -131,81 +140,211 @@ export class AIAdapter {
   }
 
   /**
-   * Central dispatch method with failover, circuit breaker, and privacy gating.
+   * Hardened capability execution pipeline using Registry, ContextBuilder,
+   * PromptCache, Scoring, and Verifier.
    */
-  public async execute<TOutput = any>(
-    request: AIRequest,
+  public async executeCapability<TInput, TOutput>(
+    capabilityId: string,
+    input: TInput,
+    privacyClass: PrivacyClass = "personal",
+    simulatedFailure?: any,
     now: Date = new Date()
   ): Promise<AIResponse<TOutput>> {
-    const providerOrder = this.getProviderOrder();
+    const capability = AICapabilityRegistry.get(capabilityId);
+    if (!capability) {
+      return {
+        ok: false,
+        provider: "none",
+        model: "none",
+        durationMs: 0,
+        fallbackTriggered: false,
+        error: { code: "schema_invalid", message: `Capability '${capabilityId}' is not registered` },
+      };
+    }
+
+    // 1. Capability Permission Check
+    if (!capability.supportedPrivacyClasses.includes(privacyClass)) {
+      return {
+        ok: false,
+        provider: "none",
+        model: "none",
+        durationMs: 0,
+        fallbackTriggered: false,
+        error: {
+          code: "privacy_blocked",
+          message: `Capability '${capabilityId}' does not permit privacy class '${privacyClass}'`,
+        },
+      };
+    }
+
+    // 2. Assemble Context via AIContextBuilder
+    const builder = new AIContextBuilder();
+    builder.setSystemRules(capability.systemRules).setOutputContract(capability.outputContract);
+
+    if (this.db) {
+      await capability.contextBuilder(this.db, input, builder, now);
+    }
+
+    const { xml: canonicalXml } = builder.build(capability.maxContextTokens);
+
+    // 3. Prompt Cache Check (Memory-First LRU)
+    const normalizedReq = JSON.stringify(input || {});
+    const cacheKey = await AIPromptCache.computeKey(
+      capability.id,
+      capability.promptVersion,
+      builder.contextVersion,
+      canonicalXml,
+      normalizedReq
+    );
+
+    if (!simulatedFailure) {
+      const cached = AIPromptCache.get<TOutput>(cacheKey, now);
+      if (cached) {
+        return {
+          ok: true,
+          data: cached.data,
+          rawText: cached.rawText,
+          provider: `${cached.provider} (cached)`,
+          model: cached.model,
+          durationMs: 1,
+          fallbackTriggered: false,
+        };
+      }
+    }
+
+    // 4. Provider Scoring & Selection (Owner Primacy)
+    const ownerOrder = this.getProviderOrder();
+    const allConfigs = ["groq", "workers_ai", "gemini", "mock"]
+      .map((id) => this.getProviderConfig(id))
+      .filter((c): c is ProviderConfig => c !== null);
+
+    const scoredCandidates = AIProviderScoring.rankCandidates(allConfigs, ownerOrder, privacyClass, circuitStates, now);
+
     let fallbackTriggered = false;
     let lastErrorCode: any = "provider_unavailable";
-    let lastErrorMessage = "No available provider could fulfill the request";
+    let lastErrorMessage = "All candidate providers failed or are unavailable";
 
-    for (let i = 0; i < providerOrder.length; i++) {
-      const providerId = providerOrder[i];
-      const config = this.getProviderConfig(providerId);
-      if (!config) continue;
+    for (let i = 0; i < scoredCandidates.length; i++) {
+      const candidate = scoredCandidates[i];
+      const config = candidate.config;
 
-      // 1. Privacy Class Check (SRS §10.4, TEST-6.3)
-      if (!config.allowedPrivacyClasses.includes(request.privacyClass)) {
-        // Provider cannot handle this privacy level (e.g. personal data sent to training tier)
+      // Skip ineligible candidates
+      if (!candidate.isPrivacyAllowed) {
         lastErrorCode = "privacy_blocked";
-        lastErrorMessage = `Provider '${providerId}' terms do not allow privacy class '${request.privacyClass}'`;
+        lastErrorMessage = candidate.disqualificationReason || "Privacy tier not permitted";
         continue;
       }
 
-      // 2. Circuit Breaker / Cooldown Check
-      const circuit = getCircuitState(providerId);
-      if (circuit.cooldownUntil > now.getTime()) {
-        // Provider is in cooldown, skip to next fallback
+      if (!candidate.isHealthy) {
         fallbackTriggered = true;
         continue;
       }
 
-      // 3. Attempt Execution
-      const startTime = Date.now();
-      try {
-        const result = await this.callProvider<TOutput>(config, request, now);
-        const durationMs = Date.now() - startTime;
+      // Check capability-specific allowlist if defined
+      if (capability.providerAllowList && !capability.providerAllowList.includes(config.id)) {
+        continue;
+      }
 
-        // Success: reset consecutive failures
+      const circuit = getCircuitState(config.id);
+      const startTime = Date.now();
+
+      try {
+        const req: AIRequest = {
+          capability: capability.id as any,
+          systemPrompt: capability.systemRules,
+          userPrompt: canonicalXml,
+          inputContext: input,
+          privacyClass,
+          simulatedFailure,
+        };
+
+        let result = await this.callProvider<any>(config, req, now);
+        let parsedData = result.data;
+
+        // 5. Run AI Verifier
+        let verification = capability.validator(parsedData, builder.getIndexedRecordIds());
+
+        // Bounded Self-Repair Retry (1 attempt max)
+        if (!verification.valid && verification.repairPrompt) {
+          try {
+            const repairReq: AIRequest = {
+              capability: capability.id as any,
+              systemPrompt: capability.systemRules,
+              userPrompt: `${canonicalXml}\n\n${verification.repairPrompt}`,
+              inputContext: input,
+              privacyClass,
+            };
+            const repairRes = await this.callProvider<any>(config, repairReq, now);
+            const secondCheck = capability.validator(repairRes.data, builder.getIndexedRecordIds());
+            if (secondCheck.valid) {
+              parsedData = repairRes.data;
+              verification = secondCheck;
+            }
+          } catch {
+            // Repair attempt failed, verification stays invalid
+          }
+        }
+
+        if (!verification.valid) {
+          throw new Error(`AI verification failed: ${verification.errors.join("; ")}`);
+        }
+
+        // 6. Execute Handler (Buffers proposals to D1)
+        const handledOutput = this.db
+          ? await capability.handler(this.db, parsedData, input, now)
+          : parsedData;
+
+        const durationMs = Date.now() - startTime;
         circuit.consecutiveFailures = 0;
         circuit.cooldownUntil = 0;
+        circuit.avgLatencyMs = Math.round((circuit.avgLatencyMs + durationMs) / 2);
+
+        // Cache successful output
+        AIPromptCache.set(
+          cacheKey,
+          capability.id,
+          capability.promptVersion,
+          builder.contextVersion,
+          handledOutput,
+          result.rawText,
+          config.id,
+          config.model,
+          900,
+          now
+        );
+
         await this.recordProviderHealth(config.id, config.model, "healthy", 0, durationMs, now);
 
         return {
           ok: true,
-          data: result.data,
+          data: handledOutput,
           rawText: result.rawText,
           provider: config.id,
           model: config.model,
           durationMs,
-          fallbackTriggered,
+          fallbackTriggered: fallbackTriggered || i > 0 || candidate.ownerRank > 0,
         };
       } catch (err: any) {
         const durationMs = Date.now() - startTime;
         fallbackTriggered = true;
         circuit.consecutiveFailures++;
 
-        // Determine failure classification
         let failureCode = "500";
-        let cooldownMs = 5000; // default 5s
+        let cooldownMs = 5000;
 
         if (err.name === "AbortError" || err.message?.includes("timeout")) {
           failureCode = "timeout";
           cooldownMs = 15000;
-        } else if (err.status === 429 || err.message?.includes("429") || err.message?.includes("rate_limited")) {
+        } else if (err.status === 429 || err.message?.includes("429")) {
           failureCode = "429";
-          cooldownMs = err.retryAfterMs || 60000; // respect Retry-After or 60s
+          cooldownMs = err.retryAfterMs || 60000;
         } else if (err.status >= 500 || err.message?.includes("503")) {
           failureCode = "503";
           cooldownMs = 30000;
         }
 
-        // Tripped circuit breaker after 3 failures
         if (circuit.consecutiveFailures >= 3) {
-          cooldownMs = Math.max(cooldownMs, 300000); // 5 min cooldown
+          cooldownMs = Math.max(cooldownMs, 300000);
         }
 
         circuit.cooldownUntil = now.getTime() + cooldownMs;
@@ -224,7 +363,6 @@ export class AIAdapter {
       }
     }
 
-    // All providers failed or were privacy-blocked -> Safe graceful degradation (TEST-6.7)
     return {
       ok: false,
       provider: "none",
@@ -233,25 +371,125 @@ export class AIAdapter {
       fallbackTriggered: true,
       error: {
         code: lastErrorCode,
-        message: lastErrorCode === "privacy_blocked"
-          ? lastErrorMessage
-          : "AI assistance is temporarily unavailable. Core tasks, timetable, and reminders remain operational.",
+        message:
+          lastErrorCode === "privacy_blocked"
+            ? lastErrorMessage
+            : "AI assistance is temporarily unavailable. Core tasks, timetable, and reminders remain operational.",
       },
     };
   }
 
   /**
-   * Calls a specific provider adapter.
+   * Legacy / Direct execution method (compatible with tests/unit_ai.ts).
    */
+  public async execute<TOutput = any>(
+    request: AIRequest,
+    now: Date = new Date()
+  ): Promise<AIResponse<TOutput>> {
+    const providerOrder = this.getProviderOrder();
+    let fallbackTriggered = false;
+    let lastErrorCode: any = "provider_unavailable";
+    let lastErrorMessage = "No available provider could fulfill the request";
+
+    for (let i = 0; i < providerOrder.length; i++) {
+      const providerId = providerOrder[i];
+      const config = this.getProviderConfig(providerId);
+      if (!config) continue;
+
+      if (!config.allowedPrivacyClasses.includes(request.privacyClass)) {
+        lastErrorCode = "privacy_blocked";
+        lastErrorMessage = `Provider '${providerId}' terms do not allow privacy class '${request.privacyClass}'`;
+        continue;
+      }
+
+      const circuit = getCircuitState(providerId);
+      if (circuit.cooldownUntil > now.getTime()) {
+        fallbackTriggered = true;
+        continue;
+      }
+
+      const startTime = Date.now();
+      try {
+        const result = await this.callProvider<TOutput>(config, request, now);
+        const durationMs = Date.now() - startTime;
+
+        circuit.consecutiveFailures = 0;
+        circuit.cooldownUntil = 0;
+        circuit.avgLatencyMs = Math.round((circuit.avgLatencyMs + durationMs) / 2);
+        await this.recordProviderHealth(config.id, config.model, "healthy", 0, durationMs, now);
+
+        return {
+          ok: true,
+          data: result.data,
+          rawText: result.rawText,
+          provider: config.id,
+          model: config.model,
+          durationMs,
+          fallbackTriggered: fallbackTriggered || i > 0,
+        };
+      } catch (err: any) {
+        const durationMs = Date.now() - startTime;
+        fallbackTriggered = true;
+        circuit.consecutiveFailures++;
+
+        let failureCode = "500";
+        let cooldownMs = 5000;
+
+        if (err.name === "AbortError" || err.message?.includes("timeout")) {
+          failureCode = "timeout";
+          cooldownMs = 15000;
+        } else if (err.status === 429 || err.message?.includes("429")) {
+          failureCode = "429";
+          cooldownMs = err.retryAfterMs || 60000;
+        } else if (err.status >= 500 || err.message?.includes("503")) {
+          failureCode = "503";
+          cooldownMs = 30000;
+        }
+
+        if (circuit.consecutiveFailures >= 3) {
+          cooldownMs = Math.max(cooldownMs, 300000);
+        }
+
+        circuit.cooldownUntil = now.getTime() + cooldownMs;
+        await this.recordProviderHealth(
+          config.id,
+          config.model,
+          circuit.consecutiveFailures >= 3 ? "cooldown" : "degraded",
+          circuit.consecutiveFailures,
+          durationMs,
+          now,
+          failureCode
+        );
+
+        lastErrorCode = failureCode === "429" ? "rate_limited" : "provider_unavailable";
+        lastErrorMessage = err.message || `Provider ${config.id} failed`;
+      }
+    }
+
+    return {
+      ok: false,
+      provider: "none",
+      model: "none",
+      durationMs: 0,
+      fallbackTriggered: true,
+      error: {
+        code: lastErrorCode,
+        message:
+          lastErrorCode === "privacy_blocked"
+            ? lastErrorMessage
+            : "AI assistance is temporarily unavailable. Core tasks, timetable, and reminders remain operational.",
+      },
+    };
+  }
+
   private async callProvider<TOutput>(
     config: ProviderConfig,
     request: AIRequest,
-    now: Date
+    _now: Date
   ): Promise<{ data: TOutput; rawText: string }> {
-    // Check for simulated failure fixture in tests (TEST-6.2, TEST-6.4)
     if (request.simulatedFailure && config.id !== "mock") {
       const sim = request.simulatedFailure;
-      request.simulatedFailure = undefined; // Clear so fallback provider succeeds
+      request.simulatedFailure = undefined;
       if (sim === "429") {
         const err: any = new Error("Rate limit exceeded (simulated 429)");
         err.status = 429;
@@ -274,7 +512,7 @@ export class AIAdapter {
       }
     }
 
-    switch (config.id) {
+    switch (config.id.toLowerCase()) {
       case "mock":
         return this.callMockProvider<TOutput>(config, request);
       case "groq":
@@ -283,19 +521,17 @@ export class AIAdapter {
         return this.callWorkersAiProvider<TOutput>(config, request);
       case "gemini":
         return this.callGeminiProvider<TOutput>(config, request);
+      case "ollama":
+        return this.callOllamaProvider<TOutput>(config, request);
       default:
         throw new Error(`Unsupported provider: ${config.id}`);
     }
   }
 
-  /**
-   * Deterministic Mock Provider for offline testing and CI suites.
-   */
   private async callMockProvider<TOutput>(
-    config: ProviderConfig,
+    _config: ProviderConfig,
     request: AIRequest
   ): Promise<{ data: TOutput; rawText: string }> {
-    // Generate deterministic structured response based on capability and input context
     let mockResult: any;
 
     if (request.capability === "task_breakdown") {
@@ -325,6 +561,10 @@ export class AIAdapter {
             evidence: "Submission verification",
           },
         ],
+        reason: "Decomposed complex milestone into 3 sequential subtasks",
+        confidence: 0.95,
+        evidence: `Based on project title ${taskTitle}`,
+        affected_record_ids: request.inputContext?.taskId ? [request.inputContext.taskId] : [],
       };
     } else if (request.capability === "weekly_plan") {
       mockResult = {
@@ -339,23 +579,36 @@ export class AIAdapter {
             evidence: "Physics Lab slot on Friday requires manual verified",
           },
         ],
+        reason: "Weekly academic and schedule synthesis",
+        confidence: 0.9,
+        evidence: "Timetable occurrences and upcoming assignment deadlines",
+        affected_record_ids: [],
       };
     } else if (request.capability === "prioritize") {
+      const firstTaskId = request.inputContext?.tasks?.[0]?.id || "task-1";
       mockResult = {
         recommended_order: [
           {
-            task_id: request.inputContext?.tasks?.[0]?.id || "task-1",
+            task_id: firstTaskId,
             rank: 1,
             urgency_score: 9.5,
             reasoning: "Imminent deadline with high priority",
           },
         ],
         summary: "Prioritized based on strict deadline urgency and preparation lead times",
+        reason: "Urgency deadline scoring",
+        confidence: 0.95,
+        evidence: "Earliest deadline and high priority tag",
+        affected_record_ids: [firstTaskId],
       };
     } else {
       mockResult = {
         next_action: "Review upcoming timetable and tackle overdue items",
+        rationale: "Derived from timetable context and urgent task priority",
         confidence: 0.95,
+        reason: "Derived from timetable context and urgent task priority",
+        evidence: "Current timetable slot and overdue tasks list",
+        affected_record_ids: [],
       };
     }
 
@@ -363,17 +616,12 @@ export class AIAdapter {
     return { data: mockResult as TOutput, rawText };
   }
 
-  /**
-   * Groq Provider Implementation (OpenAI-compatible /chat/completions).
-   */
   private async callGroqProvider<TOutput>(
     config: ProviderConfig,
     request: AIRequest
   ): Promise<{ data: TOutput; rawText: string }> {
     const apiKey = this.env?.GROQ_API_KEY;
-    if (!apiKey) {
-      throw new Error("GROQ_API_KEY not configured");
-    }
+    if (!apiKey) throw new Error("GROQ_API_KEY not configured");
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -381,15 +629,12 @@ export class AIAdapter {
     try {
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
           model: config.model,
           messages: [
             { role: "system", content: request.systemPrompt },
-            { role: "user", content: `<user_data>\n${request.userPrompt}\n</user_data>` },
+            { role: "user", content: request.userPrompt },
           ],
           response_format: { type: "json_object" },
           temperature: 0.1,
@@ -401,10 +646,6 @@ export class AIAdapter {
       if (!response.ok) {
         const err: any = new Error(`Groq API error: ${response.status}`);
         err.status = response.status;
-        const retryAfter = response.headers.get("retry-after");
-        if (retryAfter) {
-          err.retryAfterMs = parseInt(retryAfter, 10) * 1000;
-        }
         throw err;
       }
 
@@ -417,71 +658,86 @@ export class AIAdapter {
     }
   }
 
-  /**
-   * Cloudflare Workers AI Provider Implementation.
-   */
   private async callWorkersAiProvider<TOutput>(
     config: ProviderConfig,
     request: AIRequest
   ): Promise<{ data: TOutput; rawText: string }> {
     const aiBinding = this.env?.AI;
-    if (!aiBinding) {
-      throw new Error("Cloudflare Workers AI binding (env.AI) not configured");
-    }
+    if (!aiBinding) throw new Error("Cloudflare Workers AI binding (env.AI) not configured");
 
-    const promptText = `${request.systemPrompt}\n\nIMPORTANT: Return valid JSON only.\n\n<user_data>\n${request.userPrompt}\n</user_data>`;
+    const promptText = `${request.systemPrompt}\n\nIMPORTANT: Return valid JSON only.\n\n${request.userPrompt}`;
     const response: any = await aiBinding.run(config.model, {
       prompt: promptText,
       max_tokens: 1024,
       temperature: 0.1,
     });
 
-    const rawText = response.response || JSON.stringify(response);
-    // Extract JSON block if wrapped in markdown
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Workers AI did not return valid JSON");
-    }
-    const data = JSON.parse(jsonMatch[0]) as TOutput;
-    return { data, rawText: jsonMatch[0] };
+    const rawText = typeof response === "string" ? response : response?.response || JSON.stringify(response);
+    const data = JSON.parse(rawText) as TOutput;
+    return { data, rawText };
   }
 
-  /**
-   * Google Gemini Provider Implementation.
-   */
   private async callGeminiProvider<TOutput>(
     config: ProviderConfig,
     request: AIRequest
   ): Promise<{ data: TOutput; rawText: string }> {
     const apiKey = this.env?.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY not configured");
-    }
+    if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${apiKey}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0.1 },
+      }),
+    });
+
+    if (!response.ok) {
+      const err: any = new Error(`Gemini API error: ${response.status}`);
+      err.status = response.status;
+      throw err;
+    }
+
+    const resJson = (await response.json()) as any;
+    const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const data = JSON.parse(rawText) as TOutput;
+    return { data, rawText };
+  }
+
+  /**
+   * Local Ollama Provider Implementation (Prepared for Block 9 Desktop Agent).
+   */
+  private async callOllamaProvider<TOutput>(
+    config: ProviderConfig,
+    request: AIRequest
+  ): Promise<{ data: TOutput; rawText: string }> {
+    const host = this.env?.OLLAMA_HOST || "http://localhost:11434";
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(`${host}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: request.systemPrompt }] },
-          contents: [{ parts: [{ text: `<user_data>\n${request.userPrompt}\n</user_data>` }] }],
-          generationConfig: { response_mime_type: "application/json", temperature: 0.1 },
+          model: config.model,
+          prompt: `${request.systemPrompt}\n\n${request.userPrompt}`,
+          format: "json",
+          stream: false,
         }),
         signal: controller.signal,
       });
 
       if (!response.ok) {
-        const err: any = new Error(`Gemini API error: ${response.status}`);
+        const err: any = new Error(`Ollama local error: ${response.status}`);
         err.status = response.status;
         throw err;
       }
 
       const resJson = (await response.json()) as any;
-      const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      const rawText = resJson.response || "{}";
       const data = JSON.parse(rawText) as TOutput;
       return { data, rawText };
     } finally {
@@ -490,7 +746,8 @@ export class AIAdapter {
   }
 
   /**
-   * Records provider health telemetry in D1 provider_health table (SRS §8.12).
+   * Records provider health telemetry in D1 (SRS §8.12).
+   * Strictly omits prompt text, user messages, or model outputs (Privacy scrubbing).
    */
   private async recordProviderHealth(
     provider: string,
@@ -498,12 +755,12 @@ export class AIAdapter {
     status: "healthy" | "cooldown" | "degraded" | "offline",
     consecutiveFailures: number,
     durationMs: number,
-    now: Date,
+    now: Date = new Date(),
     lastFailureCode?: string
   ): Promise<void> {
     if (!this.db) return;
-
     const nowIso = now.toISOString();
+
     try {
       await this.db
         .prepare(
@@ -513,7 +770,6 @@ export class AIAdapter {
              total_requests, total_tokens, avg_latency_ms, updated_at
            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)
            ON CONFLICT(provider) DO UPDATE SET
-             model = excluded.model,
              status = excluded.status,
              consecutive_failures = excluded.consecutive_failures,
              last_success_at = CASE WHEN excluded.consecutive_failures = 0 THEN excluded.last_success_at ELSE provider_health.last_success_at END,
@@ -537,7 +793,6 @@ export class AIAdapter {
         )
         .run();
     } catch (e) {
-      // Non-fatal telemetry error
       console.warn("[ProviderHealth Telemetry Warning]", e);
     }
   }

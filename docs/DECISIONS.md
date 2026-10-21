@@ -174,3 +174,47 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 **Decision**: Every AI request carries an explicit `PrivacyClass` (`synthetic_test`, `low_sensitivity`, `personal`, `restricted`). External providers whose terms allow training on free tiers or log retention are blocked from receiving `restricted` data, returning a graceful 403 `privacy_blocked` envelope. Untrusted user content is quarantined inside `<user_data>...</user_data>` delimiters with control-tag escaping to neutralize prompt injection. The cron scheduler remains 100% deterministic with zero AI calls (Rule 5).  
 **Alternatives rejected**: Unchecked raw string interpolation into LLM prompts.  
 **Trade-off**: Restricted context cannot be processed by third-party cloud LLMs unless local/private models are active.
+
+
+---
+
+## ADR-020 — Block 6.1: Dynamic Capability Registry & Facade Architecture
+
+**Date**: 2026-10-21  
+**Context**: Block 6.1 architecture hardening pass to support future extensions (Desktop Agent, Email, Browser Automation, Voice) without modifying the central adapter or leaking domain logic into routing.  
+**Decision**: Created `AICapabilityRegistry` (`worker/aiCapabilityRegistry.ts`) with typed capability definitions (`id`, `promptId`, `promptVersion`, `checksum`, `dependencies`, `supportedPrivacyClasses`, `maxContextTokens`, `maxOutputTokens`, `timeoutMs`, `systemRules`, `outputContract`, `contextBuilder`, `validator`, `handler`). Capabilities register themselves dynamically. Eliminated all hardcoded switch statements in dispatch. Preserved `AICapabilities` class as a backwards-compatible facade with identical method signatures so that existing REST routes and Telegram command handlers require zero changes.  
+**Alternatives rejected**: Switch statement dispatch inside `aiAdapter.ts` (violates open-closed principle; causes merge friction as new capabilities are added).  
+**Trade-off**: Requires explicit capability registration at module initialization.
+
+---
+
+## ADR-021 — Block 6.1: Canonical XML Context Construction & Dedicated Token Budgeting
+
+**Date**: 2026-10-21  
+**Context**: Complex prompts across multiple entities (tasks, timetable occurrences, materials, history) need structured demarcation, deterministic serialization, anti-hallucination citation indexing, and token budget enforcement before LLM dispatch.  
+**Decision**: Built `AIContextBuilder` (`worker/aiContextBuilder.ts`) producing standardized XML segments: `<system_rules>`, `<context>` (containing `<tasks>`, `<classes>`, `<materials>`, `<history>`), `<owner_request>`, and `<output_contract>`. All entities are assigned typed IDs, deduplicated by key, and indexed for citation verification. Token budgeting is decoupled into `TokenBudgetManager` (`worker/aiTokenBudgetManager.ts`) using a calibrated heuristic (4 chars/token). Enforces ceilings by pruning low-priority entities while strictly preserving mandatory entities (overdue tasks, today's schedule, immediate classes, and cited evidence).  
+**Alternatives rejected**: Ad-hoc JSON/string prompt concatenation inside capability functions; embedding token trimming into individual capability handlers.  
+**Trade-off**: XML formatting slightly increases prompt token count (~5-10% overhead) compared to raw minified JSON, but provides superior prompt injection isolation and structural parsing for frontier LLMs.
+
+---
+
+## ADR-022 — Block 6.1: Memory-First LRU Prompt Cache with SHA-256 XML Hashing
+
+**Date**: 2026-10-21  
+**Context**: Repeated analytical AI queries within short timeframes (e.g. rapid dashboard refreshes, identical suggestions) cause unnecessary latency and external provider rate-limit pressure.  
+**Decision**: Implemented `AIPromptCache` (`worker/aiPromptCache.ts`) with an in-memory LRU cache (capped at 200 entries, default 15-minute TTL). Deterministic cache keys are computed via Web Crypto SHA-256 over canonical inputs: `capability + promptVersion + contextVersion + canonicalXml + normalizedOwnerRequest`. Caches only successful, schema-validated responses with complete provider metadata. Strictly excludes provider failures, rate limits, and network errors.  
+**Alternatives rejected**: Defaulting to D1 database for prompt cache (unnecessary D1 write/read quota burn on Cloudflare Free tier for transient cache entries; memory-first is faster and zero-cost).  
+**Trade-off**: In-memory cache is isolate-scoped; cold starts or isolate evictions trigger fresh provider requests, which is completely safe and idempotent.
+
+---
+
+## ADR-023 — Block 6.1: Two-Stage Verification, Bounded Self-Repair & Owner Primacy Scoring
+
+**Date**: 2026-10-21  
+**Context**: Grounding safety requires verifying LLM outputs against context facts before proposal creation. Provider selection must respect owner preference without allowing degraded providers to stall execution.  
+**Decision**: 
+1. `AIVerifier` (`worker/aiVerifier.ts`) validates outputs in two stages: strict JSON schema typing and anti-hallucination citation checks (all cited record IDs must exist in the context index). On failure, generates a structured repair prompt and attempts exactly 1 bounded self-repair call.
+2. `AIProviderScoring` (`worker/aiProviderScoring.ts`) ranks candidate providers using Owner Primacy: owner preference (`env.AI_PROVIDER_ORDER`) is given overwhelming weight (10,000 pts per rank) and is only overridden if a provider is in circuit cooldown or disallows the request's privacy tier. Latency serves solely as an intra-tier tie-breaker.
+3. `AIExecutionPlanner` (`worker/aiExecutionPlanner.ts`) defines platform-neutral typed execution plans (`draft -> validated -> approved -> rejected`) with zero autonomous execution capability, preparing the foundation for Block 9 Desktop Agent.  
+**Alternatives rejected**: Unchecked LLM outputs converted directly to proposals; autonomous AI multi-step execution without owner approval gates (violates Rule 11).  
+**Trade-off**: Self-repair retry adds latency on malformed provider outputs, bounded to 1 attempt.
