@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal AI OS · Share Target Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        bg: '#0A0C0F',
+        surface: '#11141A',
+        raised: '#171B22',
+        subtle: '#1C212A',
+        arc: '#62D2E6',
+        ember: '#E8B04A',
+        crimson: '#E5545B',
+        textPrimary: '#E8ECF1',
+        textSecondary: '#9AA4B2',
+        textTertiary: '#6B7585',
+        hairline: 'rgba(255, 255, 255, 0.07)',
+        hairlineStrong: 'rgba(255, 255, 255, 0.12)',
+      },
+      fontFamily: {
+        sans: ['"Instrument Sans"', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'monospace'],
+      },
+      borderRadius: {
+        'sm': '6px',
+        'md': '8px',
+        'lg': '12px',
+        'xl': '16px',
+      }
+    }
+  }
+}
+</script>
+<style>
+  body {
+    background-color: #060709;
+    color: #E8ECF1;
+    font-family: 'Instrument Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .presence-ring {
+    stroke-dasharray: 283;
+    stroke-dashoffset: 14;
+    transition: stroke-dashoffset 0.5s ease;
+  }
+  .glass-card {
+    background: rgba(17, 20, 26, 0.72);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  /* Custom scrollbar for preview */
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+</style>
+</head>
+<body class="min-h-screen w-full flex items-center justify-center p-4 sm:p-8 bg-[#050608]">
+
+  <!-- Mobile Device Simulation Frame (360x800 container) -->
+  <div class="relative w-[360px] h-[800px] bg-bg rounded-[24px] border border-hairlineStrong shadow-2xl flex flex-col overflow-hidden select-none">
+    
+    <!-- Top System Status Bar -->
+    <div class="w-full h-9 px-4 flex items-center justify-between text-[11px] font-mono text-textTertiary bg-surface/80 border-b border-hairline z-20 shrink-0">
+      <div class="flex items-center space-x-2">
+        <span class="text-textSecondary font-semibold">10:42</span>
+        <span class="text-[9px] px-1 py-0.5 rounded bg-subtle border border-hairline text-textTertiary">IST</span>
+      </div>
+      
+      <!-- Scheduler Presence Ring (mini) -->
+      <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-1.5" title="Presence Ring: Scheduler nominal (96% QoS)">
+          <span class="w-1.5 h-1.5 rounded-full bg-arc animate-pulse"></span>
+          <span class="text-[10px] text-textSecondary">study-pc</span>
+        </div>
+        <div class="w-3.5 h-2 rounded-[2px] border border-textTertiary relative flex items-center p-0.5">
+          <div class="h-full w-2 bg-textSecondary rounded-[1px]"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- App Top Bar (Review shared text) -->
+    <header class="w-full h-14 px-4 bg-surface border-b border-hairline flex items-center justify-between shrink-0 z-20">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-2 h-2 rounded-full bg-ember" title="Uncommitted State"></div>
+        <div>
+          <h1 class="text-[15px] font-medium tracking-tight text-textPrimary leading-none">Review shared text</h1>
+          <p class="text-[10px] font-mono text-textTertiary mt-1">INTENT · INGESTION_STAGE_0</p>
+        </div>
+      </div>
+      
+      <!-- Close / Dismiss Button (min 44px tap target) -->
+      <button class="w-11 h-11 -mr-2 flex items-center justify-center text-textSecondary hover:text-textPrimary rounded-lg active:bg-raised transition-colors" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Scrollable Ingestion Form Surface -->
+    <main class="flex-1 overflow-y-auto px-4 py-3.5 space-y-4 text-xs">
+      
+      <!-- Untrusted Source Payload Container -->
+      <section class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] uppercase font-mono tracking-wider text-textTertiary flex items-center gap-1">
+            <svg class="w-3 h-3 text-ember" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Shared text <span class="text-textSecondary">(untrusted, as received)</span>
+          </span>
+          <span class="text-[9px] font-mono text-textTertiary">SRC: CLIPBOARD</span>
+        </div>
+
+        <!-- Read-only Quote Block -->
+        <div class="bg-surface rounded-lg border-l-2 border-l-ember border border-hairline p-3 space-y-2 relative">
+          <p class="text-[12px] leading-relaxed text-textSecondary font-sans selection:bg-arc selection:text-bg">
+            “Lab record submission moved to Friday 5 pm. Bring signed cover page. — see <span class="text-arc/90 underline decoration-hairline underline-offset-2">https://college.example/notices/412</span>”
+          </p>
+
+          <div class="flex items-center justify-between pt-1 border-t border-hairline/60">
+            <!-- Detected Link Chip -->
+            <a href="#" class="inline-flex items-center space-x-1.5 px-2 py-1 rounded bg-raised border border-hairline text-arc hover:border-arc/40 transition-colors text-[10px] font-mono">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+              <span class="truncate max-w-[150px]">college.example/notices/412</span>
+            </a>
+
+            <!-- Show all control -->
+            <button type="button" class="text-[10px] font-mono text-textTertiary hover:text-textSecondary px-1.5 py-0.5 rounded">
+              Show all (84 ch)
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Policy Guardrail Helper Banner -->
+      <div class="px-2.5 py-1.5 rounded-md bg-surface/50 border border-hairline flex items-center space-x-2 text-[10px] text-textTertiary font-mono">
+        <span class="w-1 h-1 rounded-full bg-ember shrink-0"></span>
+        <span class="leading-normal">Rule: Dates aren’t guessed from the text.</span>
+      </div>
+
+      <!-- Editable Task Fields Area -->
+      <section class="space-y-3 pt-0.5">
+        
+        <!-- Field 1: Task Title -->
+        <div class="space-y-1">
+          <div class="flex items-center justify-between">
+            <label class="text-[11px] font-medium text-textSecondary uppercase tracking-wide">Task title</label>
+            <span class="text-[9px] font-mono text-textTertiary">FIRST LINE EXTRACT</span>
+          </div>
+          <div class="relative">
+            <input 
+              type="text" 
+              value="Lab record submission moved to Friday 5 pm" 
+              class="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-textPrimary text-[13px] font-sans focus:outline-none focus:border-arc/70 transition-colors"
+              placeholder="Enter task description"
+            />
+          </div>
+        </div>
+
+        <!-- Field 2: Date Picker & Time Picker -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <!-- Date Picker -->
+          <div class="space-y-1">
+            <label class="text-[11px] font-medium text-textSecondary uppercase tracking-wide">Date</label>
+            <button type="button" class="w-full h-11 bg-surface border border-hairline rounded-md px-2.5 flex items-center justify-between text-left text-textPrimary hover:bg-raised transition-colors">
+              <div class="flex items-center space-x-1.5 overflow-hidden">
+                <svg width="13" height="13" class="text-textTertiary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span class="font-mono text-[11px] truncate text-arc">Fri 23 Oct 2026</span>
+              </div>
+              <svg width="12" height="12" class="text-textTertiary shrink-0 ml-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Time Picker -->
+          <div class="space-y-1">
+            <label class="text-[11px] font-medium text-textSecondary uppercase tracking-wide">Time (IST)</label>
+            <button type="button" class="w-full h-11 bg-surface border border-hairline rounded-md px-2.5 flex items-center justify-between text-left text-textPrimary hover:bg-raised transition-colors">
+              <div class="flex items-center space-x-1.5 overflow-hidden">
+                <svg width="13" height="13" class="text-textTertiary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                <span class="font-mono text-[11px] text-textPrimary">17:00</span>
+              </div>
+              <svg width="12" height="12" class="text-textTertiary shrink-0 ml-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- All-day Toggle (Dense 44px row) -->
+        <div class="h-11 px-3 bg-surface border border-hairline rounded-md flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="text-[12px] text-textPrimary">All-day task</span>
+            <span class="text-[9px] font-mono text-textTertiary">(No 00:00 timestamp)</span>
+          </div>
+          <!-- Toggle switch off -->
+          <button type="button" role="switch" aria-checked="false" class="w-9 h-5 bg-subtle border border-hairline rounded-full relative p-0.5 transition-colors focus:outline-none">
+            <div class="w-4 h-4 bg-textTertiary rounded-full shadow-sm transition-transform"></div>
+          </button>
+        </div>
+
+        <!-- Priority Segmented Control (Normal / High / Urgent) -->
+        <div class="space-y-1">
+          <label class="text-[11px] font-medium text-textSecondary uppercase tracking-wide">Priority</label>
+          <div class="h-11 p-1 bg-surface border border-hairline rounded-md grid grid-cols-3 gap-1">
+            <button type="button" class="h-full rounded bg-raised border border-hairline text-textPrimary font-medium text-[11px] flex items-center justify-center space-x-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-textTertiary"></span>
+              <span>Normal</span>
+            </button>
+            <button type="button" class="h-full rounded text-textSecondary hover:text-textPrimary text-[11px] flex items-center justify-center space-x-1 transition-colors">
+              <span class="w-1.5 h-1.5 rounded-full bg-ember"></span>
+              <span>High</span>
+            </button>
+            <button type="button" class="h-full rounded text-textSecondary hover:text-textPrimary text-[11px] flex items-center justify-center space-x-1 transition-colors">
+              <span class="w-1.5 h-1.5 rounded-full bg-crimson"></span>
+              <span>Urgent</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Project Selector Dropdown -->
+        <div class="space-y-1">
+          <label class="text-[11px] font-medium text-textSecondary uppercase tracking-wide">Project</label>
+          <button type="button" class="w-full h-11 bg-surface border border-hairline rounded-md px-3 flex items-center justify-between text-left text-textPrimary hover:bg-raised transition-colors">
+            <div class="flex items-center space-x-2">
+              <span class="w-2 h-2 rounded-[2px] bg-arc/60"></span>
+              <span class="text-[12px] font-sans">Academics · Lab coursework</span>
+            </div>
+            <span class="text-[10px] font-mono text-textTertiary flex items-center">
+              #acad-2026
+              <svg width="12" height="12" class="ml-1 text-textTertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </span>
+          </button>
+        </div>
+
+      </section>
+
+      <!-- Bottom Spacer to clear fixed actions -->
+      <div class="h-4"></div>
+    </main>
+
+    <!-- Bottom Action Deck (Glass overlay with light top hairline) -->
+    <footer class="p-3.5 bg-surface/90 border-t border-hairline backdrop-blur-md space-y-2 z-20 shrink-0">
+      
+      <!-- Invariant Monospace Assurance -->
+      <div class="flex items-center justify-center space-x-1.5 text-center">
+        <svg class="w-3 h-3 text-textTertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <p class="text-[10px] font-mono text-textTertiary">Nothing is stored until you tap Save.</p>
+      </div>
+
+      <!-- Action Buttons (Minimum 44px height targets) -->
+      <div class="flex items-center space-x-2">
+        <!-- Secondary: Discard (min 44px tap target) -->
+        <button type="button" class="h-11 px-4 rounded-md border border-hairline bg-raised hover:bg-subtle active:scale-[0.98] text-textSecondary hover:text-textPrimary font-medium text-[13px] transition-all flex items-center justify-center">
+          Discard
+        </button>
+
+        <!-- Primary: Save task (ARC #62D2E6, min 44px tap target) -->
+        <button type="button" class="flex-1 h-11 px-4 rounded-md bg-arc hover:bg-[#72dbed] active:scale-[0.98] text-[#0A0C0F] font-semibold text-[13px] tracking-tight transition-all flex items-center justify-center space-x-1.5 shadow-sm">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>Save task</span>
+        </button>
+      </div>
+      
+      <!-- Android Gesture Navigation Pill Indicator -->
+      <div class="w-full flex justify-center pt-1">
+        <div class="w-28 h-1 rounded-full bg-textTertiary/30"></div>
+      </div>
+    </footer>
+
+  </div>
+
+</body>
+</html>

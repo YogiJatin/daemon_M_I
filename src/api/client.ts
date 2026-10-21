@@ -1,0 +1,200 @@
+import type {
+  FocusData,
+  TodayData,
+  Task,
+  WeekSchedule,
+  SystemStatus,
+  AuditEventItem,
+} from './types';
+
+// In-memory token storage (NEVER in localStorage, per AGENTS.md / Block 4 security contract)
+let inMemorySessionToken: string | null = null;
+
+export function setSessionToken(token: string | null) {
+  inMemorySessionToken = token;
+}
+
+export function getSessionToken(): string | null {
+  return inMemorySessionToken;
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers || {});
+  headers.set('Accept', 'application/json');
+
+  if (inMemorySessionToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${inMemorySessionToken}`);
+  }
+
+  if (options.body && typeof options.body === 'string' && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const res = await fetch(path, {
+    ...options,
+    headers,
+    credentials: 'include', // Send HttpOnly cookie
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || json.ok === false) {
+    const errorMsg = json.error?.message || `Request failed with status ${res.status}`;
+    const err = new Error(errorMsg) as any;
+    err.code = json.error?.code || 'request_failed';
+    err.status = res.status;
+    err.details = json.error;
+    throw err;
+  }
+
+  return json.data as T;
+}
+
+export const api = {
+  // Auth
+  async pair(code: string): Promise<{ authenticated: boolean; token: string; expires_at: string }> {
+    const data = await request<{ authenticated: boolean; token: string; expires_at: string }>(
+      '/api/v1/auth/pair',
+      {
+        method: 'POST',
+        body: JSON.stringify({ code: code.trim() }),
+      }
+    );
+    if (data.token) {
+      setSessionToken(data.token);
+    }
+    return data;
+  },
+
+  async getMe(): Promise<{ owner_user_id: string; expires_at: string; created_at: string }> {
+    return request('/api/v1/auth/me');
+  },
+
+  async logout(): Promise<{ logged_out: boolean }> {
+    const res = await request<{ logged_out: boolean }>('/api/v1/auth/logout', { method: 'POST' });
+    setSessionToken(null);
+    return res;
+  },
+
+  // Focus & Read Models
+  async getFocus(): Promise<FocusData> {
+    return request<FocusData>('/api/v1/focus');
+  },
+
+  async getToday(): Promise<TodayData> {
+    return request<TodayData>('/api/v1/today');
+  },
+
+  async getUpcoming(): Promise<{ tasks: Task[]; schedule_preview: any[] }> {
+    return request('/api/v1/upcoming');
+  },
+
+  // Tasks
+  async getTasks(params: { status?: string; priority?: string; page?: number; limit?: number } = {}): Promise<{
+    tasks: Task[];
+    pagination: { page: number; total: number; has_more: boolean };
+  }> {
+    const sp = new URLSearchParams();
+    if (params.status) sp.set('status', params.status);
+    if (params.priority) sp.set('priority', params.priority);
+    if (params.page) sp.set('page', String(params.page));
+    if (params.limit) sp.set('limit', String(params.limit || 50));
+    
+    const res = await fetch(`/api/v1/tasks?${sp.toString()}`, {
+      headers: inMemorySessionToken ? { Authorization: `Bearer ${inMemorySessionToken}`, Accept: 'application/json' } : { Accept: 'application/json' },
+      credentials: 'include',
+    });
+    const json = await res.json();
+    if (!res.ok || json.ok === false) throw new Error(json.error?.message || 'Failed to fetch tasks');
+    return {
+      tasks: json.data || [],
+      pagination: json.pagination || { page: 1, total: json.data?.length || 0, has_more: false },
+    };
+  },
+
+  async getTask(id: string): Promise<Task> {
+    return request<Task>(`/api/v1/tasks/${encodeURIComponent(id)}`);
+  },
+
+  async createTask(data: { title: string; priority?: string; deadline?: string; category?: string; description?: string }): Promise<Task> {
+    return request<Task>('/api/v1/tasks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateTask(id: string, data: Partial<Task> & { deadline?: string }): Promise<Task> {
+    return request<Task>(`/api/v1/tasks/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async completeTask(id: string): Promise<{ completed: boolean; task: Task }> {
+    return request(`/api/v1/tasks/${encodeURIComponent(id)}/complete`, {
+      method: 'POST',
+    });
+  },
+
+  async snoozeTask(id: string, minutes: number): Promise<{ snoozed: boolean; task: Task }> {
+    return request(`/api/v1/tasks/${encodeURIComponent(id)}/snooze`, {
+      method: 'POST',
+      body: JSON.stringify({ minutes }),
+    });
+  },
+
+  async dismissTask(id: string): Promise<{ dismissed: boolean; task: Task }> {
+    return request(`/api/v1/tasks/${encodeURIComponent(id)}/dismiss`, {
+      method: 'POST',
+    });
+  },
+
+  async getTaskWhy(id: string): Promise<{ task: Task; audit_trail: any[]; notifications: any[] }> {
+    return request(`/api/v1/tasks/${encodeURIComponent(id)}/why`);
+  },
+
+  // Timetable
+  async getTimetableWeek(date?: string): Promise<WeekSchedule> {
+    const sp = date ? `?date=${encodeURIComponent(date)}` : '';
+    return request<WeekSchedule>(`/api/v1/timetable/week${sp}`);
+  },
+
+  async updateOccurrenceStatus(id: string, status: string): Promise<any> {
+    return request(`/api/v1/timetable/occurrences/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  // History & Audit
+  async getHistory(params: { entity_type?: string; limit?: number } = {}): Promise<AuditEventItem[]> {
+    const sp = new URLSearchParams();
+    if (params.entity_type) sp.set('entity_type', params.entity_type);
+    if (params.limit) sp.set('limit', String(params.limit || 50));
+    const res = await fetch(`/api/v1/history?${sp.toString()}`, {
+      headers: inMemorySessionToken ? { Authorization: `Bearer ${inMemorySessionToken}`, Accept: 'application/json' } : { Accept: 'application/json' },
+      credentials: 'include',
+    });
+    const json = await res.json();
+    return json.data || [];
+  },
+
+  // System Status
+  async getSystemStatus(): Promise<SystemStatus> {
+    return request<SystemStatus>('/api/v1/system/status');
+  },
+
+  // Settings
+  async pauseReminders(): Promise<{ paused: boolean }> {
+    return request('/api/v1/settings/pause', { method: 'POST' });
+  },
+
+  async resumeReminders(): Promise<{ resumed: boolean }> {
+    return request('/api/v1/settings/resume', { method: 'POST' });
+  },
+
+  // Global Search
+  async search(query: string): Promise<{ tasks: any[]; subjects: any[]; recurrence_rules: any[] }> {
+    return request(`/api/v1/search?q=${encodeURIComponent(query)}`);
+  },
+};

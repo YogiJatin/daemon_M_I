@@ -272,3 +272,29 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 2. `getSignedExportJson()` produces an export bundle with a separate `manifest.json` containing `schema_version`, `export_version`, `generated_at`, `head_hash`, `snapshot_hash`, `record_count`, `checksum_algorithm: "SHA-256"`, and `checksum` of the canonical records array. Any external party can verify integrity offline using standard SHA-256 tooling.  
 **Alternatives rejected**: Deserializing past records into live Domain entities (violates forensic immutability; vulnerable to schema drift).  
 **Trade-off**: Replay is strictly read-only and cannot automatically "restore" complex business state without manual intervention.
+
+---
+
+## ADR-030 — Block 4: OS Shell Architecture, Universal Inspector, and State Vocabulary
+
+**Date**: 2026-10-21  
+**Context**: Block 4 requires an authenticated responsive PWA interface that feels like a unified Personal AI Operating System rather than a collection of disparate CRUD web pages.  
+**Decision**: 
+1. Mode-based single operating surface (`/` Focus, `/tasks` Memory, `/timetable` Academy, `/history` Timeline, `/health` System, `/settings` Settings, `/pair` Pairing, `/panel` Quick Panel).
+2. Persistent `AppShell` wrapping all views with unified `Sidebar`, `Header`, `CommandLayer` (`Ctrl+K`), `ContentRegion`, `PresenceLayer`, and a single dual-mode `Inspector` (Right-side drawer on desktop, Bottom Sheet on mobile).
+3. Standardized entity primitives (`EntityRow`, `StatusGlyph`, `PresenceRing`, `Card`, `EmptyState`) displaying the uniform status vocabulary.
+**Alternatives rejected**: Page-first routing with fragmented individual detail dialogs; separate component libraries for each screen.  
+**Trade-off**: Requires centralizing inspector state in the root shell.
+
+---
+
+## ADR-031 — Block 4: Strict Backend Ownership of Timetable Expansion & System Status Contracts
+
+**Date**: 2026-10-21  
+**Context**: Rule 2 & Block 4 non-negotiable constraints stipulate that the frontend must remain a presentation/interaction layer only, never calculating recurrence expansion, scheduler state, or audit chains locally.  
+**Decision**: 
+1. Added `GET /api/v1/timetable/week` to `worker/apiRouter.ts`, expanding occurrences on the server via `getSchedulePreview()` across the current week (Monday-Sunday) and returning pre-materialized classes with material checklists.
+2. Added `GET /api/v1/system/status` exposing unified health across Scheduler, AI Monolith, Cryptographic Audit Ledger, D1 Database, Telegram Gateway, Provider routing, and Desktop adapter readiness.
+3. Task details drawer consumes existing `GET /api/v1/tasks/:id/why` for server-backed provenance and mutation audit trails.
+**Alternatives rejected**: Calculating week boundaries, class slot expansions, or audit validation client-side in React.  
+**Trade-off**: Additional read query on initial timetable render; mitigated by D1 single-source-of-truth caching.

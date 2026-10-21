@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "surface-bright": "#37393e",
+          "outline-variant": "#3f4948",
+          "background": "#111317",
+          "primary-fixed-dim": "#90d2d3",
+          "inverse-surface": "#e2e2e8",
+          "on-primary": "#003738",
+          "error-container": "#93000a",
+          "surface-dim": "#111317",
+          "surface-variant": "#333539",
+          "on-surface-variant": "#bfc8c8",
+          "on-tertiary-fixed": "#3b0900",
+          "surface-container-lowest": "#0c0e12",
+          "surface": "#111317",
+          "on-primary-fixed-variant": "#004f51",
+          "primary": "#90d2d3",
+          "on-secondary-fixed": "#261a00",
+          "secondary-fixed-dim": "#e4c27d",
+          "primary-container": "#3a7d7e",
+          "inverse-primary": "#216869",
+          "surface-container-low": "#1a1c20",
+          "error": "#ffb4ab",
+          "on-error": "#690005",
+          "on-background": "#e2e2e8",
+          "outline": "#899392",
+          "surface-tint": "#90d2d3",
+          "on-surface": "#e2e2e8",
+          "on-primary-fixed": "#002020",
+          "inverse-on-surface": "#2f3035",
+          "on-secondary": "#402d00",
+          "on-secondary-container": "#d5b470",
+          "tertiary-fixed": "#ffdbd1",
+          "surface-container-highest": "#333539",
+          "secondary-fixed": "#ffdf9f",
+          "surface-container-high": "#282a2e",
+          "on-tertiary-fixed-variant": "#82270c",
+          "surface-container": "#1e2024",
+          "on-primary-container": "#e5ffff",
+          "secondary": "#e4c27d",
+          "on-tertiary": "#601400",
+          "tertiary": "#ffb5a0",
+          "on-secondary-fixed-variant": "#5a4309",
+          "tertiary-fixed-dim": "#ffb5a0",
+          "on-tertiary-container": "#fff9f7",
+          "tertiary-container": "#bd5234",
+          "primary-fixed": "#aceeef",
+          "secondary-container": "#5d450b",
+          "on-error-container": "#ffdad6"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.125rem",
+          "lg": "0.25rem",
+          "xl": "0.5rem",
+          "full": "0.75rem"
+        },
+        "spacing": {
+          "margin-mobile": "1rem",
+          "space-sm": "0.5rem",
+          "space-lg": "1.5rem",
+          "space-md": "1rem",
+          "gutter": "1rem",
+          "gutter-mobile": "0.75rem",
+          "space-xl": "2.5rem",
+          "margin": "2rem",
+          "space-xs": "0.25rem"
+        },
+        "fontFamily": {
+          "code-md": [
+            "Space Mono"
+          ],
+          "body-lg": [
+            "IBM Plex Sans"
+          ],
+          "headline-sm": [
+            "IBM Plex Sans"
+          ],
+          "display-lg": [
+            "IBM Plex Sans"
+          ],
+          "body-md": [
+            "IBM Plex Sans"
+          ],
+          "headline-lg": [
+            "IBM Plex Sans"
+          ],
+          "display-lg-mobile": [
+            "IBM Plex Sans"
+          ],
+          "title-md": [
+            "IBM Plex Sans"
+          ],
+          "label-sm": [
+            "Space Mono"
+          ],
+          "label-md": [
+            "Space Mono"
+          ]
+        },
+        "fontSize": {
+          "code-md": [
+            "13px",
+            {
+              "lineHeight": "20px",
+              "letterSpacing": "0em",
+              "fontWeight": "400"
+            }
+          ],
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "26px",
+              "letterSpacing": "0.01em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-sm": [
+            "20px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.005em",
+              "fontWeight": "500"
+            }
+          ],
+          "display-lg": [
+            "40px",
+            {
+              "lineHeight": "48px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "600"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "22px",
+              "letterSpacing": "0.01em",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-lg": [
+            "28px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "500"
+            }
+          ],
+          "display-lg-mobile": [
+            "30px",
+            {
+              "lineHeight": "38px",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "title-md": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "0em",
+              "fontWeight": "500"
+            }
+          ],
+          "label-sm": [
+            "10px",
+            {
+              "lineHeight": "14px",
+              "letterSpacing": "0.06em",
+              "fontWeight": "400"
+            }
+          ],
+          "label-md": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "letterSpacing": "0.04em",
+              "fontWeight": "400"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-low z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex flex-col"><div class="h-14 px-gutter flex items-center justify-between bg-surface-container-lowest/60"><div class="flex items-center gap-space-xs"><span class="material-symbols-outlined text-primary text-[20px]">terminal</span><span class="font-label-md text-label-md text-on-surface font-bold tracking-tight uppercase">Personal AI OS</span></div><span class="w-1.5 h-1.5 rounded-full bg-primary ring-2 ring-primary/20"></span></div><div class="px-gutter pt-space-md pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Workspace</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="today" href="#">Today</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="tasks" href="#">Tasks</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="timetable" href="#">Timetable</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="recurring" href="#">Recurring</a></nav><div class="px-gutter pt-space-lg pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Intelligence</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="suggestions" href="#">Suggestions</a><a class="flex items-center justify-between px-space-sm py-1.5 rounded bg-surface-container-high text-on-surface font-title-md transition-colors text-body-md" data-path="inbox" href="#"><span>Inbox</span><span class="font-label-sm text-label-sm px-1.5 py-0.2 rounded-full bg-primary-container text-on-primary-container font-medium">3</span></a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="history" href="#">History</a></nav><div class="px-gutter pt-space-lg pb-space-xs"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">System</span></div><nav class="flex flex-col px-space-xs space-y-0.5" data-active-classes="bg-surface-container-high text-on-surface font-title-md"><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="desktop" href="#">Desktop</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="health" href="#">Health</a><a class="flex items-center px-space-sm py-1.5 rounded text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors font-body-md text-body-md" data-path="settings" href="#">Settings</a></nav></div><div class="p-space-sm bg-surface-container-lowest/80 m-space-xs rounded flex flex-col gap-1"><div class="flex items-center justify-between"><span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Node Relay</span><span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span></div><div class="flex items-center gap-1.5 font-code-md text-code-md text-on-surface"><span class="text-primary">rpi-relay-blr</span></div><span class="font-label-sm text-label-sm text-outline">synced 14s ago</span></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-14 bg-surface-container-low/95 backdrop-blur-xl z-40 px-gutter flex items-center justify-between gap-space-md shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-2"><div class="relative flex items-center justify-center w-5 h-5"><span class="absolute inline-flex w-full h-full rounded-full opacity-30 bg-primary animate-ping"></span><span class="relative inline-flex w-2.5 h-2.5 rounded-full bg-primary"></span></div><div class="flex items-center gap-2 font-code-md text-code-md text-on-surface-variant"><span class="text-on-surface font-medium">Scheduler</span><span class="text-outline">·</span><span>38s ago</span><span class="text-outline">·</span><span class="text-primary font-medium">96% QoS</span></div></div><div class="relative w-80 lg:w-96"><span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-outline">search</span><input class="w-full bg-surface-container-lowest text-on-surface placeholder:text-outline font-body-md text-body-md pl-8 pr-16 py-1 rounded focus:outline-none focus:ring-1 focus:ring-primary/40" placeholder="Add task or type a command..." readonly="" type="text"/><kbd class="absolute right-2 top-1/2 -translate-y-1/2 font-label-sm text-label-sm text-outline bg-surface-container-high px-1.5 py-0.5 rounded">Ctrl K</kbd></div></div><div class="flex items-center gap-space-md"><div class="flex items-center gap-1.5 font-code-md text-code-md text-on-surface-variant"><span class="material-symbols-outlined text-[16px] text-outline">schedule</span><span>Wed 21 Oct 2026, 10:42 IST</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="relative pt-14 w-full px-gutter bg-surface min-h-screen"><div class="flex flex-col w-full pb-margin">
+<!-- Offline/Failsafe Alert Banner -->
+<div class="w-full mb-space-lg bg-surface-container-low rounded-lg p-space-sm pl-space-md flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-space-sm min-w-0">
+<span class="inline-block w-2 h-2 rounded-full bg-secondary shrink-0"></span>
+<p class="font-body-md text-body-md text-on-surface truncate">
+<span class="font-title-md text-title-md text-secondary mr-1">Notice:</span>
+        AI offline mode active — manual tasks, offline heuristics, and recurring schedules continue without interruption.
+      </p>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<span class="font-label-sm text-label-sm text-outline hidden md:inline">daemon: local-fallback</span>
+<button class="px-space-xs py-0.5 rounded text-outline hover:text-on-surface hover:bg-surface-container transition-colors" onclick="this.closest('.w-full').remove()" title="Dismiss notification">
+<span class="material-symbols-outlined text-[16px] block">close</span>
+</button>
+</div>
+</div>
+<!-- Screen Header & Philosophy -->
+<div class="flex flex-col gap-space-xs mb-space-lg">
+<div class="flex flex-col md:flex-row md:items-baseline justify-between gap-space-xs">
+<div class="flex items-baseline gap-space-md">
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Inbox</h1>
+<span class="font-label-sm text-label-sm text-outline font-code-md tracking-wider uppercase">Stage 0 · Ephemeral Buffer</span>
+</div>
+<div class="flex items-center gap-2 font-code-md text-code-md text-outline">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="text-on-surface">ingest: listening</span>
+<span class="text-outline">·</span>
+<span class="text-primary font-medium">0 auto-promotions</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">
+      Nothing here becomes an operational task until you explicitly confirm it. Machine extractions are strictly advisory and require human sanction.
+    </p>
+</div>
+<!-- Nav Tabs & Filter Strip -->
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md mb-space-lg bg-surface-container-lowest p-space-xs rounded-lg">
+<div class="flex items-center gap-space-xs">
+<button class="px-space-md py-1.5 rounded font-title-md text-title-md bg-surface-container-high text-primary flex items-center gap-space-xs shadow-sm transition-all" id="tab-proposals" onclick="switchInboxTab('proposals')">
+<span>Proposals</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.2 rounded-full bg-primary/20 text-primary font-code-md">2</span>
+</button>
+<button class="px-space-md py-1.5 rounded font-title-md text-title-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all flex items-center gap-space-xs" id="tab-failed" onclick="switchInboxTab('failed')">
+<span>Failed Sources</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.2 rounded-full bg-error-container text-error font-code-md">1</span>
+</button>
+</div>
+<div class="flex items-center gap-space-sm px-space-sm py-1 font-code-md text-label-md text-outline">
+<span class="material-symbols-outlined text-[14px]">shield</span>
+<span>Punctual isolation · Raw inputs ephemeral</span>
+</div>
+</div>
+<!-- VIEW 1: PROPOSALS (Default Active) -->
+<div class="flex flex-col gap-space-lg" id="view-proposals">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-code-md">Candidate Task Proposals</span>
+<span class="font-label-sm text-label-sm text-outline">· 2 pending manual review</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline font-code-md hidden sm:inline">Dashed perimeter indicates uncommitted state</span>
+</div>
+<!-- Candidate Card 1 -->
+<article class="bg-surface-container-low rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md transition-colors" style="border: 1px dashed rgba(215, 205, 190, 0.16);">
+<!-- Card Top Meta -->
+<div class="flex flex-wrap items-center justify-between gap-space-xs pb-space-sm bg-surface-container/40 p-space-sm rounded">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-sm text-label-sm font-code-md tracking-wider uppercase px-2 py-0.5 rounded bg-surface-container-lowest text-primary" style="border: 1px dashed rgba(144, 210, 211, 0.4);">Proposal</span>
+<span class="font-code-md text-code-md text-outline">prop_882c</span>
+<span class="text-outline text-xs">/</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-code-md">Advisory: medium · not a probability</span>
+</div>
+<div class="flex items-center gap-1.5 font-code-md text-label-sm text-outline">
+<span class="material-symbols-outlined text-[14px]">history</span>
+<span>Ingested today 09:34 IST via shared text</span>
+</div>
+</div>
+<!-- Candidate Title (Editable) -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-code-md flex items-center justify-between" for="cand-title-1">
+<span>Candidate title</span>
+<span class="text-primary font-normal flex items-center gap-1 cursor-pointer hover:underline text-[11px]" onclick="document.getElementById('cand-title-1').focus()">
+<span class="material-symbols-outlined text-[12px]">edit</span> Edit title
+          </span>
+</label>
+<div class="relative">
+<input class="w-full bg-surface-container-lowest text-on-surface font-title-md text-title-md px-space-md py-2 rounded focus:outline-none focus:ring-1 focus:ring-primary shadow-inner" id="cand-title-1" style="box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);" type="text" value="Submit lab record to Prof. Rao"/>
+</div>
+</div>
+<!-- Evidence Quote Block -->
+<div class="bg-surface-container rounded p-space-md shadow-sm relative" style="border-left: 2px solid #899392;">
+<div class="flex items-center justify-between mb-space-xs">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-code-md">Untrusted source text</span>
+<span class="font-label-sm text-label-sm text-outline font-code-md">source_payload_hash: #8fa0e</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface italic">
+          “…submit your records by next Friday evening…”
+        </p>
+</div>
+<!-- Extracted Entities & Ambiguity Resolution -->
+<div class="flex flex-wrap items-center gap-space-sm pt-space-xs">
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-surface-container-lowest font-code-md text-label-md text-on-surface-variant">
+<span class="text-outline uppercase text-[10px]">Date role:</span>
+<span class="text-on-surface">deadline</span>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-surface-container-lowest font-code-md text-label-md text-on-surface-variant">
+<span class="text-outline uppercase text-[10px]">Original token:</span>
+<span class="text-on-surface">“next Friday evening”</span>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-surface-container-high font-code-md text-label-md text-primary cursor-pointer hover:bg-surface-bright transition-colors shadow-sm" title="Adjust proposed date">
+<span class="material-symbols-outlined text-[14px]">event</span>
+<span class="font-medium text-on-surface">Fri 23 Oct · 18:00 IST</span>
+<span class="material-symbols-outlined text-[14px] text-outline">arrow_drop_down</span>
+</div>
+<!-- Ambiguity Warning Badge -->
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-secondary-container/60 text-secondary font-code-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-secondary">warning</span>
+<span>‘evening’ has no exact time specification</span>
+</div>
+</div>
+<!-- Action Row -->
+<div class="flex items-center justify-between pt-space-sm mt-space-xs bg-surface-container-lowest/30 p-space-sm rounded">
+<span class="font-label-sm text-label-sm text-outline font-code-md">Deterministic fallback default: 18:00</span>
+<div class="flex items-center gap-space-sm">
+<button class="px-space-md py-1.5 rounded font-title-md text-title-md text-error hover:bg-error-container/30 transition-colors flex items-center gap-1" onclick="dismissProposal(this)">
+<span class="material-symbols-outlined text-[16px]">close</span>
+<span>Reject</span>
+</button>
+<button class="px-space-md py-1.5 rounded font-title-md text-title-md bg-surface-container text-on-surface hover:bg-surface-container-highest transition-colors shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">tune</span>
+<span>Edit and confirm</span>
+</button>
+<button class="px-space-lg py-1.5 rounded font-title-md text-title-md bg-primary text-on-primary hover:bg-primary-fixed-dim transition-colors shadow-sm flex items-center gap-1 font-medium" onclick="confirmProposal(this)">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span>Confirm</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Candidate Card 2 -->
+<article class="bg-surface-container-low rounded-xl p-space-lg shadow-sm flex flex-col gap-space-md transition-colors" style="border: 1px dashed rgba(215, 205, 190, 0.16);">
+<!-- Card Top Meta -->
+<div class="flex flex-wrap items-center justify-between gap-space-xs pb-space-sm bg-surface-container/40 p-space-sm rounded">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-sm text-label-sm font-code-md tracking-wider uppercase px-2 py-0.5 rounded bg-surface-container-lowest text-primary" style="border: 1px dashed rgba(144, 210, 211, 0.4);">Proposal</span>
+<span class="font-code-md text-code-md text-outline">prop_914f</span>
+<span class="text-outline text-xs">/</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-code-md">Advisory: low · not a probability</span>
+</div>
+<div class="flex items-center gap-1.5 font-code-md text-label-sm text-outline">
+<span class="material-symbols-outlined text-[14px]">history</span>
+<span>Ingested today 08:12 IST via clipboard forward</span>
+</div>
+</div>
+<!-- Candidate Title (Editable) -->
+<div class="flex flex-col gap-space-xs">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-code-md flex items-center justify-between" for="cand-title-2">
+<span>Candidate title</span>
+<span class="text-primary font-normal flex items-center gap-1 cursor-pointer hover:underline text-[11px]" onclick="document.getElementById('cand-title-2').focus()">
+<span class="material-symbols-outlined text-[12px]">edit</span> Edit title
+          </span>
+</label>
+<div class="relative">
+<input class="w-full bg-surface-container-lowest text-on-surface font-title-md text-title-md px-space-md py-2 rounded focus:outline-none focus:ring-1 focus:ring-primary shadow-inner" id="cand-title-2" style="box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);" type="text" value="Review seminar slide deck draft"/>
+</div>
+</div>
+<!-- Evidence Quote Block -->
+<div class="bg-surface-container rounded p-space-md shadow-sm relative" style="border-left: 2px solid #899392;">
+<div class="flex items-center justify-between mb-space-xs">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-code-md">Untrusted source text</span>
+<span class="font-label-sm text-label-sm text-outline font-code-md">source_payload_hash: #11a2d</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface italic">
+          “Can you look over the seminar slides sometime before tomorrow morning session?”
+        </p>
+</div>
+<!-- Extracted Entities & Ambiguity Resolution -->
+<div class="flex flex-wrap items-center gap-space-sm pt-space-xs">
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-surface-container-lowest font-code-md text-label-md text-on-surface-variant">
+<span class="text-outline uppercase text-[10px]">Date role:</span>
+<span class="text-on-surface">event_start</span>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-surface-container-lowest font-code-md text-label-md text-on-surface-variant">
+<span class="text-outline uppercase text-[10px]">Original token:</span>
+<span class="text-on-surface">“tomorrow morning session”</span>
+</div>
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-surface-container-high font-code-md text-label-md text-primary cursor-pointer hover:bg-surface-bright transition-colors shadow-sm" title="Adjust proposed date">
+<span class="material-symbols-outlined text-[14px]">event</span>
+<span class="font-medium text-on-surface">Thu 22 Oct · 09:00 IST</span>
+<span class="material-symbols-outlined text-[14px] text-outline">arrow_drop_down</span>
+</div>
+<!-- Ambiguity Warning Badge -->
+<div class="flex items-center gap-1.5 px-space-sm py-1 rounded bg-secondary-container/60 text-secondary font-code-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-secondary">warning</span>
+<span>Date could not be verified against sender calendar timezone</span>
+</div>
+</div>
+<!-- Action Row -->
+<div class="flex items-center justify-between pt-space-sm mt-space-xs bg-surface-container-lowest/30 p-space-sm rounded">
+<span class="font-label-sm text-label-sm text-outline font-code-md">Extracted priority: high-intent / conversational</span>
+<div class="flex items-center gap-space-sm">
+<button class="px-space-md py-1.5 rounded font-title-md text-title-md text-error hover:bg-error-container/30 transition-colors flex items-center gap-1" onclick="dismissProposal(this)">
+<span class="material-symbols-outlined text-[16px]">close</span>
+<span>Reject</span>
+</button>
+<button class="px-space-md py-1.5 rounded font-title-md text-title-md bg-surface-container text-on-surface hover:bg-surface-container-highest transition-colors shadow-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">tune</span>
+<span>Edit and confirm</span>
+</button>
+<button class="px-space-lg py-1.5 rounded font-title-md text-title-md bg-primary text-on-primary hover:bg-primary-fixed-dim transition-colors shadow-sm flex items-center gap-1 font-medium" onclick="confirmProposal(this)">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span>Confirm</span>
+</button>
+</div>
+</div>
+</article>
+</div>
+<!-- VIEW 2: FAILED SOURCES (Hidden tab container or preview) -->
+<div class="flex flex-col gap-space-md mt-space-xl" id="view-failed">
+<div class="flex items-center justify-between pt-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline font-code-md">Failed Sources</span>
+<span class="font-label-sm text-label-sm text-error font-code-md">(1 unhandled ingestion abort)</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline font-code-md">Isolation ledger</span>
+</div>
+<div class="bg-surface-container-low rounded-lg p-space-md shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs max-w-3xl">
+<div class="flex flex-wrap items-center gap-space-sm">
+<span class="font-code-md text-code-md text-outline">20 Oct 21:12 IST</span>
+<span class="px-2 py-0.5 rounded bg-surface-container font-code-md text-label-sm text-on-surface">Shared text</span>
+<span class="px-2 py-0.5 rounded bg-error-container text-error font-code-md text-label-sm font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">error</span> processing failed
+          </span>
+<span class="font-code-md text-label-sm text-outline">err_code: invalid_output</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant font-code-md text-sm mt-1">
+          Payload contained malformed UTF-8 characters and incomplete prompt boundary from mobile clip sync.
+        </p>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<button class="px-space-md py-1.5 rounded font-title-md text-title-md bg-surface-container text-on-surface hover:bg-surface-container-highest transition-colors flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[16px]">refresh</span>
+<span>Retry parser</span>
+</button>
+<button class="px-space-md py-1.5 rounded font-title-md text-title-md text-outline hover:text-on-surface hover:bg-surface-container transition-colors" onclick="this.closest('.rounded-lg').remove()">
+<span>Dismiss</span>
+</button>
+</div>
+</div>
+<div class="flex items-center justify-between py-space-xs px-space-xs font-code-md text-label-sm text-outline">
+<span>Failed items remain in local isolation buffer until manually cleared or re-queued.</span>
+<span>Retention: 7 days</span>
+</div>
+</div>
+</div>
+<script>
+  function switchInboxTab(tab) {
+    const tabProposals = document.getElementById('tab-proposals');
+    const tabFailed = document.getElementById('tab-failed');
+    const viewProposals = document.getElementById('view-proposals');
+    const viewFailed = document.getElementById('view-failed');
+
+    if (tab === 'proposals') {
+      tabProposals.className = 'px-space-md py-1.5 rounded font-title-md text-title-md bg-surface-container-high text-primary flex items-center gap-space-xs shadow-sm transition-all';
+      tabFailed.className = 'px-space-md py-1.5 rounded font-title-md text-title-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all flex items-center gap-space-xs';
+      viewProposals.style.display = 'flex';
+      viewFailed.classList.remove('ring-1', 'ring-primary/40');
+    } else {
+      tabFailed.className = 'px-space-md py-1.5 rounded font-title-md text-title-md bg-surface-container-high text-primary flex items-center gap-space-xs shadow-sm transition-all';
+      tabProposals.className = 'px-space-md py-1.5 rounded font-title-md text-title-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all flex items-center gap-space-xs';
+      viewFailed.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
+  function confirmProposal(btn) {
+    const card = btn.closest('article');
+    card.style.opacity = '0.35';
+    card.style.pointerEvents = 'none';
+    btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">done_all</span><span>Promoted to Tasks</span>';
+  }
+
+  function dismissProposal(btn) {
+    const card = btn.closest('article');
+    card.remove();
+  }
+</script></main></div></body></html>

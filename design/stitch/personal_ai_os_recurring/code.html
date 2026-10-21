@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@100..900&family=Space+Mono:wght@100..900&display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"on-surface-variant":"#bfc8c8","inverse-on-surface":"#2f3035","outline":"#899392","surface-container-highest":"#333539","primary-fixed-dim":"#90d2d3","on-secondary":"#402d00","on-tertiary-fixed":"#3b0900","primary":"#90d2d3","background":"#111317","on-secondary-fixed":"#261a00","primary-fixed":"#aceeef","error-container":"#93000a","on-secondary-fixed-variant":"#5a4309","on-primary-container":"#e5ffff","surface-bright":"#37393e","secondary-fixed-dim":"#e4c27d","on-tertiary-fixed-variant":"#82270c","surface-container-lowest":"#0c0e12","on-tertiary":"#601400","error":"#ffb4ab","on-tertiary-container":"#fff9f7","on-background":"#e2e2e8","on-primary-fixed":"#002020","surface-container-low":"#1a1c20","tertiary-fixed":"#ffdbd1","on-surface":"#e2e2e8","tertiary-fixed-dim":"#ffb5a0","on-error":"#690005","surface-variant":"#333539","tertiary-container":"#bd5234","on-primary-fixed-variant":"#004f51","on-error-container":"#ffdad6","inverse-primary":"#216869","secondary":"#e4c27d","surface-container-high":"#282a2e","on-secondary-container":"#d5b470","tertiary":"#ffb5a0","surface":"#111317","inverse-surface":"#e2e2e8","secondary-fixed":"#ffdf9f","outline-variant":"#3f4948","secondary-container":"#5d450b","on-primary":"#003738","surface-container":"#1e2024","primary-container":"#3a7d7e","surface-tint":"#90d2d3","surface-dim":"#111317"},borderRadius:{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},spacing:{"space-sm":"0.5rem","space-lg":"1.5rem","margin":"2rem","gutter":"1rem","space-xs":"0.25rem","margin-mobile":"1rem","space-md":"1rem","gutter-mobile":"0.75rem","space-xl":"2.5rem"},fontFamily:{"label-sm":["Space Mono"],"code-md":["Space Mono"],"headline-sm":["IBM Plex Sans"],"title-md":["IBM Plex Sans"],"headline-lg":["IBM Plex Sans"],"display-lg":["IBM Plex Sans"],"label-md":["Space Mono"],"body-md":["IBM Plex Sans"],"display-lg-mobile":["IBM Plex Sans"],"body-lg":["IBM Plex Sans"]},fontSize:{"label-sm":["10px",{"lineHeight":"14px","letterSpacing":"0.06em","fontWeight":"400"}],"code-md":["13px",{"lineHeight":"20px","letterSpacing":"0em","fontWeight":"400"}],"headline-sm":["20px",{"lineHeight":"28px","letterSpacing":"-0.005em","fontWeight":"500"}],"title-md":["16px",{"lineHeight":"24px","letterSpacing":"0em","fontWeight":"500"}],"headline-lg":["28px",{"lineHeight":"36px","letterSpacing":"-0.01em","fontWeight":"500"}],"display-lg":["40px",{"lineHeight":"48px","letterSpacing":"-0.02em","fontWeight":"600"}],"label-md":["12px",{"lineHeight":"16px","letterSpacing":"0.04em","fontWeight":"400"}],"body-md":["14px",{"lineHeight":"22px","letterSpacing":"0.01em","fontWeight":"400"}],"display-lg-mobile":["30px",{"lineHeight":"38px","letterSpacing":"-0.015em","fontWeight":"600"}],"body-lg":["16px",{"lineHeight":"26px","letterSpacing":"0.01em","fontWeight":"400"}]}}}}</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-screen w-72 bg-surface-container-lowest z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.6)]"><div class="flex flex-col"><div class="h-14 px-space-md flex items-center justify-between bg-surface-container-low"><div class="flex items-center gap-space-sm"><span class="material-symbols-outlined text-primary text-[20px]">terminal</span><span class="font-headline-sm text-title-md text-on-surface uppercase tracking-wider font-semibold">Personal AI OS</span></div><span class="font-label-sm text-label-sm text-primary px-space-xs py-0.5 bg-primary-container/20 rounded">v2.4</span></div><nav class="px-space-sm py-space-md space-y-space-md" data-active-classes="bg-primary-container text-on-primary-container font-semibold rounded"><div class="space-y-space-xs"><div class="px-space-sm py-1 font-label-sm text-label-sm uppercase text-outline tracking-wider">Primary</div><div class="space-y-0.5"><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="today" href="#"><span class="material-symbols-outlined text-[18px]">wb_sunny</span><span>Today</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="tasks" href="#"><span class="material-symbols-outlined text-[18px]">check_circle</span><span>Tasks</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="timetable" href="#"><span class="material-symbols-outlined text-[18px]">calendar_today</span><span>Timetable</span></a><a aria-current="page" class="flex items-center gap-space-sm px-space-sm py-1.5 transition-colors bg-primary-container text-on-primary-container font-semibold rounded" data-path="recurring" href="#"><span class="material-symbols-outlined text-[18px]">autorenew</span><span>Recurring</span></a></div></div><div class="space-y-space-xs"><div class="px-space-sm py-1 font-label-sm text-label-sm uppercase text-outline tracking-wider">Secondary</div><div class="space-y-0.5"><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="suggestions" href="#"><span class="material-symbols-outlined text-[18px]">lightbulb</span><span>Suggestions</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="inbox" href="#"><span class="material-symbols-outlined text-[18px]">move_to_inbox</span><span>Inbox</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="history" href="#"><span class="material-symbols-outlined text-[18px]">history</span><span>History</span></a></div></div><div class="space-y-space-xs"><div class="px-space-sm py-1 font-label-sm text-label-sm uppercase text-outline tracking-wider">System</div><div class="space-y-0.5"><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="desktop" href="#"><span class="material-symbols-outlined text-[18px]">desktop_windows</span><span>Desktop</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="health" href="#"><span class="material-symbols-outlined text-[18px]">monitor_heart</span><span>Health</span></a><a class="flex items-center gap-space-sm px-space-sm py-1.5 rounded font-body-md text-body-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors" data-path="settings" href="#"><span class="material-symbols-outlined text-[18px]">tune</span><span>Settings</span></a></div></div></nav></div><div class="p-space-sm bg-surface-container-low/50"><div class="flex items-center gap-space-sm px-space-sm py-space-sm rounded bg-surface-container-high"><span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span><div class="flex flex-col min-w-0"><span class="font-label-sm text-label-sm text-on-surface truncate">rpi-relay-blr</span><span class="font-code-md text-label-sm text-on-surface-variant">synced 14s ago</span></div><span class="material-symbols-outlined text-outline text-[16px] ml-auto">sensors</span></div></div></aside><div class="pl-72"><header class="fixed top-0 left-72 right-0 h-14 bg-surface-container-low/90 backdrop-blur-xl z-40 flex items-center justify-between px-space-lg shadow-[0_1px_8px_rgba(0,0,0,0.5)]"><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-sm px-space-sm py-1 rounded-full bg-surface-container"><span class="w-2 h-2 rounded-full bg-primary"></span><span class="font-label-md text-label-md text-on-surface">Scheduler</span><span class="font-label-sm text-label-sm text-outline">·</span><span class="font-label-md text-label-md text-on-surface-variant">38s ago</span><span class="font-label-sm text-label-sm text-outline">·</span><span class="font-code-md text-label-md text-primary font-medium">96%</span></div><div class="flex items-center gap-space-sm px-space-md py-1.5 rounded bg-surface-container-lowest text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer w-96"><span class="material-symbols-outlined text-[18px] text-outline">terminal</span><span class="font-body-md text-body-md flex-1 text-outline truncate">Add task or type a command...</span><kbd class="font-code-md text-label-sm px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface">Ctrl K</kbd></div></div><div class="flex items-center gap-space-lg"><div class="flex items-center gap-space-xs text-on-surface-variant font-code-md text-code-md"><span class="material-symbols-outlined text-outline text-[18px]">schedule</span><span>Wed 21 Oct 2026, 10:42 IST</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="relative pt-14 w-full px-space-lg bg-surface"><div class="flex flex-col w-full py-space-md">
+<!-- Main Grid Workspace: Left Deck & Right Inspector Pane -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- LEFT COLUMN: Rules Engine Workspace (Col span 7 to 8) -->
+<div class="lg:col-span-8 flex flex-col space-y-space-md">
+<!-- Section Header & System Diagnostics -->
+<div class="bg-surface-container-low p-space-md rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+<div class="flex flex-col space-y-1">
+<div class="flex items-center gap-space-sm">
+<h1 class="font-headline-sm text-headline-sm text-on-surface font-medium tracking-tight">Recurring</h1>
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-surface-container-high text-primary tracking-wider font-medium">3 active · 1 paused</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse ml-1" title="Daemon daemon-evaluating"></span>
+</div>
+<p class="font-body-md text-label-md text-outline">Deterministic schedule rules evaluated every minute by local scheduler daemon.</p>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<button class="flex items-center gap-space-xs px-space-md py-1.5 rounded bg-primary-container text-on-primary-container font-label-md text-label-md hover:bg-primary transition-colors font-medium">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>New recurring rule</span>
+</button>
+</div>
+</div>
+<!-- Rule Cards Deck -->
+<div class="flex flex-col space-y-space-md">
+<!-- CARD 1: Gym - push day -->
+<article class="bg-surface-container-low p-space-md rounded-lg flex flex-col space-y-space-md transition-colors hover:bg-surface-container">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col space-y-1 min-w-0">
+<div class="flex items-center gap-space-sm flex-wrap">
+<h2 class="font-headline-sm text-title-md text-on-surface font-medium">Gym — push day</h2>
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-surface-container text-primary font-medium">Selected weekdays M W F</span>
+<span class="font-code-md text-label-sm text-outline">Active from 5 Oct 2026 · No end date</span>
+</div>
+<div class="flex items-center gap-space-md pt-0.5">
+<!-- Day dots -->
+<div aria-label="Active days: Monday, Wednesday, Friday" class="flex items-center gap-1 font-label-sm text-label-sm">
+<span class="w-5 h-5 rounded flex items-center justify-center bg-primary-container text-on-primary-container font-bold">M</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">T</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-primary-container text-on-primary-container font-bold">W</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">T</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-primary-container text-on-primary-container font-bold">F</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">S</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">S</span>
+</div>
+<div class="flex items-center gap-space-xs font-code-md text-label-md text-on-surface">
+<span class="material-symbols-outlined text-[14px] text-outline">schedule</span>
+<span>18:30 IST</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<label class="relative inline-flex items-center cursor-pointer" title="Toggle active status">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest rounded-full peer peer-checked:bg-primary-container after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+</label>
+<button class="px-space-sm py-1 rounded bg-surface-container-high hover:bg-surface-bright text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm transition-colors">Edit</button>
+</div>
+</div>
+<!-- 14-Day Occurrence Horizon Strip -->
+<div class="p-space-sm rounded bg-surface-container-lowest flex flex-col space-y-space-xs">
+<div class="flex items-center justify-between text-outline font-label-sm text-label-sm">
+<span class="uppercase tracking-wider">14-Day Occurrence Horizon</span>
+<span class="font-code-md text-primary font-medium">Next: Fri 23 Oct · 18:30</span>
+</div>
+<div class="grid grid-cols-14 gap-1 pt-1 overflow-x-auto pb-0.5" style="grid-template-columns: repeat(14, minmax(0, 1fr));">
+<!-- Wed 21 (Today - Occurs) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-primary-container text-on-primary-container shadow-[inset_0_0_0_1px_rgba(144,210,211,0.9)]">
+<span class="font-label-sm text-[9px] uppercase opacity-80">W</span>
+<span class="font-code-md text-label-sm font-bold">21</span>
+</div>
+<!-- Thu 22 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">22</span>
+</div>
+<!-- Fri 23 (Occurs) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-primary-container text-on-primary-container font-medium">
+<span class="font-label-sm text-[9px] uppercase opacity-80">F</span>
+<span class="font-code-md text-label-sm font-bold">23</span>
+</div>
+<!-- Sat 24 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">S</span>
+<span class="font-code-md text-label-sm">24</span>
+</div>
+<!-- Sun 25 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">S</span>
+<span class="font-code-md text-label-sm">25</span>
+</div>
+<!-- Mon 26 (Occurs) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-primary-container text-on-primary-container font-medium">
+<span class="font-label-sm text-[9px] uppercase opacity-80">M</span>
+<span class="font-code-md text-label-sm font-bold">26</span>
+</div>
+<!-- Tue 27 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">27</span>
+</div>
+<!-- Wed 28 (Occurs) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-primary-container text-on-primary-container font-medium">
+<span class="font-label-sm text-[9px] uppercase opacity-80">W</span>
+<span class="font-code-md text-label-sm font-bold">28</span>
+</div>
+<!-- Thu 29 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">29</span>
+</div>
+<!-- Fri 30 (Occurs) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-primary-container text-on-primary-container font-medium">
+<span class="font-label-sm text-[9px] uppercase opacity-80">F</span>
+<span class="font-code-md text-label-sm font-bold">30</span>
+</div>
+<!-- Sat 31 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">S</span>
+<span class="font-code-md text-label-sm">31</span>
+</div>
+<!-- Sun 1 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">S</span>
+<span class="font-code-md text-label-sm">1</span>
+</div>
+<!-- Mon 2 (Occurs) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-primary-container text-on-primary-container font-medium">
+<span class="font-label-sm text-[9px] uppercase opacity-80">M</span>
+<span class="font-code-md text-label-sm font-bold">2</span>
+</div>
+<!-- Tue 3 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">3</span>
+</div>
+</div>
+</div>
+</article>
+<!-- CARD 2: Weekly review -->
+<article class="bg-surface-container-low p-space-md rounded-lg flex flex-col space-y-space-md transition-colors hover:bg-surface-container">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col space-y-1 min-w-0">
+<div class="flex items-center gap-space-sm flex-wrap">
+<h2 class="font-headline-sm text-title-md text-on-surface font-medium">Weekly review</h2>
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-surface-container text-primary font-medium">Weekly · Sunday</span>
+<span class="font-code-md text-label-sm text-outline">Active · Perpetual</span>
+</div>
+<div class="flex items-center gap-space-md pt-0.5">
+<div aria-label="Active days: Sunday" class="flex items-center gap-1 font-label-sm text-label-sm">
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">M</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">T</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">W</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">T</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">F</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">S</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-primary-container text-on-primary-container font-bold">S</span>
+</div>
+<div class="flex items-center gap-space-xs font-code-md text-label-md text-on-surface">
+<span class="material-symbols-outlined text-[14px] text-outline">schedule</span>
+<span>20:00 IST</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<label class="relative inline-flex items-center cursor-pointer" title="Toggle active status">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest rounded-full peer peer-checked:bg-primary-container after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+</label>
+<button class="px-space-sm py-1 rounded bg-surface-container-high hover:bg-surface-bright text-on-surface-variant hover:text-on-surface font-label-sm text-label-sm transition-colors">Edit</button>
+</div>
+</div>
+<!-- 14-Day Occurrence Horizon Strip -->
+<div class="p-space-sm rounded bg-surface-container-lowest flex flex-col space-y-space-xs">
+<div class="flex items-center justify-between text-outline font-label-sm text-label-sm">
+<span class="uppercase tracking-wider">14-Day Occurrence Horizon</span>
+<span class="font-code-md text-primary font-medium">Next: Sun 25 Oct · 20:00</span>
+</div>
+<div class="grid grid-cols-14 gap-1 pt-1 overflow-x-auto pb-0.5" style="grid-template-columns: repeat(14, minmax(0, 1fr));">
+<!-- Wed 21 (Today) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/30 text-on-surface shadow-[inset_0_0_0_1px_rgba(144,210,211,0.6)]">
+<span class="font-label-sm text-[9px] uppercase opacity-70">W</span>
+<span class="font-code-md text-label-sm font-semibold text-primary">21</span>
+</div>
+<!-- Thu 22 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">22</span>
+</div>
+<!-- Fri 23 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">F</span>
+<span class="font-code-md text-label-sm">23</span>
+</div>
+<!-- Sat 24 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">S</span>
+<span class="font-code-md text-label-sm">24</span>
+</div>
+<!-- Sun 25 (Occurs) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-primary-container text-on-primary-container font-medium">
+<span class="font-label-sm text-[9px] uppercase opacity-80">S</span>
+<span class="font-code-md text-label-sm font-bold">25</span>
+</div>
+<!-- Mon 26 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">M</span>
+<span class="font-code-md text-label-sm">26</span>
+</div>
+<!-- Tue 27 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">27</span>
+</div>
+<!-- Wed 28 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">W</span>
+<span class="font-code-md text-label-sm">28</span>
+</div>
+<!-- Thu 29 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">29</span>
+</div>
+<!-- Fri 30 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">F</span>
+<span class="font-code-md text-label-sm">30</span>
+</div>
+<!-- Sat 31 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">S</span>
+<span class="font-code-md text-label-sm">31</span>
+</div>
+<!-- Sun 1 (Occurs) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-primary-container text-on-primary-container font-medium">
+<span class="font-label-sm text-[9px] uppercase opacity-80">S</span>
+<span class="font-code-md text-label-sm font-bold">1</span>
+</div>
+<!-- Mon 2 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">M</span>
+<span class="font-code-md text-label-sm">2</span>
+</div>
+<!-- Tue 3 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">3</span>
+</div>
+</div>
+</div>
+</article>
+<!-- CARD 3: Lab record write-up (Target being edited) -->
+<article class="bg-surface-container-low p-space-md rounded-lg flex flex-col space-y-space-md shadow-[inset_0_0_0_1px_rgba(144,210,211,0.25)] relative">
+<div class="absolute -left-1 top-4 bottom-4 w-1 bg-primary rounded-r"></div>
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col space-y-1 min-w-0">
+<div class="flex items-center gap-space-sm flex-wrap">
+<h2 class="font-headline-sm text-title-md text-on-surface font-medium">Lab record write-up</h2>
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-surface-container text-primary font-medium">Alternating weeks · Week A (anchored Mon 19 Oct)</span>
+<span class="font-code-md text-label-sm text-outline">Active · Bi-weekly cadenced</span>
+</div>
+<div class="flex items-center gap-space-md pt-0.5">
+<div aria-label="Active days: Tuesday" class="flex items-center gap-1 font-label-sm text-label-sm">
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">M</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-primary-container text-on-primary-container font-bold">T</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">W</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">T</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">F</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">S</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">S</span>
+</div>
+<div class="flex items-center gap-space-xs font-code-md text-label-md text-on-surface">
+<span class="material-symbols-outlined text-[14px] text-outline">schedule</span>
+<span>17:00 IST</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<label class="relative inline-flex items-center cursor-pointer" title="Toggle active status">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-surface-container-highest rounded-full peer peer-checked:bg-primary-container after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+</label>
+<button class="px-space-sm py-1 rounded bg-primary-container text-on-primary-container font-label-sm text-label-sm font-semibold transition-colors">Editing</button>
+</div>
+</div>
+<!-- 14-Day Occurrence Horizon Strip -->
+<div class="p-space-sm rounded bg-surface-container-lowest flex flex-col space-y-space-xs">
+<div class="flex items-center justify-between text-outline font-label-sm text-label-sm">
+<div class="flex items-center gap-space-sm">
+<span class="uppercase tracking-wider">14-Day Occurrence Horizon</span>
+<span class="font-code-md text-[10px] text-secondary">Parity: Current Week A (Suppressed W-Sun) > Week B > Week A</span>
+</div>
+<span class="font-code-md text-primary font-medium">Next: Tue 3 Nov · 17:00 (Week A)</span>
+</div>
+<div class="grid grid-cols-14 gap-1 pt-1 overflow-x-auto pb-0.5" style="grid-template-columns: repeat(14, minmax(0, 1fr));">
+<!-- Wed 21 (Today) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/30 text-on-surface shadow-[inset_0_0_0_1px_rgba(144,210,211,0.6)]">
+<span class="font-label-sm text-[9px] uppercase opacity-70">W</span>
+<span class="font-code-md text-label-sm font-semibold text-primary">21</span>
+</div>
+<!-- Thu 22 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">22</span>
+</div>
+<!-- Fri 23 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">F</span>
+<span class="font-code-md text-label-sm">23</span>
+</div>
+<!-- Sat 24 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">S</span>
+<span class="font-code-md text-label-sm">24</span>
+</div>
+<!-- Sun 25 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">S</span>
+<span class="font-code-md text-label-sm">25</span>
+</div>
+<!-- Mon 26 (Week B) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">M</span>
+<span class="font-code-md text-label-sm">26</span>
+</div>
+<!-- Tue 27 (Week B - Not occurring) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline" title="Week B suppressed">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">27</span>
+</div>
+<!-- Wed 28 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">W</span>
+<span class="font-code-md text-label-sm">28</span>
+</div>
+<!-- Thu 29 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">T</span>
+<span class="font-code-md text-label-sm">29</span>
+</div>
+<!-- Fri 30 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">F</span>
+<span class="font-code-md text-label-sm">30</span>
+</div>
+<!-- Sat 31 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">S</span>
+<span class="font-code-md text-label-sm">31</span>
+</div>
+<!-- Sun 1 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">S</span>
+<span class="font-code-md text-label-sm">1</span>
+</div>
+<!-- Mon 2 -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/40 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-70">M</span>
+<span class="font-code-md text-label-sm">2</span>
+</div>
+<!-- Tue 3 (Week A - Occurs) -->
+<div class="flex flex-col items-center justify-center py-1 rounded bg-primary-container text-on-primary-container font-medium">
+<span class="font-label-sm text-[9px] uppercase opacity-80">T</span>
+<span class="font-code-md text-label-sm font-bold">3</span>
+</div>
+</div>
+</div>
+</article>
+<!-- CARD 4: Morning walk (Paused state) -->
+<article class="bg-surface-container-low/55 p-space-md rounded-lg flex flex-col space-y-space-md opacity-60 hover:opacity-80 transition-opacity">
+<div class="flex items-start justify-between gap-space-sm">
+<div class="flex flex-col space-y-1 min-w-0">
+<div class="flex items-center gap-space-sm flex-wrap">
+<h2 class="font-headline-sm text-title-md text-on-surface font-medium line-through decoration-outline">Morning walk</h2>
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-surface-container-high text-secondary font-medium">Daily</span>
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-secondary-container text-secondary font-medium uppercase tracking-wider">Paused</span>
+</div>
+<div class="flex items-center gap-space-md pt-0.5">
+<div aria-label="Daily (paused)" class="flex items-center gap-1 font-label-sm text-label-sm">
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">M</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">T</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">W</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">T</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">F</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">S</span>
+<span class="w-5 h-5 rounded flex items-center justify-center bg-surface-container-high text-outline">S</span>
+</div>
+<div class="flex items-center gap-space-xs font-code-md text-label-md text-outline">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span>06:50 IST</span>
+</div>
+<span class="font-code-md text-label-sm text-outline">· Paused — future occurrences suppressed, history kept</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm shrink-0">
+<button class="px-space-sm py-1 rounded bg-secondary-container hover:bg-secondary text-on-secondary font-label-sm text-label-sm font-medium transition-colors">Resume</button>
+<button class="px-space-sm py-1 rounded bg-surface-container-high hover:bg-surface-bright text-on-surface-variant font-label-sm text-label-sm transition-colors">Edit</button>
+</div>
+</div>
+<!-- 14-Day Suppressed Strip -->
+<div class="p-space-sm rounded bg-surface-container-lowest/80 flex flex-col space-y-space-xs">
+<div class="flex items-center justify-between text-outline font-label-sm text-label-sm">
+<span class="uppercase tracking-wider">14-Day Occurrence Horizon</span>
+<span class="font-code-md text-secondary">Occurrences suspended</span>
+</div>
+<div class="grid grid-cols-14 gap-1 pt-1 overflow-x-auto pb-0.5" style="grid-template-columns: repeat(14, minmax(0, 1fr));">
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">W</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">T</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">F</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">S</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">S</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">M</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">T</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">W</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">T</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">F</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">S</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">S</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">M</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+<div class="flex flex-col items-center justify-center py-1 rounded bg-surface-container-high/20 text-outline">
+<span class="font-label-sm text-[9px] uppercase opacity-40">T</span>
+<span class="font-code-md text-label-sm text-outline/60">-</span>
+</div>
+</div>
+</div>
+</article>
+</div>
+<!-- Empty State / Reference Box Drawer preview -->
+<div class="p-space-md rounded-lg bg-surface-container-low/40 flex flex-col sm:flex-row items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md">
+<div class="w-10 h-10 rounded bg-surface-container-high flex items-center justify-center text-outline shrink-0">
+<span class="material-symbols-outlined text-[20px]">save_as</span>
+</div>
+<div class="flex flex-col">
+<span class="font-title-md text-body-md text-on-surface font-medium">Routine catalog ready</span>
+<span class="font-body-md text-label-md text-outline">No recurring tasks yet in Personal finance or Health labs. Add a routine, bill or weekly lab.</span>
+</div>
+</div>
+<button class="shrink-0 px-space-md py-1.5 rounded bg-surface-container-high hover:bg-surface-bright text-on-surface font-label-md text-label-md flex items-center gap-1 transition-colors">
+<span class="material-symbols-outlined text-[16px]">add_circle</span>
+<span>Add routine</span>
+</button>
+</div>
+</div>
+<!-- RIGHT COLUMN: 400px Create / Edit Panel (Col span 4) -->
+<aside class="lg:col-span-4 w-full bg-surface-container-low rounded-lg p-space-lg flex flex-col space-y-space-md shadow-sm">
+<!-- Panel Header -->
+<div class="flex items-center justify-between pb-space-sm">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Configuring Node</span>
+<h2 class="font-headline-sm text-title-md text-on-surface font-medium">Edit Recurring Rule</h2>
+</div>
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-primary-container/20 text-primary font-code-md">RULE-084</span>
+</div>
+<!-- Rule Name Display & Context -->
+<div class="flex flex-col space-y-1">
+<label class="font-label-sm text-label-sm uppercase text-outline tracking-wider">Rule Title</label>
+<div class="p-space-sm rounded bg-surface-container-lowest text-on-surface font-body-md text-body-md font-medium flex items-center justify-between">
+<span>Lab record write-up</span>
+<span class="material-symbols-outlined text-outline text-[16px]">lock</span>
+</div>
+</div>
+<!-- Recurrence Pattern Selector: Segmented Control -->
+<div class="flex flex-col space-y-1.5">
+<label class="font-label-sm text-label-sm uppercase text-outline tracking-wider">Cadence Pattern</label>
+<div class="grid grid-cols-4 gap-1 p-1 bg-surface-container-lowest rounded">
+<button class="py-1 rounded text-center font-label-sm text-label-sm text-outline hover:text-on-surface transition-colors" type="button">Daily</button>
+<button class="py-1 rounded text-center font-label-sm text-label-sm text-outline hover:text-on-surface transition-colors" type="button">Weekly</button>
+<button class="py-1 rounded text-center font-label-sm text-label-sm text-outline hover:text-on-surface transition-colors" type="button">Weekdays</button>
+<button class="py-1 rounded text-center font-label-sm text-label-sm bg-primary-container text-on-primary-container font-medium shadow-sm" type="button">Alternating</button>
+</div>
+</div>
+<!-- Alternating A/B Parameters Block -->
+<div class="p-space-md rounded bg-surface-container-lowest flex flex-col space-y-space-md">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-primary font-medium">Alternating A/B Parameters</span>
+<span class="material-symbols-outlined text-primary text-[16px]">tune</span>
+</div>
+<div class="flex flex-col space-y-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Week A starts on Monday</label>
+<div class="flex items-center justify-between px-space-sm py-1.5 rounded bg-surface-container text-on-surface font-code-md text-code-md">
+<span>Mon 19 Oct 2026</span>
+<span class="material-symbols-outlined text-[16px] text-outline">calendar_month</span>
+</div>
+<span class="font-code-md text-label-sm text-outline">Anchor date determines A/B parity</span>
+</div>
+<div class="flex flex-col space-y-1.5">
+<label class="font-label-sm text-label-sm text-on-surface-variant">Active Week Occurrence</label>
+<div class="grid grid-cols-2 gap-1 p-1 bg-surface-container rounded">
+<button class="py-1 rounded text-center font-label-sm text-label-sm bg-primary-container text-on-primary-container font-medium" type="button">Week A</button>
+<button class="py-1 rounded text-center font-label-sm text-label-sm text-outline hover:text-on-surface" type="button">Week B</button>
+</div>
+</div>
+</div>
+<!-- Weekday Chips Selector -->
+<div class="flex flex-col space-y-1.5">
+<label class="font-label-sm text-label-sm uppercase text-outline tracking-wider">Days of Week</label>
+<div class="grid grid-cols-7 gap-1">
+<button class="py-1.5 rounded bg-surface-container-lowest text-outline hover:bg-surface-container font-label-sm text-label-sm" type="button">M</button>
+<button class="py-1.5 rounded bg-primary-container text-on-primary-container font-bold text-label-sm shadow-sm" type="button">T</button>
+<button class="py-1.5 rounded bg-surface-container-lowest text-outline hover:bg-surface-container font-label-sm text-label-sm" type="button">W</button>
+<button class="py-1.5 rounded bg-surface-container-lowest text-outline hover:bg-surface-container font-label-sm text-label-sm" type="button">T</button>
+<button class="py-1.5 rounded bg-surface-container-lowest text-outline hover:bg-surface-container font-label-sm text-label-sm" type="button">F</button>
+<button class="py-1.5 rounded bg-surface-container-lowest text-outline hover:bg-surface-container font-label-sm text-label-sm" type="button">S</button>
+<button class="py-1.5 rounded bg-surface-container-lowest text-outline hover:bg-surface-container font-label-sm text-label-sm" type="button">S</button>
+</div>
+</div>
+<!-- Execution Time -->
+<div class="flex flex-col space-y-1">
+<label class="font-label-sm text-label-sm uppercase text-outline tracking-wider">Execution Time</label>
+<div class="flex items-center justify-between px-space-sm py-1.5 rounded bg-surface-container-lowest font-code-md text-code-md text-on-surface">
+<span>17:00</span>
+<span class="text-outline text-label-sm uppercase tracking-wide">IST (Asia/Kolkata)</span>
+</div>
+</div>
+<!-- Active Range Grid -->
+<div class="grid grid-cols-2 gap-space-sm">
+<div class="flex flex-col space-y-1">
+<label class="font-label-sm text-label-sm uppercase text-outline tracking-wider">Start Date</label>
+<div class="px-space-sm py-1.5 rounded bg-surface-container-lowest font-code-md text-code-md text-on-surface">
+            19 Oct 2026
+          </div>
+</div>
+<div class="flex flex-col space-y-1">
+<label class="font-label-sm text-label-sm uppercase text-outline tracking-wider">End Date</label>
+<div class="px-space-sm py-1.5 rounded bg-surface-container-lowest font-code-md text-code-md text-outline truncate" title="No end date (indefinite)">
+            Indefinite
+          </div>
+</div>
+</div>
+<!-- Reminder Lead Time Selector -->
+<div class="flex flex-col space-y-1.5">
+<div class="flex items-center justify-between">
+<label class="font-label-sm text-label-sm uppercase text-outline tracking-wider">Dispatch Notification</label>
+<span class="font-code-md text-label-sm text-primary">15:00 trigger</span>
+</div>
+<div class="grid grid-cols-4 gap-1 p-1 bg-surface-container-lowest rounded">
+<button class="py-1 rounded text-center font-label-sm text-label-sm text-outline hover:text-on-surface" type="button">At time</button>
+<button class="py-1 rounded text-center font-label-sm text-label-sm text-outline hover:text-on-surface" type="button">30m</button>
+<button class="py-1 rounded text-center font-label-sm text-label-sm bg-primary-container text-on-primary-container font-medium shadow-sm" type="button">2h</button>
+<button class="py-1 rounded text-center font-label-sm text-label-sm text-outline hover:text-on-surface" type="button">1d</button>
+</div>
+</div>
+<!-- Machine Telemetry Notice -->
+<div class="flex items-center gap-space-xs text-outline font-code-md text-label-sm pt-1">
+<span class="material-symbols-outlined text-[14px] text-primary">info</span>
+<span>IST fixed · one occurrence per date</span>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-space-sm pt-space-md">
+<button class="flex-1 py-2 px-space-md rounded bg-primary text-on-primary font-headline-sm text-label-md font-semibold tracking-wide hover:bg-primary-fixed transition-colors shadow-sm" type="button">
+          Save rule
+        </button>
+<button class="py-2 px-space-md rounded bg-surface-container-high hover:bg-surface-bright text-on-surface-variant font-label-sm text-label-md transition-colors" type="button">
+          Cancel
+        </button>
+</div>
+</aside>
+</div>
+</div></main></div></body></html>

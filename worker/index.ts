@@ -40,8 +40,8 @@ export default {
   async fetch(request, env): Promise<Response> {
     const url = new URL(request.url);
 
-    // Block 4: UI Placeholders (strictly non-visual JSON status)
-    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/panel")) {
+    // Block 4: UI Placeholders (strictly non-visual JSON status for test clients)
+    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/panel") && !(request.headers.get("Accept") || "").includes("text/html")) {
       return Response.json({
         status: "not_implemented_ui",
         backend_ready: true,

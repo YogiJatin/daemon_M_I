@@ -64,7 +64,7 @@ export async function evaluateSuggestions(
   const ist = getISTDateParts(now);
   const todayYmd = ist.localDate;
   const currentTime = ist.localTime;
-  const currentHour = ist.hour;
+  const currentHour = parseInt(ist.hours, 10);
   const nowIso = now.toISOString();
   const yesterdayYmd = addDaysYmd(todayYmd, -1);
   const tomorrowYmd = addDaysYmd(todayYmd, 1);
