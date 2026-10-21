@@ -18,6 +18,7 @@
  *   - validator
  *   - handler
  * - Zero hardcoded switch statements in capability execution.
+ * - Immutability: Definitions are frozen upon registration; registry locks after initialization.
  */
 
 import { PrivacyClass } from "./aiAdapter";
@@ -44,25 +45,42 @@ export interface AICapabilityDefinition<TInput = any, TOutput = any> {
 }
 
 export class AICapabilityRegistry {
-  private static capabilities = new Map<string, AICapabilityDefinition>();
+  private static capabilities = new Map<string, Readonly<AICapabilityDefinition>>();
+  private static locked: boolean = false;
 
   public static register<TInput, TOutput>(definition: AICapabilityDefinition<TInput, TOutput>): void {
+    if (this.locked) {
+      throw new Error(`Capability Registry is locked and immutable. Cannot register '${definition?.id}' after initialization.`);
+    }
     if (!definition.id || typeof definition.id !== "string") {
       throw new Error("Capability definition must have a valid non-empty 'id'");
     }
-    this.capabilities.set(definition.id.toLowerCase(), definition);
+    const key = definition.id.toLowerCase();
+    if (this.capabilities.has(key)) {
+      throw new Error(`Capability '${definition.id}' is already registered and cannot be overwritten.`);
+    }
+    this.capabilities.set(key, Object.freeze({ ...definition }));
   }
 
-  public static get(id: string): AICapabilityDefinition | null {
+  public static freeze(): void {
+    this.locked = true;
+  }
+
+  public static isFrozen(): boolean {
+    return this.locked;
+  }
+
+  public static get(id: string): Readonly<AICapabilityDefinition> | null {
     if (!id) return null;
     return this.capabilities.get(id.toLowerCase()) || null;
   }
 
-  public static list(): AICapabilityDefinition[] {
+  public static list(): Readonly<AICapabilityDefinition>[] {
     return Array.from(this.capabilities.values());
   }
 
   public static clear(): void {
+    this.locked = false;
     this.capabilities.clear();
   }
 }

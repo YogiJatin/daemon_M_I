@@ -2,11 +2,11 @@
  * tests/unit_ai_hardening.ts — Block 6.1 AI Architecture Hardening Unit Tests
  *
  * Verifies:
- * 1. Capability Registry: Registration, metadata retrieval, unregistered rejection.
+ * 1. Capability Registry: Registration, metadata retrieval, unregistered rejection, post-init immutability.
  * 2. XML Context Builder: Canonical segmentation, record deduplication, deterministic output.
  * 3. Token Budget Manager: Heuristic token estimation, priority entity preservation, trimming.
- * 4. Prompt Cache: Memory-first LRU, canonical XML hashing, error exclusion, automatic TTL.
- * 5. AI Verifier: Citation checking, priority enum, confidence range, repair request generation.
+ * 4. Prompt Cache: Memory-first LRU, canonical XML hashing, error exclusion, version invalidation, automatic TTL.
+ * 5. AI Verifier: Citation checking, priority enum, confidence range, repair request generation (strictly 1 attempt).
  * 6. Provider Scoring: Owner primacy preservation, privacy gating, latency tie-break.
  * 7. Explainability: Mandatory fields (reason, confidence, evidence, affected_record_ids).
  * 8. Execution Planner: Platform-neutral plan typing, zero execution.
@@ -27,7 +27,7 @@ import { validateSuggestNextOutput } from "../worker/schemas/suggest_next";
 import { validateExplainability } from "../worker/schemas/explainability";
 import { ProviderConfig } from "../worker/aiAdapter";
 
-// Import aiCapabilities to trigger top-level capability registrations
+// Import aiCapabilities to trigger top-level capability registrations & lock registry
 import "../worker/aiCapabilities";
 
 let passCount = 0;
@@ -61,6 +61,31 @@ async function runHardeningTests() {
   const unknown = AICapabilityRegistry.get("non_existent_capability");
   assert(unknown === null, "Registry returns null for unknown capability");
 
+  // Immutability checks
+  assert(AICapabilityRegistry.isFrozen(), "Registry is marked frozen/immutable after initialization");
+  let registerThrew = false;
+  try {
+    AICapabilityRegistry.register({
+      id: "malicious_overwrite",
+      promptId: "p_bad",
+      promptVersion: "9.9.9",
+      checksum: "sha256_bad",
+      dependencies: [],
+      supportedPrivacyClasses: ["personal"],
+      maxContextTokens: 100,
+      maxOutputTokens: 100,
+      timeoutMs: 1000,
+      systemRules: "",
+      outputContract: "",
+      contextBuilder: async () => {},
+      validator: () => ({ valid: true, errors: [] }),
+      handler: async () => ({}),
+    });
+  } catch (err: any) {
+    registerThrew = true;
+  }
+  assert(registerThrew, "Registry rejects new registrations after initialization (immutability enforced)");
+
   // ----------------------------------------------------
   // 2. XML Context Builder
   // ----------------------------------------------------
@@ -84,6 +109,10 @@ async function runHardeningTests() {
 
   const task1Matches = (built.xml.match(/id="task_1"/g) || []).length;
   assert(task1Matches === 1, "Entity 'task_1' is deduplicated and appears exactly once in XML");
+
+  // Determinism check: build again, verify byte-for-byte identical output
+  const built2 = builder.build(2500);
+  assert(built.xml === built2.xml, "XML Context Builder produces byte-for-byte deterministic canonical output");
 
   // ----------------------------------------------------
   // 3. Token Budget Manager
@@ -122,6 +151,16 @@ async function runHardeningTests() {
   const hit = AIPromptCache.get(cacheKey);
   assert(hit !== null && hit.data?.cached === true, "Prompt cache returns stored value on hit");
   assert(hit?.provider === "mock", "Prompt cache preserves provider metadata");
+
+  // Cache invalidation when prompt_version changes
+  const newPromptKey = await AIPromptCache.computeKey("task_breakdown", "1.2.0", "2.0.0", "<xml>context</xml>", '{"id":1}');
+  assert(newPromptKey !== cacheKey, "Cache key changes when promptVersion changes (invalidating old cache)");
+  assert(AIPromptCache.get(newPromptKey) === null, "Prompt cache misses when promptVersion differs");
+
+  // Cache invalidation when context_version changes
+  const newContextKey = await AIPromptCache.computeKey("task_breakdown", "1.1.0", "2.1.0", "<xml>context</xml>", '{"id":1}');
+  assert(newContextKey !== cacheKey, "Cache key changes when contextVersion changes (invalidating old cache)");
+  assert(AIPromptCache.get(newContextKey) === null, "Prompt cache misses when contextVersion differs");
 
   // ----------------------------------------------------
   // 5. AI Verifier
@@ -170,9 +209,9 @@ async function runHardeningTests() {
   ]);
 
   const ranked = AIProviderScoring.rankCandidates(configs, ownerOrder, "personal", healthMap);
-  assert(ranked[0].config.id === "groq", "Owner preference top choice 'groq' is ranked #1 when healthy");
+  assert(ranked[0].config.id === "groq", "Owner preference top choice 'groq' is ranked #1 when healthy (even with higher latency than workers_ai/mock)");
 
-  // When groq is in cooldown, owner second choice 'workers_ai' becomes #1
+  // When groq is in cooldown, owner second choice 'workers_ai' takes over
   const cooldownHealthMap = new Map([
     ["groq", { consecutiveFailures: 3, cooldownUntil: Date.now() + 60000, avgLatencyMs: 250 }],
     ["workers_ai", { consecutiveFailures: 0, cooldownUntil: 0, avgLatencyMs: 150 }],

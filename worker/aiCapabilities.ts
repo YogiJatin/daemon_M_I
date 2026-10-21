@@ -376,6 +376,8 @@ RULES:
 });
 
 // ---------------------------------------------------------------------------
+AICapabilityRegistry.freeze();
+
 // AICapabilities Facade (Preserves exact Block 6 method signatures)
 // ---------------------------------------------------------------------------
 export class AICapabilities {
