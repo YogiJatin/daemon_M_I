@@ -11,6 +11,7 @@
 
 import { istToUtcDate } from "./dateParser";
 import { planNotification } from "./notificationPlanner";
+import { AuditService } from "./auditService";
 
 export interface TaskProposalInput {
   title: string;
@@ -82,6 +83,8 @@ export async function createTaskProposal(
       nowIso
     )
     .run();
+
+  AuditService.emit(db, { eventType: "PROPOSAL_CREATED", entityType: "proposal", entityId: id, actor: "ai", payload: { id, title: input.title.trim(), priority: input.priority || "normal" }, metadata: { proposal_id: id, title: input.title.trim(), priority: input.priority || "normal" } });
 
   return {
     id,
@@ -256,6 +259,8 @@ export async function confirmProposal(
     )
     .run();
 
+  AuditService.emit(db, { eventType: "PROPOSAL_APPROVED", entityType: "proposal", entityId: proposalId, actor: "owner", payload: { proposal_id: proposalId, created_task_id: taskId }, metadata: { proposal_id: proposalId, created_task_id: taskId } });
+
   const createdTask = await db.prepare("SELECT * FROM tasks WHERE id = ?").bind(taskId).first();
   const updatedProposal = await db.prepare("SELECT * FROM task_proposals WHERE id = ?").bind(proposalId).first<TaskProposalRecord>();
 
@@ -312,6 +317,8 @@ export async function rejectProposal(
     )
     .bind(`aud_${crypto.randomUUID()}`, proposalId, JSON.stringify({ reason }), nowIso)
     .run();
+
+  AuditService.emit(db, { eventType: "PROPOSAL_REJECTED", entityType: "proposal", entityId: proposalId, actor: "owner", payload: { proposal_id: proposalId, reason: reason || "Rejected by owner" }, metadata: { proposal_id: proposalId, reason: reason || "Rejected by owner" } });
 
   const updated = await db.prepare("SELECT * FROM task_proposals WHERE id = ?").bind(proposalId).first<TaskProposalRecord>();
   return { success: true, proposal: updated || undefined };

@@ -43,7 +43,11 @@ import {
 import {
   getExportData,
   getExportCsv,
+  getSignedExportJson,
 } from "./exportService";
+import { AuditService } from "./auditService";
+import { AuditVerifier } from "./auditVerifier";
+import { AuditReplay } from "./auditReplay";
 import { AICapabilities } from "./aiCapabilities";
 import { PrivacyClass } from "./aiAdapter";
 import {
@@ -493,6 +497,7 @@ export async function handleApiRequest(
         });
       }
 
+      AuditService.emit(env.DB, { eventType: "TASK_CREATED", entityType: "task", entityId: taskId, actor: "owner", payload: { id: taskId, title, priority, status: "open" }, metadata: { task_id: taskId, title, priority } }, env);
       const created = await env.DB.prepare("SELECT * FROM tasks WHERE id = ?").bind(taskId).first();
       return jsonSuccess(created, undefined, 201);
     }
@@ -648,6 +653,7 @@ export async function handleApiRequest(
           ).bind(crypto.randomUUID(), taskId, nowIso),
         ]);
 
+        AuditService.emit(env.DB, { eventType: "TASK_COMPLETED", entityType: "task", entityId: taskId, actor: "owner", payload: { id: taskId, status: "done" }, metadata: { task_id: taskId, status: "done" } }, env);
         const completed = await env.DB.prepare("SELECT * FROM tasks WHERE id = ?").bind(taskId).first();
         return jsonSuccess(completed);
       }
@@ -1323,6 +1329,8 @@ export async function handleApiRequest(
         );
       }
 
+      AuditService.emit(env.DB, { eventType: "AI_RESPONSE", entityType: "ai", entityId: capability, actor: "ai", payload: { capability, provider: res.provider, model: res.model, duration_ms: res.durationMs }, metadata: { capability, provider: res.provider, model: res.model, latency: res.durationMs } }, env);
+      AuditService.emit(env.DB, { eventType: "AI_RESPONSE", entityType: "ai", entityId: capability, actor: "ai", payload: { capability, provider: res.provider, model: res.model, duration_ms: res.durationMs }, metadata: { capability, provider: res.provider, model: res.model, latency: res.durationMs } }, env);
       return jsonSuccess({
         capability,
         result: res.data,
@@ -1474,6 +1482,8 @@ export async function handleApiRequest(
         return jsonError(res.error?.code || "ai_failed", res.error?.message || "Execution failed", 502);
       }
 
+      AuditService.emit(env.DB, { eventType: "AI_RESPONSE", entityType: "ai", entityId: capability, actor: "ai", payload: { capability, provider: res.provider, model: res.model, duration_ms: res.durationMs }, metadata: { capability, provider: res.provider, model: res.model, latency: res.durationMs } }, env);
+      AuditService.emit(env.DB, { eventType: "AI_RESPONSE", entityType: "ai", entityId: capability, actor: "ai", payload: { capability, provider: res.provider, model: res.model, duration_ms: res.durationMs }, metadata: { capability, provider: res.provider, model: res.model, latency: res.durationMs } }, env);
       return jsonSuccess({
         capability,
         result: res.data,
@@ -1482,6 +1492,46 @@ export async function handleApiRequest(
         duration_ms: res.durationMs,
         fallback_triggered: res.fallbackTriggered,
       });
+    }
+
+    // =======================================================================
+    // 14.5. AUDIT & CRYPTOGRAPHIC LEDGER SERVICES (Block 6.2)
+    // =======================================================================
+
+    // GET /api/v1/audit/latest
+    if (method === "GET" && path === "/api/v1/audit/latest") {
+      const latest = await AuditService.getLatest(env.DB);
+      return jsonSuccess(latest);
+    }
+
+    // GET /api/v1/audit/entity/:type/:id
+    if (method === "GET" && path.startsWith("/api/v1/audit/entity/")) {
+      const parts = path.slice("/api/v1/audit/entity/".length).split("/");
+      if (parts.length < 2) {
+        return jsonError("invalid_request", "Expected path /api/v1/audit/entity/:type/:id", 400);
+      }
+      const [entityType, entityId] = parts;
+      const timeline = await AuditReplay.replayEntityTimeline(env.DB, entityType, entityId);
+      return jsonSuccess(timeline);
+    }
+
+    // GET /api/v1/audit/verify
+    if (method === "GET" && path === "/api/v1/audit/verify") {
+      const fromSeq = url.searchParams.get("from") ? parseInt(url.searchParams.get("from")!, 10) : 1;
+      const toSeq = url.searchParams.get("to") ? parseInt(url.searchParams.get("to")!, 10) : undefined;
+      const report = await AuditVerifier.verifyChain(env.DB, fromSeq, toSeq);
+      return jsonSuccess(report);
+    }
+
+    // GET /api/v1/audit/export
+    if (method === "GET" && path === "/api/v1/audit/export") {
+      const format = url.searchParams.get("format") || "signed_json";
+      if (format === "signed_json") {
+        const signedBundle = await getSignedExportJson(env.DB, now);
+        return jsonSuccess(signedBundle);
+      }
+      const latest = await AuditService.getLatest(env.DB);
+      return jsonSuccess(latest);
     }
 
     // =======================================================================
