@@ -11,6 +11,7 @@
  */
 
 import { materializeRecurringOccurrences } from "./recurrenceEngine";
+import { confirmProposal, rejectProposal } from "./inboxService";
 
 export interface CallbackResult {
   success: boolean;
@@ -49,6 +50,54 @@ export async function handleCallbackQuery(
 
   const now = new Date();
   const nowIso = now.toISOString();
+
+  // 2a. Proposal confirmation / rejection callbacks (Block 6)
+  if (action === "p_conf" || action === "p_confirm" || action === "p_rej" || action === "p_reject") {
+    const proposal = await env.DB.prepare(
+      `SELECT id, title, status FROM task_proposals WHERE id = ? OR substr(id, 1, 13) = ?`
+    )
+      .bind(idFragment, idFragment)
+      .first<{ id: string; title: string; status: string }>();
+
+    if (!proposal) {
+      return {
+        success: false,
+        action,
+        message: "Proposal not found.",
+      };
+    }
+
+    if (action === "p_conf" || action === "p_confirm") {
+      if (proposal.status === "confirmed") {
+        return {
+          success: true,
+          action,
+          message: `Proposal "${proposal.title}" was already confirmed.`,
+        };
+      }
+      const res = await confirmProposal(env.DB, proposal.id, undefined, now);
+      return {
+        success: res.success,
+        action,
+        taskId: res.task?.id,
+        message: res.success ? `Confirmed task: "${proposal.title}"` : (res.error || "Failed to confirm"),
+      };
+    } else {
+      if (proposal.status === "rejected") {
+        return {
+          success: true,
+          action,
+          message: `Proposal "${proposal.title}" was already rejected.`,
+        };
+      }
+      const res = await rejectProposal(env.DB, proposal.id, "Rejected via Telegram", now);
+      return {
+        success: res.success,
+        action,
+        message: res.success ? `Rejected proposal: "${proposal.title}"` : (res.error || "Failed to reject"),
+      };
+    }
+  }
 
   // 2. Task lookup & verification
   const task = await env.DB.prepare(

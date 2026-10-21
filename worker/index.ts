@@ -1385,7 +1385,7 @@ export default {
 
       // Route command if present; otherwise capture plain-text as task (BLOCK_1.md)
       const messageText = typeof payload?.message?.text === "string" ? payload.message.text : "";
-      const context = { db: env.DB, updateId, senderId, chatId };
+      const context = { db: env.DB, updateId, senderId, chatId, env };
 
       let routed = await routeCommand(messageText, context);
 
@@ -1398,7 +1398,7 @@ export default {
       // Send reply AFTER commit. If send fails, still return HTTP 200 —
       // do NOT repeat the mutation (BLOCK_1.md).
       if (routed?.response && chatId !== undefined) {
-        await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, chatId, routed.response).catch(() => {
+        await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, chatId, routed.response, (routed as any)?.replyMarkup).catch(() => {
           // Swallow — reply failure must not affect the HTTP response or cause a retry
         });
       }
@@ -1411,6 +1411,7 @@ export default {
         taskId: routed?.taskId ?? null,
         deadline: routed?.deadline ?? null,
         tasks: routed?.tasks ?? null,
+        proposals: (routed as any)?.proposals ?? null,
         result: routed?.response ?? null,
       });
     }

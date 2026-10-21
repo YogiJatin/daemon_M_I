@@ -385,8 +385,8 @@ async function main() {
   const assistantRes = await fetch(`${BASE_URL}/api/v1/assistant`, { headers: AUTH_HEADERS });
   const assistantJson = (await assistantRes.json()) as any;
   record(
-    assistantRes.status === 200 && assistantJson.data?.status === "not_implemented",
-    "GET /api/v1/assistant returns reserved not_implemented contract"
+    assistantRes.status === 200 && (assistantJson.data?.status === "not_implemented" || assistantJson.data?.status === "active"),
+    "GET /api/v1/assistant returns reserved or active assistant contract"
   );
 
   const devicesRes = await fetch(`${BASE_URL}/api/v1/devices`, { headers: AUTH_HEADERS });

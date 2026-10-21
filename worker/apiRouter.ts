@@ -44,6 +44,13 @@ import {
   getExportData,
   getExportCsv,
 } from "./exportService";
+import { AICapabilities } from "./aiCapabilities";
+import { PrivacyClass } from "./aiAdapter";
+import {
+  listTaskProposals,
+  confirmProposal,
+  rejectProposal,
+} from "./inboxService";
 
 // ---------------------------------------------------------------------------
 // Standard Envelopes & Error Helpers
@@ -1164,7 +1171,7 @@ export async function handleApiRequest(
 
       let body: any = {};
       try {
-        body = await req.json();
+        body = await request.json();
       } catch {
         body = {};
       }
@@ -1244,13 +1251,244 @@ export async function handleApiRequest(
     }
 
     // =======================================================================
-    // 14. RESERVED FUTURE SERVICES (AI, Devices, Integrations Foundations)
+    // =======================================================================
+    // 14. AI CAPABILITIES & TASK PROPOSALS INBOX (Block 6)
+    // =======================================================================
+
+    // GET /api/v1/ai/health
+    if (method === "GET" && path === "/api/v1/ai/health") {
+      const providers = await env.DB.prepare(
+        `SELECT provider, model, status, consecutive_failures, cooldown_until,
+                last_success_at, last_failure_at, last_failure_code, total_requests,
+                avg_latency_ms, updated_at
+         FROM provider_health
+         ORDER BY provider ASC`
+      ).all();
+
+      const configuredOrder = (env.AI_PROVIDER_ORDER || "groq,workers_ai,gemini,mock")
+        .split(",")
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+
+      return jsonSuccess({
+        configured_provider_order: configuredOrder,
+        primary_provider: configuredOrder[0] || "groq",
+        providers: providers.results || [],
+      });
+    }
+
+    // POST /api/v1/ai/:capability
+    if (method === "POST" && path.startsWith("/api/v1/ai/") && path !== "/api/v1/ai/health") {
+      const capability = path.slice("/api/v1/ai/".length);
+      let body: any = {};
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+
+      const privacyClass: PrivacyClass = body.privacy_class || "personal";
+      const simulatedFailure = body.simulated_failure || undefined;
+      const aiCaps = new AICapabilities(env, env.DB);
+
+      let res: any;
+      if (capability === "task_breakdown") {
+        res = await aiCaps.taskBreakdown(
+          {
+            taskId: body.task_id,
+            title: body.title,
+            notes: body.notes,
+          },
+          privacyClass,
+          simulatedFailure,
+          now
+        );
+      } else if (capability === "weekly_plan") {
+        res = await aiCaps.weeklyPlan(privacyClass, simulatedFailure, now);
+      } else if (capability === "prioritize") {
+        res = await aiCaps.prioritize(privacyClass, simulatedFailure, now);
+      } else if (capability === "suggest_next") {
+        res = await aiCaps.suggestNext(body.query, privacyClass, simulatedFailure, now);
+      } else {
+        return jsonError("invalid_capability", `Unknown AI capability '${capability}'`, 400);
+      }
+
+      if (!res.ok) {
+        return jsonError(
+          res.error?.code || "ai_execution_failed",
+          res.error?.message || "AI capability execution failed",
+          res.error?.code === "privacy_blocked" ? 403 : 502,
+          undefined,
+          { provider: res.provider, fallback_triggered: res.fallbackTriggered }
+        );
+      }
+
+      return jsonSuccess({
+        capability,
+        result: res.data,
+        provider: res.provider,
+        model: res.model,
+        duration_ms: res.durationMs,
+        fallback_triggered: res.fallbackTriggered,
+      });
+    }
+
+    // GET /api/v1/inbox
+    if (method === "GET" && path === "/api/v1/inbox") {
+      const status = url.searchParams.get("status") || "pending";
+      const limit = parseInt(url.searchParams.get("limit") || "20", 10);
+      const offset = parseInt(url.searchParams.get("offset") || "0", 10);
+
+      const result = await listTaskProposals(env.DB, status, limit, offset);
+      return jsonSuccess({
+        proposals: result.proposals,
+        total: result.total,
+        limit,
+        offset,
+      });
+    }
+
+    // POST /api/v1/inbox/:id/confirm
+    if (method === "POST" && path.startsWith("/api/v1/inbox/") && path.endsWith("/confirm")) {
+      const proposalId = path.slice("/api/v1/inbox/".length, path.length - "/confirm".length);
+      let body: any = {};
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+
+      const result = await confirmProposal(env.DB, proposalId, body.overrides, now);
+      if (!result.success) {
+        return jsonError("confirm_failed", result.error || "Failed to confirm proposal", 400);
+      }
+
+      return jsonSuccess({
+        message: "Proposal confirmed and converted to task",
+        task: result.task,
+        proposal: result.proposal,
+      });
+    }
+
+    // POST /api/v1/inbox/:id/reject
+    if (method === "POST" && path.startsWith("/api/v1/inbox/") && path.endsWith("/reject")) {
+      const proposalId = path.slice("/api/v1/inbox/".length, path.length - "/reject".length);
+      let body: any = {};
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+
+      const result = await rejectProposal(env.DB, proposalId, body.reason, now);
+      if (!result.success) {
+        return jsonError("reject_failed", result.error || "Failed to reject proposal", 400);
+      }
+
+      return jsonSuccess({
+        message: "Proposal rejected",
+        proposal: result.proposal,
+      });
+    }
+
+    // GET /api/v1/assistant
+    if (method === "GET" && path === "/api/v1/assistant") {
+      const pendingProposals = await env.DB.prepare(
+        "SELECT COUNT(*) as count FROM task_proposals WHERE status = 'pending'"
+      ).first<{ count: number }>();
+
+      const providerCount = await env.DB.prepare(
+        "SELECT COUNT(*) as count FROM provider_health WHERE status = 'healthy'"
+      ).first<{ count: number }>();
+
+      return jsonSuccess({
+        service: "assistant",
+        status: "active",
+        capabilities: ["task_breakdown", "weekly_plan", "prioritize", "suggest_next"],
+        pending_proposals_count: pendingProposals?.count || 0,
+        healthy_providers_count: providerCount?.count || 0,
+      });
+    }
+
+    // GET /api/v1/context
+    if (method === "GET" && path === "/api/v1/context") {
+      const ist = getISTDateParts(now);
+      const todayYmd = ist.localDate;
+
+      const nextClass = await getNextClass(env.DB, now);
+      const ongoingClass = await getOngoingClass(env.DB, now);
+
+      const budgetRow = (await env.DB.prepare(
+        "SELECT sent_count, reserved_count FROM daily_notification_counters WHERE local_date = ? AND channel = 'telegram'"
+      ).bind(todayYmd).first<{ sent_count: number; reserved_count: number }>()) || { sent_count: 0, reserved_count: 0 };
+
+      const pendingProposals = await env.DB.prepare(
+        "SELECT COUNT(*) as count FROM task_proposals WHERE status = 'pending'"
+      ).first<{ count: number }>();
+
+      const openTasks = await env.DB.prepare(
+        "SELECT COUNT(*) as count FROM tasks WHERE status = 'open'"
+      ).first<{ count: number }>();
+
+      return jsonSuccess({
+        current_ist: `${todayYmd} ${ist.localTime}`,
+        ongoing_class: ongoingClass || null,
+        next_class: nextClass || null,
+        open_tasks_count: openTasks?.count || 0,
+        pending_proposals_count: pendingProposals?.count || 0,
+        attention_budget_remaining: Math.max(0, 8 - budgetRow.sent_count - budgetRow.reserved_count),
+      });
+    }
+
+    // POST /api/v1/assistant/action
+    if (method === "POST" && path === "/api/v1/assistant/action") {
+      let body: any = {};
+      try {
+        body = await request.json();
+      } catch {
+        body = {};
+      }
+
+      const capability = body.capability;
+      if (!capability) {
+        return jsonError("missing_field", "Field 'capability' is required", 400);
+      }
+
+      const privacyClass: PrivacyClass = body.privacy_class || "personal";
+      const aiCaps = new AICapabilities(env, env.DB);
+
+      let res: any;
+      if (capability === "task_breakdown") {
+        res = await aiCaps.taskBreakdown(body.input || {}, privacyClass, body.simulated_failure, now);
+      } else if (capability === "weekly_plan") {
+        res = await aiCaps.weeklyPlan(privacyClass, body.simulated_failure, now);
+      } else if (capability === "prioritize") {
+        res = await aiCaps.prioritize(privacyClass, body.simulated_failure, now);
+      } else if (capability === "suggest_next") {
+        res = await aiCaps.suggestNext(body.input?.query, privacyClass, body.simulated_failure, now);
+      } else {
+        return jsonError("invalid_capability", `Unknown AI capability '${capability}'`, 400);
+      }
+
+      if (!res.ok) {
+        return jsonError(res.error?.code || "ai_failed", res.error?.message || "Execution failed", 502);
+      }
+
+      return jsonSuccess({
+        capability,
+        result: res.data,
+        provider: res.provider,
+        model: res.model,
+        duration_ms: res.durationMs,
+        fallback_triggered: res.fallbackTriggered,
+      });
+    }
+
+    // =======================================================================
+    // 15. RESERVED FUTURE SERVICES (Devices, Integrations Foundations)
     // =======================================================================
 
     if (
-      path === "/api/v1/assistant" ||
-      path === "/api/v1/context" ||
-      path === "/api/v1/assistant/action" ||
       path === "/api/v1/devices" ||
       path === "/api/v1/actions" ||
       path === "/api/v1/integrations" ||

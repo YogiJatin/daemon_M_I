@@ -30,6 +30,7 @@ export interface ExportDataPayload {
     class_occurrences: any[];
     settings: any[];
     audit_events: any[];
+    task_proposals: any[];
   };
 }
 
@@ -206,6 +207,17 @@ export async function getExportData(
   const holidays = holidaysRes.results || [];
   const occurrences = occurrencesRes.results || [];
   const auditEvents = auditRes.results || [];
+  const proposalsRes = await db
+    .prepare(
+      `SELECT id, source_event_id, title, description, category, priority,
+              date_role, proposed_local_date, proposed_local_time, evidence_quote,
+              ambiguity_reasons, advisory_confidence, status, task_id, reviewed_at,
+              created_at, updated_at
+       FROM task_proposals
+       ORDER BY created_at ASC`
+    )
+    .all<any>();
+  const proposals = proposalsRes.results || [];
 
   return {
     export_version: "1.0",
@@ -223,6 +235,7 @@ export async function getExportData(
       class_occurrences: occurrences.length,
       settings: safeSettings.length,
       audit_events: auditEvents.length,
+      task_proposals: proposals.length,
     },
     data: {
       tasks,
@@ -236,6 +249,7 @@ export async function getExportData(
       class_occurrences: occurrences,
       settings: safeSettings,
       audit_events: auditEvents,
+      task_proposals: proposals,
     },
   };
 }

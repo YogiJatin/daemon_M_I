@@ -19,6 +19,8 @@ import {
 import { createPairingChallenge } from "./auth";
 import { evaluateSuggestions } from "./suggestionsEngine";
 import { getExportData } from "./exportService";
+import { AICapabilities } from "./aiCapabilities";
+import { listTaskProposals } from "./inboxService";
 
 interface SnoozePresetResult {
   success: boolean;
@@ -113,6 +115,7 @@ export interface CommandContext {
   senderId?: number | string;
   chatId?: number | string;
   now?: Date;
+  env?: any;
 }
 
 export interface CommandResult {
@@ -123,6 +126,8 @@ export interface CommandResult {
   taskId?: string;
   deadline?: ParsedDeadline;
   tasks?: any[];
+  replyMarkup?: any;
+  proposals?: any[];
 }
 
 export function handleStart(args: string, _context?: CommandContext): CommandResult {
@@ -1277,6 +1282,171 @@ export async function handleExport(args: string, context?: CommandContext): Prom
   };
 }
 
+export async function handleAI(args: string, context?: CommandContext): Promise<CommandResult> {
+  if (!context?.db) {
+    return { command: "ai", args, success: false, response: "Database unavailable." };
+  }
+  const now = context.now ?? new Date();
+  const ai = new AICapabilities(context.env || {}, context.db);
+  const res = await ai.suggestNext(args || undefined, "personal", undefined, now);
+
+  if (!res.ok || !res.data) {
+    return {
+      command: "ai",
+      args,
+      success: false,
+      response: `AI suggestion failed: ${res.error?.message || "Unavailable"}`,
+    };
+  }
+
+  const response = `🤖 *AI Suggestion* (${res.provider}/${res.model}):\n\n🎯 *Next Action*: ${res.data.next_action}\n💡 *Rationale*: ${res.data.rationale}\n📈 *Confidence*: ${Math.round(res.data.confidence * 100)}%`;
+
+  return {
+    command: "ai",
+    args,
+    success: true,
+    response,
+  };
+}
+
+export async function handleInbox(args: string, context?: CommandContext): Promise<CommandResult> {
+  if (!context?.db) {
+    return { command: "inbox", args, success: false, response: "Database unavailable." };
+  }
+  const res = await listTaskProposals(context.db, "pending", 5, 0);
+  if (res.proposals.length === 0) {
+    return {
+      command: "inbox",
+      args,
+      success: true,
+      response: "📥 Inbox is clear! No pending task proposals.",
+    };
+  }
+
+  const lines = [`📥 *Pending Task Proposals (${res.total})*:\n`];
+  const buttons: any[] = [];
+
+  res.proposals.forEach((p, idx) => {
+    const dStr = p.proposed_local_date ? ` [📅 ${p.proposed_local_date}${p.proposed_local_time ? ` ${p.proposed_local_time}` : ""}]` : "";
+    lines.push(`${idx + 1}. *${p.title}*${dStr}\n   _Evidence: ${p.evidence_quote || "AI synthesis"}_`);
+    buttons.push([
+      { text: `✅ Confirm #${idx + 1}`, callback_data: `p_conf:${p.id.slice(0, 13)}` },
+      { text: `❌ Reject #${idx + 1}`, callback_data: `p_rej:${p.id.slice(0, 13)}` },
+    ]);
+  });
+
+  return {
+    command: "inbox",
+    args,
+    success: true,
+    response: lines.join("\n"),
+    replyMarkup: { inline_keyboard: buttons },
+    proposals: res.proposals,
+  };
+}
+
+export async function handleBreakdown(args: string, context?: CommandContext): Promise<CommandResult> {
+  if (!context?.db) {
+    return { command: "breakdown", args, success: false, response: "Database unavailable." };
+  }
+  if (!args.trim()) {
+    return {
+      command: "breakdown",
+      args,
+      success: false,
+      response: "Usage: /breakdown <task title or ID>\nExample: /breakdown Prepare Machine Learning Lab Report",
+    };
+  }
+  const now = context.now ?? new Date();
+  const ai = new AICapabilities(context.env || {}, context.db);
+
+  const isTaskId = args.trim().length >= 8 && !args.trim().includes(" ");
+  const input = isTaskId ? { taskId: args.trim() } : { title: args.trim() };
+
+  const res = await ai.taskBreakdown(input, "personal", undefined, now);
+  if (!res.ok || !res.data) {
+    return {
+      command: "breakdown",
+      args,
+      success: false,
+      response: `Breakdown failed: ${res.error?.message || "Unavailable"}`,
+    };
+  }
+
+  const lines = [
+    `🤖 *Task Breakdown* (${res.provider}/${res.model}):`,
+    `📋 ${res.data.summary}\n`,
+    `Generated ${res.data.proposals.length} subtask proposals in your /inbox:`,
+  ];
+
+  const buttons: any[] = [];
+  res.data.proposals.forEach((p, idx) => {
+    lines.push(`${idx + 1}. *${p.title}* (~${p.estimated_minutes}m, priority: ${p.priority})`);
+    if (p.id) {
+      buttons.push([
+        { text: `✅ Confirm #${idx + 1}`, callback_data: `p_conf:${p.id.slice(0, 13)}` },
+        { text: `❌ Reject #${idx + 1}`, callback_data: `p_rej:${p.id.slice(0, 13)}` },
+      ]);
+    }
+  });
+
+  return {
+    command: "breakdown",
+    args,
+    success: true,
+    response: lines.join("\n"),
+    replyMarkup: buttons.length > 0 ? { inline_keyboard: buttons } : undefined,
+    proposals: res.data.proposals,
+  };
+}
+
+export async function handlePlan(args: string, context?: CommandContext): Promise<CommandResult> {
+  if (!context?.db) {
+    return { command: "plan", args, success: false, response: "Database unavailable." };
+  }
+  const now = context.now ?? new Date();
+  const ai = new AICapabilities(context.env || {}, context.db);
+  const res = await ai.weeklyPlan("personal", undefined, now);
+
+  if (!res.ok || !res.data) {
+    return {
+      command: "plan",
+      args,
+      success: false,
+      response: `Weekly planning failed: ${res.error?.message || "Unavailable"}`,
+    };
+  }
+
+  const lines = [
+    `🗓️ *Weekly Plan Synthesis* (${res.provider}/${res.model}):`,
+    `📝 ${res.data.summary}\n`,
+  ];
+
+  if (res.data.focus_areas && res.data.focus_areas.length > 0) {
+    lines.push("🎯 *Focus Areas*:");
+    res.data.focus_areas.forEach((fa) => lines.push(`• ${fa}`));
+    lines.push("");
+  }
+
+  if (res.data.bottlenecks && res.data.bottlenecks.length > 0) {
+    lines.push("⚠️ *Bottlenecks*:");
+    res.data.bottlenecks.forEach((bn) => lines.push(`• ${bn}`));
+    lines.push("");
+  }
+
+  if (res.data.proposals && res.data.proposals.length > 0) {
+    lines.push(`📥 *Created ${res.data.proposals.length} Action Proposals* in /inbox`);
+  }
+
+  return {
+    command: "plan",
+    args,
+    success: true,
+    response: lines.join("\n"),
+    proposals: res.data.proposals,
+  };
+}
+
 export async function routeCommand(text: string, context?: CommandContext): Promise<CommandResult | null> {
   const trimmed = text.trim();
   if (!trimmed.startsWith("/")) {
@@ -1333,6 +1503,15 @@ export async function routeCommand(text: string, context?: CommandContext): Prom
       return await handleSuggestions(args, context);
     case "export":
       return await handleExport(args, context);
+    case "ai":
+    case "suggest":
+      return await handleAI(args, context);
+    case "inbox":
+      return await handleInbox(args, context);
+    case "breakdown":
+      return await handleBreakdown(args, context);
+    case "plan":
+      return await handlePlan(args, context);
     default:
       return null;
   }

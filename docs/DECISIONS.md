@@ -149,3 +149,28 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 **Decision**: Orchestrated weekly backup via GitHub Actions workflow using the Worker's authenticated `/api/v1/export?format=json` endpoint as the source of truth. Encrypted immediately with `age` using the owner's public recipient key before upload. Plaintext is wiped immediately on runner. Google Drive OAuth uses narrow `drive.file` scope. Private decryption key stays strictly offline on the owner's PC.  
 **Alternatives rejected**: Storing backup blobs in D1 (violates SRS Appendix A) or using unverified Cloudflare D1 HTTP export API directly.  
 **Trade-off**: Backup runner requires authenticated API access to Worker, secured via secret tokens in GitHub Secrets.
+
+### ADR-017: Multi-Provider AI Architecture & Configurable Failover Order
+
+**Context**: SRS §§7.8, 10.1–10.4 and BLOCK_6.md require resilient AI assistance across primary, fallback, and testing providers.  
+**Decision**: Single central AI adapter boundary (`worker/aiAdapter.ts`). Provider order is fully configurable via `AI_PROVIDER_ORDER` env variable (default: `groq,workers_ai,mock`). Primary model is Groq (`llama-3.3-70b-versatile`), primary fallback is Cloudflare Workers AI (`@cf/meta/llama-3.1-8b-instruct`), optional Gemini (`gemini-2.0-flash`), with an in-memory deterministic mock provider for CI and tests. Automatic failover triggers on 429, 503, timeout, or schema failure with circuit-breaker tracking and cooldowns.  
+**Alternatives rejected**: Hardcoding a single LLM provider (violates SRS §10.3 failover rule) or making direct provider SDK calls inside individual features.  
+**Trade-off**: Requires keeping provider schemas synchronized and bounded latency timeouts (6–8s).
+
+---
+
+### ADR-018: Human-in-the-Loop Task Proposal Pattern
+
+**Context**: SRS §§3, 7.8, 8.4 (Rule 11) dictate that AI outputs are untrusted proposals and can never authorize autonomous side effects on the tasks table or notification loop.  
+**Decision**: Dedicated `task_proposals` table buffers all candidate tasks in `pending` status. Proposals only become active tasks when the owner explicitly confirms them via REST API (`POST /api/v1/inbox/:id/confirm`) or Telegram inline buttons (`p_conf:<id>`). Upon confirmation, durable task rows are committed, notifications planned, and an audit trail is created. Rejections (`POST /api/v1/inbox/:id/reject` or `p_rej:<id>`) preserve reasoning and log to `ai_evaluations`.  
+**Alternatives rejected**: Auto-inserting AI tasks directly into the `tasks` table with a flag (violates Rule 1 and Rule 11).  
+**Trade-off**: Requires an extra owner confirmation step before AI subtasks enter the reminder pipeline.
+
+---
+
+### ADR-019: Privacy Classification & Prompt Injection Defense
+
+**Context**: SRS §§10.6, 13.5 (TEST-6.3, TEST-6.4) mandate privacy boundaries and protection against prompt injection attacks.  
+**Decision**: Every AI request carries an explicit `PrivacyClass` (`synthetic_test`, `low_sensitivity`, `personal`, `restricted`). External providers whose terms allow training on free tiers or log retention are blocked from receiving `restricted` data, returning a graceful 403 `privacy_blocked` envelope. Untrusted user content is quarantined inside `<user_data>...</user_data>` delimiters with control-tag escaping to neutralize prompt injection. The cron scheduler remains 100% deterministic with zero AI calls (Rule 5).  
+**Alternatives rejected**: Unchecked raw string interpolation into LLM prompts.  
+**Trade-off**: Restricted context cannot be processed by third-party cloud LLMs unless local/private models are active.
