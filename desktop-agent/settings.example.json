@@ -1,0 +1,14 @@
+{
+  "_comment": "Copy this file to settings.json (gitignored) and set obsidianVault to your vault path.",
+  "obsidianVault": "D:\\daemon's brain",
+  "defaultFolder": "Workflows",
+  "overwrite": false,
+  "port": 27124,
+  "allowedOrigins": [
+    "http://localhost:5173",
+    "http://localhost:8787",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8787",
+    "https://personal-ai-os.jatin-personal-ai.workers.dev"
+  ]
+}

@@ -29,3 +29,8 @@ dist-ssr
 !.dev.vars.example
 .env*
 !.env.example
+
+# Desktop agent — local settings contain vault path (personal, not committed)
+desktop-agent/settings.json
+# PowerShell sync script — local only (contains vault config reference)
+scripts/obsidian-vault.conf

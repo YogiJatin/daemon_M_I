@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "npm run build && vite preview",
     "deploy": "npm run build && wrangler deploy",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "agent": "tsx desktop-agent/obsidian-writer.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.3.0",
