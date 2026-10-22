@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Personal AI OS: encrypted Google Drive backup.
-# Requires a dedicated BACKUP_EXPORT_TOKEN; never use the Telegram webhook secret.
+# Personal AI OS: encrypted backup to Google Drive through a guarded Apps Script gateway.
+# Only the age-encrypted archive is sent to the gateway. Never use the Telegram webhook secret.
 
 set -Eeuo pipefail
 umask 077
@@ -26,14 +26,12 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-# Require every credential/config value before starting. An incomplete run must fail.
+# Require every credential/config value before doing work.
 [[ -n "${WORKER_URL:-}" ]] || fail "Required setting WORKER_URL is missing."
 [[ -n "${BACKUP_EXPORT_TOKEN:-}" ]] || fail "Required secret BACKUP_EXPORT_TOKEN is missing."
 [[ -n "${AGE_PUBLIC_KEY:-}" ]] || fail "Required secret AGE_PUBLIC_KEY is missing."
-[[ -n "${GOOGLE_CLIENT_ID:-}" ]] || fail "Required secret GOOGLE_CLIENT_ID is missing."
-[[ -n "${GOOGLE_CLIENT_SECRET:-}" ]] || fail "Required secret GOOGLE_CLIENT_SECRET is missing."
-[[ -n "${GOOGLE_REFRESH_TOKEN:-}" ]] || fail "Required secret GOOGLE_REFRESH_TOKEN is missing."
-[[ -n "${GOOGLE_DRIVE_FOLDER_ID:-}" ]] || fail "Required secret GOOGLE_DRIVE_FOLDER_ID is missing."
+[[ -n "${DRIVE_UPLOAD_URL:-}" ]] || fail "Required secret DRIVE_UPLOAD_URL is missing."
+[[ -n "${DRIVE_UPLOAD_SECRET:-}" ]] || fail "Required secret DRIVE_UPLOAD_SECRET is missing."
 
 WORKER_URL="${WORKER_URL%/}"
 [[ "$WORKER_URL" == https://* ]] || fail "WORKER_URL must be an HTTPS origin."
@@ -45,22 +43,28 @@ fi
 if (( ${#BACKUP_EXPORT_TOKEN} < 32 )); then
   fail "BACKUP_EXPORT_TOKEN must be at least 32 characters."
 fi
+if (( ${#DRIVE_UPLOAD_SECRET} < 32 )); then
+  fail "DRIVE_UPLOAD_SECRET must be at least 32 characters."
+fi
 if [[ ! "$AGE_PUBLIC_KEY" =~ ^age1[0-9a-z]+$ ]]; then
   fail "AGE_PUBLIC_KEY is not in the expected age recipient format (age1...)."
 fi
+if [[ ! "$DRIVE_UPLOAD_URL" =~ ^https://script\.google\.com/macros/s/[^/?#]+/exec$ ]]; then
+  fail "DRIVE_UPLOAD_URL must be a Google Apps Script web-app URL ending in /exec."
+fi
 
-for command_name in curl jq age md5sum; do
+for command_name in curl jq age sha256sum base64; do
   command -v "$command_name" >/dev/null 2>&1 || fail "Required command is unavailable: ${command_name}."
 done
 
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/personal-ai-os-backup.XXXXXX")" || fail "Could not create a private temporary directory."
 PLAINTEXT_FILE="${TMP_DIR}/${EXPORT_NAME}.json"
 ENCRYPTED_FILE="${TMP_DIR}/${UPLOAD_NAME}"
-OAUTH_RESPONSE_FILE="${TMP_DIR}/oauth-response.json"
-UPLOAD_RESPONSE_FILE="${TMP_DIR}/upload-response.json"
-VERIFY_RESPONSE_FILE="${TMP_DIR}/verify-response.json"
+BASE64_FILE="${TMP_DIR}/encrypted.b64"
+REQUEST_FILE="${TMP_DIR}/gateway-request.json"
+RESPONSE_FILE="${TMP_DIR}/gateway-response.json"
 
-printf '=== Starting encrypted backup [%s] ===\n' "$TIMESTAMP"
+printf '=== Starting encrypted Google Drive backup [%s] ===\n' "$TIMESTAMP"
 printf 'Fetching JSON export from the Worker...\n'
 
 if ! EXPORT_HTTP_CODE="$(curl --silent --show-error --connect-timeout 15 --max-time 120 \
@@ -72,7 +76,7 @@ if ! EXPORT_HTTP_CODE="$(curl --silent --show-error --connect-timeout 15 --max-t
 fi
 [[ "$EXPORT_HTTP_CODE" == "200" ]] || fail "Worker export failed with HTTP ${EXPORT_HTTP_CODE}; response contents were not logged."
 
-# Validate the envelope and all expected exported table arrays without printing the payload.
+# Validate the envelope and exported table arrays without printing the payload.
 if ! jq -e '
   . as $root
   | ($root.ok == true)
@@ -106,7 +110,7 @@ if ! jq -e '
   fail "Worker export failed JSON/schema validation; response contents were not logged."
 fi
 
-# Check object property names for fields that should never be present in an export.
+# Reject suspicious credential-related property names before encrypting the export.
 if jq -e '
   [
     .. | objects | keys[] | ascii_downcase
@@ -118,93 +122,69 @@ fi
 
 TASK_COUNT="$(jq -r '.data.counts.tasks' "$PLAINTEXT_FILE")"
 printf 'Export validated; task count: %s.\n' "$TASK_COUNT"
-
 printf 'Encrypting export with age...\n'
 if ! age --recipient "$AGE_PUBLIC_KEY" --output "$ENCRYPTED_FILE" "$PLAINTEXT_FILE" >/dev/null 2>&1; then
   fail "Encryption failed; no backup was uploaded."
 fi
 [[ -s "$ENCRYPTED_FILE" ]] || fail "Encryption produced an empty archive."
 
-# Remove plaintext before any upload request; the EXIT trap also removes the temp directory.
+# Plaintext must be removed before any upload request.
 rm -f -- "$PLAINTEXT_FILE" || fail "Could not remove the plaintext export."
 printf 'Plaintext export removed; encrypted archive created.\n'
+
 ENCRYPTED_SIZE="$(wc -c < "$ENCRYPTED_FILE" | tr -d '[:space:]')"
-LOCAL_MD5="$(md5sum "$ENCRYPTED_FILE" | cut -d ' ' -f 1)"
-printf 'Refreshing Google Drive access token...\n'
-
-if ! OAUTH_HTTP_CODE="$(curl --silent --show-error --connect-timeout 15 --max-time 60 \
-  --output "$OAUTH_RESPONSE_FILE" --write-out '%{http_code}' \
-  --request POST 'https://oauth2.googleapis.com/token' \
-  --data-urlencode "client_id=${GOOGLE_CLIENT_ID}" \
-  --data-urlencode "client_secret=${GOOGLE_CLIENT_SECRET}" \
-  --data-urlencode "refresh_token=${GOOGLE_REFRESH_TOKEN}" \
-  --data-urlencode 'grant_type=refresh_token')"; then
-  fail "Google OAuth token refresh request failed; response contents were not logged."
+# The Apps Script gateway is intentionally capped at 5 MiB; base64 makes the request larger.
+if (( ENCRYPTED_SIZE > 5242880 )); then
+  fail "Encrypted archive exceeds the gateway's 5 MiB file limit; no upload was attempted."
 fi
-[[ "$OAUTH_HTTP_CODE" == "200" ]] || fail "Google OAuth token refresh failed with HTTP ${OAUTH_HTTP_CODE}; response contents were not logged."
-if ! ACCESS_TOKEN="$(jq -er '.access_token | select(type == "string" and length > 0)' "$OAUTH_RESPONSE_FILE" 2>/dev/null)"; then
-  fail "Google OAuth response did not contain a usable access token."
-fi
-rm -f -- "$OAUTH_RESPONSE_FILE"
+LOCAL_SHA256="$(sha256sum "$ENCRYPTED_FILE" | cut -d ' ' -f 1)"
+base64 --wrap=0 "$ENCRYPTED_FILE" > "$BASE64_FILE"
 
-METADATA="$(jq -cn \
+# jq reads base64 from a file instead of passing a large archive on the command line.
+if ! jq -n \
+  --arg token "$DRIVE_UPLOAD_SECRET" \
   --arg name "$UPLOAD_NAME" \
-  --arg folder "$GOOGLE_DRIVE_FOLDER_ID" \
-  '{name: $name, parents: [$folder], mimeType: "application/octet-stream"}')"
+  --arg sha256 "$LOCAL_SHA256" \
+  --argjson sizeBytes "$ENCRYPTED_SIZE" \
+  --rawfile contentBase64 "$BASE64_FILE" \
+  '{token: $token, name: $name, sha256: $sha256, sizeBytes: $sizeBytes, contentBase64: $contentBase64}' \
+  > "$REQUEST_FILE"; then
+  fail "Could not prepare the encrypted upload request."
+fi
 
-printf 'Uploading encrypted archive to the configured Google Drive folder...\n'
-if ! UPLOAD_HTTP_CODE="$(curl --silent --show-error --connect-timeout 15 --max-time 180 \
-  --output "$UPLOAD_RESPONSE_FILE" --write-out '%{http_code}' \
-  --request POST \
-  --header "Authorization: Bearer ${ACCESS_TOKEN}" \
-  --form "metadata=${METADATA};type=application/json;charset=UTF-8" \
-  --form "file=@${ENCRYPTED_FILE};type=application/octet-stream" \
-  "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size,md5Checksum,mimeType,parents")"; then
-  fail "Google Drive upload request failed; response contents were not logged."
+REQUEST_SIZE="$(wc -c < "$REQUEST_FILE" | tr -d '[:space:]')"
+if (( REQUEST_SIZE > 7500000 )); then
+  fail "Encoded request exceeds the Apps Script gateway request limit; no upload was attempted."
 fi
-if [[ "$UPLOAD_HTTP_CODE" != "200" && "$UPLOAD_HTTP_CODE" != "201" ]]; then
-  fail "Google Drive upload failed with HTTP ${UPLOAD_HTTP_CODE}; response contents were not logged."
+rm -f -- "$BASE64_FILE"
+
+printf 'Uploading encrypted archive through the Google Drive gateway...\n'
+# Apps Script ContentService responses may redirect to script.googleusercontent.com; follow redirects.
+if ! UPLOAD_HTTP_CODE="$(curl --location --silent --show-error --connect-timeout 15 --max-time 240 --max-redirs 5 \
+  --output "$RESPONSE_FILE" --write-out '%{http_code}' \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary "@${REQUEST_FILE}" \
+  "$DRIVE_UPLOAD_URL")"; then
+  fail "Apps Script upload request failed; response contents were not logged."
 fi
+[[ "$UPLOAD_HTTP_CODE" == "200" ]] || fail "Apps Script gateway returned HTTP ${UPLOAD_HTTP_CODE}; response contents were not logged."
 
 if ! jq -e \
   --arg name "$UPLOAD_NAME" \
-  --arg folder "$GOOGLE_DRIVE_FOLDER_ID" \
-  --arg size "$ENCRYPTED_SIZE" \
-  --arg md5 "$LOCAL_MD5" \
-  '(.id | type == "string" and length > 0)
+  --arg sha256 "$LOCAL_SHA256" \
+  --argjson sizeBytes "$ENCRYPTED_SIZE" \
+  '(.ok == true)
+   and (.id | type == "string" and length > 0)
    and (.name == $name)
-   and ((.size | tostring) == $size)
-   and (.md5Checksum == $md5)
-   and (((.parents // []) | index($folder)) != null)' \
-  "$UPLOAD_RESPONSE_FILE" >/dev/null 2>&1; then
-  fail "Google Drive upload response did not match the expected name, folder, size, or checksum."
-fi
-FILE_ID="$(jq -er '.id | select(type == "string" and length > 0)' "$UPLOAD_RESPONSE_FILE")"
-rm -f -- "$UPLOAD_RESPONSE_FILE"
-
-# Read back Drive metadata so success means the uploaded object is retrievable and intact.
-printf 'Verifying uploaded Drive object...\n'
-if ! VERIFY_HTTP_CODE="$(curl --silent --show-error --connect-timeout 15 --max-time 60 \
-  --output "$VERIFY_RESPONSE_FILE" --write-out '%{http_code}' \
-  --header "Authorization: Bearer ${ACCESS_TOKEN}" \
-  "https://www.googleapis.com/drive/v3/files/${FILE_ID}?fields=id,name,size,md5Checksum,parents")"; then
-  fail "Could not verify the uploaded Google Drive object; response contents were not logged."
-fi
-[[ "$VERIFY_HTTP_CODE" == "200" ]] || fail "Google Drive verification failed with HTTP ${VERIFY_HTTP_CODE}; response contents were not logged."
-if ! jq -e \
-  --arg id "$FILE_ID" \
-  --arg name "$UPLOAD_NAME" \
-  --arg folder "$GOOGLE_DRIVE_FOLDER_ID" \
-  --arg size "$ENCRYPTED_SIZE" \
-  --arg md5 "$LOCAL_MD5" \
-  '(.id == $id)
-   and (.name == $name)
-   and ((.size | tostring) == $size)
-   and (.md5Checksum == $md5)
-   and (((.parents // []) | index($folder)) != null)' \
-  "$VERIFY_RESPONSE_FILE" >/dev/null 2>&1; then
-  fail "Google Drive read-back verification failed; backup will not be reported as successful."
+   and (.sizeBytes == $sizeBytes)
+   and (.sha256 == $sha256)
+   and (.reused | type == "boolean")' \
+  "$RESPONSE_FILE" >/dev/null 2>&1; then
+  GATEWAY_ERROR="$(jq -r '.error // "unexpected_response" | if type == "string" and test("^[a-z_]+$") then . else "unexpected_response" end' "$RESPONSE_FILE" 2>/dev/null || printf 'unexpected_response')"
+  fail "Google Drive gateway did not verify the uploaded archive (error code: ${GATEWAY_ERROR})."
 fi
 
-printf 'Verified encrypted backup in Google Drive (%s bytes).\n' "$ENCRYPTED_SIZE"
+rm -f -- "$REQUEST_FILE" "$RESPONSE_FILE"
+printf 'Verified encrypted backup in Google Drive (%s bytes; SHA-256 matched).\n' "$ENCRYPTED_SIZE"
 printf '=== Backup completed successfully [%s] ===\n' "$TIMESTAMP"

@@ -1,4 +1,4 @@
-name: Weekly Encrypted Backup
+name: Weekly Encrypted Google Drive Backup
 
 on:
   schedule:
@@ -38,10 +38,8 @@ jobs:
           WORKER_URL: ${{ secrets.WORKER_URL }}
           BACKUP_EXPORT_TOKEN: ${{ secrets.BACKUP_EXPORT_TOKEN }}
           AGE_PUBLIC_KEY: ${{ secrets.AGE_PUBLIC_KEY }}
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          DRIVE_UPLOAD_URL: ${{ secrets.DRIVE_UPLOAD_URL }}
+          DRIVE_UPLOAD_SECRET: ${{ secrets.DRIVE_UPLOAD_SECRET }}
         run: |
           chmod +x .github/workflows/scripts/backup.sh
           ./.github/workflows/scripts/backup.sh
