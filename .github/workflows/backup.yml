@@ -1,9 +1,10 @@
+
 name: Weekly Encrypted Google Drive Backup
 
 on:
   schedule:
-    # Every Saturday at 02:00 UTC (07:30 IST)
-    - cron: '0 2 * * 6'
+    # Every Saturday at 02:17 UTC (07:47 IST)
+    - cron: '17 2 * * 6'
   workflow_dispatch:
     # Allows manual trigger for testing and ad-hoc backup drills
 
