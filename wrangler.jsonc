@@ -20,6 +20,10 @@
     }
   ],
 
+  "ai": {
+    "binding": "AI"
+  },
+
   "vars": {
     "HEALTHCHECKS_PING_URL": ""
   },

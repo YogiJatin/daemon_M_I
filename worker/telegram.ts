@@ -43,13 +43,25 @@ export async function answerCallbackQuery(
 ): Promise<void> {
   if (!token || token.startsWith("mock:")) return;
   try {
-    await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+    const resp = await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
     });
-  } catch {
-    // Ignore callback answer failure
+    const data = await resp.json().catch(() => ({})) as any;
+    console.log({
+      method: "answerCallbackQuery",
+      statusCode: resp.status,
+      telegramOk: data?.ok ?? resp.ok,
+      description: data?.description ?? null,
+      callbackQueryId,
+    });
+  } catch (err: any) {
+    console.error({
+      method: "answerCallbackQuery",
+      error: err instanceof Error ? err.message : String(err),
+      callbackQueryId,
+    });
   }
 }
 
@@ -147,6 +159,14 @@ export async function sendTelegramMessage(
         // non-json response
       }
 
+      console.error({
+        method: "sendMessage",
+        chatId,
+        statusCode: resp.status,
+        telegramOk: parsed?.ok ?? false,
+        description: parsed?.description || rawText || null,
+      });
+
       if (resp.status === 429) {
         if (parsed?.parameters?.retry_after) {
           retryAfter = Number(parsed.parameters.retry_after);
@@ -174,6 +194,14 @@ export async function sendTelegramMessage(
     }
 
     const data = (await resp.json().catch(() => ({}))) as any;
+    console.log({
+      method: "sendMessage",
+      chatId,
+      statusCode: resp.status,
+      telegramOk: data?.ok ?? true,
+      description: data?.description ?? null,
+      messageId: data?.result?.message_id ?? null,
+    });
     return {
       sent: true,
       telegramMessageId: data?.result?.message_id,
@@ -183,6 +211,13 @@ export async function sendTelegramMessage(
       err?.name === "AbortError" ||
       err?.message?.toLowerCase().includes("timeout") ||
       err?.message?.toLowerCase().includes("network");
+
+    console.error({
+      method: "sendMessage",
+      chatId,
+      error: err instanceof Error ? err.message : String(err),
+      isTimeout,
+    });
 
     return {
       sent: false,

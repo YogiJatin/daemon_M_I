@@ -47,7 +47,8 @@ export function App() {
   const [focusData, setFocusData] = useState<FocusData | null>(null);
   const [presence, setPresence] = useState<SystemPresence>('healthy');
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [inspectedTask, setInspectedTask] = useState<Task | null>(null);
   const [inspectedClass, setInspectedClass] = useState<ClassOccurrence | null>(null);
   const [inspectedEvent, setInspectedEvent] = useState<AuditEventItem | null>(null);
@@ -87,24 +88,37 @@ export function App() {
   // Primary data polling (TEST-4.2: ~30s polling while visible)
   const refreshCoreData = useCallback(async () => {
     try {
+      // 1. Verify cryptographic session first via /api/v1/auth/me
+      await api.getMe();
+      setIsAuthenticated(true);
+
+      // 2. Load dashboard read models
       const [today, focus] = await Promise.all([
-        api.getToday().catch(() => null),
-        api.getFocus().catch(() => null),
+        api.getToday().catch((err) => {
+          if (err?.status === 401 || err?.code === 'unauthorized') throw err;
+          return null;
+        }),
+        api.getFocus().catch((err) => {
+          if (err?.status === 401 || err?.code === 'unauthorized') throw err;
+          return null;
+        }),
       ]);
       if (today) setTodayData(today);
       if (focus) {
         setFocusData(focus);
         setPresence('healthy');
       }
-      setIsAuthenticated(true);
     } catch (err: any) {
-      if (err.status === 401 || err.code === 'unauthorized') {
+      if (err?.status === 401 || err?.code === 'unauthorized') {
         setIsAuthenticated(false);
+        setTodayData(null);
+        setFocusData(null);
       } else {
         setPresence('offline');
       }
     } finally {
       setIsLoading(false);
+      setIsAuthChecking(false);
     }
   }, []);
 
@@ -112,13 +126,13 @@ export function App() {
     refreshCoreData();
 
     const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && isAuthenticated) {
         refreshCoreData();
       }
     }, 30000);
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && isAuthenticated) {
         refreshCoreData();
       }
     };
@@ -128,9 +142,36 @@ export function App() {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [refreshCoreData]);
+  }, [refreshCoreData, isAuthenticated]);
 
   const isShareTarget = window.location.pathname === '/share-target';
+
+  // Auth gate: Loading state during initial cryptographic session verification
+  if (isAuthChecking) {
+    return (
+      <div className={`min-h-screen bg-floor text-on-surface antialiased flex items-center justify-center font-sans ${theme}`}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="font-mono text-xs text-outline">Verifying cryptographic session...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Auth gate: Unauthenticated users MUST see the Device Pairing Gate first
+  if (!isAuthenticated) {
+    return (
+      <div className={`min-h-screen bg-floor text-on-surface antialiased flex flex-col justify-center px-4 font-sans ${theme}`}>
+        <PairView
+          isAuthenticated={false}
+          onPairedSuccess={async () => {
+            await refreshCoreData();
+            handleSelectMode('focus');
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <AppShell

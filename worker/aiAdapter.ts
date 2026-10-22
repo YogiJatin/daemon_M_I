@@ -48,7 +48,10 @@ export interface AIResponse<TOutput = any> {
 }
 
 export interface ProviderConfig {
-  id: string; // 'groq' | 'workers_ai' | 'gemini' | 'ollama' | 'mock'
+  id: string; // 'groq' | 'workers_ai' | 'gemini' | 'ollama' | 'mock' or named profile 'groq_primary', etc.
+  providerType: "groq" | "workers_ai" | "gemini" | "ollama" | "mock";
+  keySlot?: number;
+  apiKey?: string;
   model: string;
   allowedPrivacyClasses: PrivacyClass[];
   timeoutMs: number;
@@ -97,46 +100,118 @@ export class AIAdapter {
       .filter(Boolean);
   }
 
-  public getProviderConfig(providerId: string): ProviderConfig | null {
-    switch (providerId.toLowerCase()) {
-      case "groq":
-        return {
-          id: "groq",
-          model: this.env?.GROQ_MODEL || "llama-3.3-70b-versatile",
-          allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
-          timeoutMs: 6000,
-        };
-      case "workers_ai":
-        return {
-          id: "workers_ai",
-          model: this.env?.WORKERS_AI_MODEL || "@cf/meta/llama-3.1-8b-instruct",
-          allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
-          timeoutMs: 8000,
-        };
-      case "gemini":
-        return {
-          id: "gemini",
-          model: this.env?.GEMINI_MODEL || "gemini-2.0-flash",
-          allowedPrivacyClasses: ["synthetic_test", "low_sensitivity"],
-          timeoutMs: 7000,
-        };
-      case "ollama":
-        return {
-          id: "ollama",
-          model: this.env?.OLLAMA_MODEL || "llama3.2:latest",
-          allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal", "restricted"],
-          timeoutMs: 10000,
-        };
-      case "mock":
-        return {
-          id: "mock",
-          model: "deterministic-mock-v1",
-          allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal", "restricted"],
-          timeoutMs: 500,
-        };
-      default:
-        return null;
+  /**
+   * Helper to resolve the secret API key for a given provider and slot.
+   * Slot 1 checks *_KEY_1 then fallback to *_KEY.
+   * Slot 2 checks *_KEY_2 then fallback to *_KEY_SECONDARY.
+   */
+  public resolveApiKey(providerType: "groq" | "gemini", slot: number = 1): string | null {
+    if (providerType === "groq") {
+      if (slot === 1) {
+        return this.env?.GROQ_API_KEY_1 || this.env?.GROQ_API_KEY || null;
+      }
+      if (slot === 2) {
+        return this.env?.GROQ_API_KEY_2 || this.env?.GROQ_API_KEY_SECONDARY || null;
+      }
+      return this.env?.[`GROQ_API_KEY_${slot}`] || null;
     }
+    if (providerType === "gemini") {
+      if (slot === 1) {
+        return this.env?.GEMINI_API_KEY_1 || this.env?.GEMINI_API_KEY || null;
+      }
+      if (slot === 2) {
+        return this.env?.GEMINI_API_KEY_2 || this.env?.GEMINI_API_KEY_SECONDARY || null;
+      }
+      return this.env?.[`GEMINI_API_KEY_${slot}`] || null;
+    }
+    return null;
+  }
+
+  public getProviderConfig(providerId: string): ProviderConfig | null {
+    const id = providerId.toLowerCase().trim();
+
+    // Groq profiles and slots
+    if (id === "groq" || id === "groq_primary" || id === "groq_slot1") {
+      return {
+        id: "groq_primary",
+        providerType: "groq",
+        keySlot: 1,
+        apiKey: this.resolveApiKey("groq", 1) || undefined,
+        model: this.env?.GROQ_MODEL || "llama-3.3-70b-versatile",
+        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
+        timeoutMs: 6000,
+      };
+    }
+    if (id === "groq_secondary" || id === "groq_slot2") {
+      return {
+        id: "groq_secondary",
+        providerType: "groq",
+        keySlot: 2,
+        apiKey: this.resolveApiKey("groq", 2) || undefined,
+        model: this.env?.GROQ_MODEL_SECONDARY || this.env?.GROQ_MODEL || "llama-3.3-70b-versatile",
+        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
+        timeoutMs: 6000,
+      };
+    }
+
+    // Gemini profiles and slots
+    if (id === "gemini" || id === "gemini_primary" || id === "gemini_slot1") {
+      return {
+        id: "gemini_primary",
+        providerType: "gemini",
+        keySlot: 1,
+        apiKey: this.resolveApiKey("gemini", 1) || undefined,
+        model: this.env?.GEMINI_MODEL || "gemini-2.0-flash",
+        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity"],
+        timeoutMs: 7000,
+      };
+    }
+    if (id === "gemini_secondary" || id === "gemini_slot2") {
+      return {
+        id: "gemini_secondary",
+        providerType: "gemini",
+        keySlot: 2,
+        apiKey: this.resolveApiKey("gemini", 2) || undefined,
+        model: this.env?.GEMINI_MODEL_SECONDARY || this.env?.GEMINI_MODEL || "gemini-2.0-flash",
+        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity"],
+        timeoutMs: 7000,
+      };
+    }
+
+    // Workers AI
+    if (id === "workers_ai" || id === "cf_ai") {
+      return {
+        id: "workers_ai",
+        providerType: "workers_ai",
+        model: this.env?.WORKERS_AI_MODEL || "@cf/meta/llama-3.1-8b-instruct",
+        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
+        timeoutMs: 8000,
+      };
+    }
+
+    // Ollama Local Desktop
+    if (id === "ollama" || id === "ollama_local") {
+      return {
+        id: "ollama",
+        providerType: "ollama",
+        model: this.env?.OLLAMA_MODEL || "llama3.2:latest",
+        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal", "restricted"],
+        timeoutMs: 10000,
+      };
+    }
+
+    // Deterministic Mock
+    if (id === "mock") {
+      return {
+        id: "mock",
+        providerType: "mock",
+        model: "deterministic-mock-v1",
+        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal", "restricted"],
+        timeoutMs: 500,
+      };
+    }
+
+    return null;
   }
 
   /**
@@ -214,7 +289,17 @@ export class AIAdapter {
 
     // 4. Provider Scoring & Selection (Owner Primacy)
     const ownerOrder = this.getProviderOrder();
-    const allConfigs = ["groq", "workers_ai", "gemini", "mock"]
+    // Expand default candidates into configured profiles (including multiple key slots and local Ollama)
+    const profileIds = [
+      "groq_primary",
+      "groq_secondary",
+      "workers_ai",
+      "gemini_primary",
+      "gemini_secondary",
+      "ollama",
+      "mock",
+    ];
+    const allConfigs = profileIds
       .map((id) => this.getProviderConfig(id))
       .filter((c): c is ProviderConfig => c !== null);
 
@@ -512,7 +597,8 @@ export class AIAdapter {
       }
     }
 
-    switch (config.id.toLowerCase()) {
+    const pType = config.providerType || (config.id.startsWith("groq") ? "groq" : config.id.startsWith("gemini") ? "gemini" : config.id as any);
+    switch (pType) {
       case "mock":
         return this.callMockProvider<TOutput>(config, request);
       case "groq":
@@ -620,8 +706,8 @@ export class AIAdapter {
     config: ProviderConfig,
     request: AIRequest
   ): Promise<{ data: TOutput; rawText: string }> {
-    const apiKey = this.env?.GROQ_API_KEY;
-    if (!apiKey) throw new Error("GROQ_API_KEY not configured");
+    const apiKey = config.apiKey || this.resolveApiKey("groq", config.keySlot || 1);
+    if (!apiKey) throw new Error(`Groq API key not configured for profile '${config.id}' (slot ${config.keySlot || 1})`);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -681,8 +767,8 @@ export class AIAdapter {
     config: ProviderConfig,
     request: AIRequest
   ): Promise<{ data: TOutput; rawText: string }> {
-    const apiKey = this.env?.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
+    const apiKey = config.apiKey || this.resolveApiKey("gemini", config.keySlot || 1);
+    if (!apiKey) throw new Error(`Gemini API key not configured for profile '${config.id}' (slot ${config.keySlot || 1})`);
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${apiKey}`;
     const response = await fetch(url, {
