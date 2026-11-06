@@ -1161,7 +1161,7 @@ export async function handleApiRequest(
       return jsonSuccess({
         overall_status: isPaused ? "paused" : (healthRow?.consecutive_failures > 0 ? "degraded" : "healthy"),
         reminders_paused: isPaused,
-        last_scheduler_run: healthRow?.last_scheduler_start || null,
+        last_scheduler_run: healthRow?.last_scheduler_start_at || healthRow?.last_scheduler_success_at || null,
         consecutive_failures: healthRow?.consecutive_failures || 0,
         telegram_configured: !!env.TELEGRAM_OWNER_ID,
         database_ready: true,
@@ -1191,7 +1191,7 @@ export async function handleApiRequest(
         reminders_paused: isPaused,
         scheduler: {
           status: isPaused ? "paused" : "running",
-          last_tick_at: (healthRow as any)?.last_scheduler_start || null,
+          last_tick_at: (healthRow as any)?.last_scheduler_start_at || (healthRow as any)?.last_scheduler_success_at || null,
           consecutive_failures: (healthRow as any)?.consecutive_failures || 0,
         },
         ai: {

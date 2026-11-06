@@ -120,16 +120,18 @@ export async function planNotification(
     };
   }
 
-  // If deadline is already past at plan time, do not plan future reminder
-  if (new Date(deadlineAtUtc).getTime() <= now.getTime()) {
-    return {
-      planned: false,
-      reason: "deadline already passed at plan time",
-    };
+  // Requirement: A task with a deadline ALWAYS gets at least one reminder:
+  // if the deadline is closer than the earliest configured offset (or already in the past / right now),
+  // schedule the nearest valid one (e.g. at the deadline, or now + 1 min so cron picks it up).
+  // No silent "no reminder" case!
+  const deadlineDate = new Date(deadlineAtUtc);
+  let targetInstant = deadlineDate;
+  if (deadlineDate.getTime() <= now.getTime()) {
+    targetInstant = new Date(now.getTime() + 60 * 1000);
   }
 
   // Quiet hours adjustment: move out of 22:00-06:30 IST window if needed (TEST-2B.3)
-  const scheduledAt = adjustForQuietHours(deadlineAtUtc, now);
+  const scheduledAt = adjustForQuietHours(targetInstant.toISOString(), now);
 
   const notifId = crypto.randomUUID();
   const dedupKey = `${taskId}:${stage}:${deadlineVersion}`;
@@ -141,7 +143,10 @@ export async function planNotification(
          id, task_id, deadline_version, stage, dedup_key,
          notification_kind, scheduled_at, status, created_at, updated_at
        ) VALUES (?, ?, ?, ?, ?, 'reminder', ?, 'pending', ?, ?)
-       ON CONFLICT(dedup_key) DO NOTHING`
+       ON CONFLICT(dedup_key) DO UPDATE SET
+         scheduled_at = excluded.scheduled_at,
+         status = 'pending',
+         updated_at = excluded.updated_at`
     )
     .bind(notifId, taskId, deadlineVersion, stage, dedupKey, scheduledAt, nowIso, nowIso)
     .run();

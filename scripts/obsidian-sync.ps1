@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Personal AI OS — Obsidian Vault Sync Script
+  Personal AI OS   Obsidian Vault Sync Script
   Pulls approved workflow recipes from the Worker API and writes them as
   Markdown files into the configured local Obsidian vault.
 
@@ -43,9 +43,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 # 1. Load vault configuration
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 $scriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptDir
 $confFile    = Join-Path $scriptDir "obsidian-vault.conf"
@@ -76,17 +76,17 @@ if (-not (Test-Path $vaultRoot)) {
 
 $workflowsDir = Join-Path $vaultRoot $subfolder
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 # 2. Ensure Workflows subfolder exists
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 if (-not (Test-Path $workflowsDir)) {
     New-Item -ItemType Directory -Path $workflowsDir | Out-Null
     Write-Host "Created subfolder: $workflowsDir"
 }
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 # 3. Authenticate
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 if (-not $Token) {
     Write-Error @"
 No session token found.
@@ -105,9 +105,9 @@ $headers = @{
     "Accept"        = "application/json"
 }
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 # 4. Fetch approved workflows from the API
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 $endpoint = "$ApiBase/api/v1/obsidian/workflows"
 Write-Host "`nFetching approved workflows from: $endpoint"
 
@@ -141,9 +141,9 @@ if ($count -eq 0) {
     exit 0
 }
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 # 5. Write each workflow as a Markdown file
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 $written  = 0
 $skipped  = 0
 $errors   = 0
@@ -170,18 +170,18 @@ foreach ($note in $workflows) {
     }
 }
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 # 6. Summary
-# ─────────────────────────────────────────────────────────────
+# -------------------------------------------------------------
 Write-Host ""
-Write-Host "─────────────────────────────────────────────"
+Write-Host "---------------------------------------------"
 Write-Host "Obsidian Sync Complete"
 Write-Host "  Vault   : $vaultRoot"
 Write-Host "  Folder  : $workflowsDir"
 Write-Host "  Written : $written"
 if ($skipped -gt 0) { Write-Host "  Skipped : $skipped (unsafe filenames)" }
 if ($errors  -gt 0) { Write-Host "  Errors  : $errors" }
-Write-Host "─────────────────────────────────────────────"
+Write-Host "---------------------------------------------"
 Write-Host ""
 Write-Host "D1 is the source of truth. These files are a human-readable mirror only."
 Write-Host "To update, re-run this script after approving new recipes."

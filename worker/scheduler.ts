@@ -552,33 +552,20 @@ export async function runScheduler(
     result.errors.push(`Timetable maintenance: ${msg}`);
   }
 
-  // 5. Update system_health scheduler heartbeat with 5-minute throttling (TEST-2B.8)
+  // 5. Update system_health scheduler heartbeat on EVERY tick (TEST-2B.8, reliability invariant)
   const hasErrors = result.errors.length > 0 || result.failedCount > 0;
-  const health = await db
-    .prepare(`SELECT last_scheduler_success_at FROM system_health WHERE id = 1`)
-    .first<{ last_scheduler_success_at: string | null }>();
-
-  let shouldWriteHealth = hasErrors || !health?.last_scheduler_success_at;
-  if (!shouldWriteHealth && health?.last_scheduler_success_at) {
-    const lastWrite = new Date(health.last_scheduler_success_at).getTime();
-    if (Math.abs(now.getTime() - lastWrite) >= 5 * 60 * 1000) {
-      shouldWriteHealth = true;
-    }
-  }
-
-  if (shouldWriteHealth) {
-    await db
-      .prepare(
-        `UPDATE system_health
-         SET last_scheduler_start_at = ?,
-             last_scheduler_success_at = ?,
-             updated_at = ?
-         WHERE id = 1`
-      )
-      .bind(nowIso, nowIso, nowIso)
-      .run()
-      .catch(() => {});
-  }
+  await db
+    .prepare(
+      `UPDATE system_health
+       SET last_scheduler_start_at = ?,
+           last_scheduler_success_at = ?,
+           consecutive_failures = CASE WHEN ? THEN consecutive_failures + 1 ELSE 0 END,
+           updated_at = ?
+       WHERE id = 1`
+    )
+    .bind(nowIso, nowIso, hasErrors ? 1 : 0, nowIso)
+    .run()
+    .catch(() => {});
 
   // 6. External monitoring ping (TEST-2A.7)
   if (options?.pingUrl) {

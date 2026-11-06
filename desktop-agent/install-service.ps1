@@ -14,10 +14,10 @@ try {
     $trigger = New-ScheduledTaskTrigger -AtLogOn
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit 0
     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Description "Personal AI OS Obsidian Writer & Desktop Agent" -Force -ErrorAction Stop
-    Write-Host "✅ Registered Scheduled Task: $taskName"
+    Write-Host " Registered Scheduled Task: $taskName"
     $registeredTask = $true
 } catch {
-    Write-Host "ℹ️ Scheduled Task root registration restricted without elevation ($($_.Exception.Message))."
+    Write-Host " Scheduled Task root registration restricted without elevation ($($_.Exception.Message))."
 }
 
 # Attempt 2: Standard user Startup folder (Rule 30 compliant: guaranteed zero elevation)
@@ -32,9 +32,10 @@ try {
     $shortcut.WorkingDirectory = $repoDir
     $shortcut.Description = "Personal AI OS Obsidian Writer & Desktop Agent"
     $shortcut.Save()
-    Write-Host "✅ Registered User Logon Shortcut in Startup folder: $shortcutPath"
+    Write-Host " Registered User Logon Shortcut in Startup folder: $shortcutPath"
 } catch {
     Write-Error "Failed to register Startup shortcut: $($_.Exception.Message)"
 }
 
 Write-Host "`nDesktop Agent autostart is active. It will run at every Windows logon."
+

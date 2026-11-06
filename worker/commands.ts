@@ -1,4 +1,4 @@
-﻿import { parseDateShorthand, ParsedDeadline, getISTDateParts, istToUtcDate } from "./dateParser";
+﻿import { parseDateShorthand, ParsedDeadline, getISTDateParts, istToUtcDate, extractTimeAndTitle } from "./dateParser";
 import { planNotification, planCatchupDigest } from "./notificationPlanner";
 import {
   parseRecurrenceShorthand,
@@ -239,23 +239,23 @@ export async function handleAdd(args: string, context?: CommandContext): Promise
       command: "add",
       args,
       success: false,
-      response: "Usage: /add <title> or /add <date-shorthand> | <title>",
+      response: "Usage: /add <title> or /add <title> <time-expression>",
     };
   }
 
-  let titlePart: string;
-  let deadline: ParsedDeadline;
+  const now = context?.now || new Date();
 
+  // 1. Recurrence check if pipe format is used
   if (trimmed.includes("|")) {
     const pipeIndex = trimmed.indexOf("|");
     const datePart = trimmed.slice(0, pipeIndex).trim();
-    titlePart = trimmed.slice(pipeIndex + 1).trim();
+    const titlePart = trimmed.slice(pipeIndex + 1).trim();
 
     if (!titlePart) {
       return { command: "add", args, success: false, response: "Task title cannot be empty." };
     }
 
-    const recResult = parseRecurrenceShorthand(datePart, context?.now);
+    const recResult = parseRecurrenceShorthand(datePart, now);
     if (recResult.isRecurrence) {
       if (recResult.error || !recResult.ruleInput) {
         return { command: "add", args, success: false, response: recResult.error || "Invalid recurrence format." };
@@ -264,9 +264,9 @@ export async function handleAdd(args: string, context?: CommandContext): Promise
         const { ruleId, occurrencesCreated } = await createRecurrenceRule(
           context.db,
           { ...recResult.ruleInput, title: titlePart },
-          context.now || new Date()
+          now
         );
-        const nowIso = (context.now || new Date()).toISOString();
+        const nowIso = now.toISOString();
         if (context.updateId) {
           await context.db
             .prepare(
@@ -291,26 +291,52 @@ export async function handleAdd(args: string, context?: CommandContext): Promise
         response: `Recurring task configured: "${titlePart}" (${recResult.summary || recResult.ruleInput.pattern})`,
       };
     }
-
-    const parseResult = parseDateShorthand(datePart, context?.now);
-    if (!parseResult.success || !parseResult.deadline) {
-      return { command: "add", args, success: false, response: parseResult.error || "Invalid date format." };
-    }
-    deadline = parseResult.deadline;
-  } else {
-    titlePart = trimmed;
-    deadline = { kind: "none", localDate: null, localTime: null, utcInstant: null };
   }
 
-  let taskId = crypto.randomUUID();   // fallback if no DB
+  // 2. Extract natural language time expression and stripped title
+  const extracted = extractTimeAndTitle(trimmed, now);
+  const titlePart = extracted.title || trimmed;
+  const deadline = extracted.deadline;
+
+  let taskId = crypto.randomUUID(); // fallback if no DB
   if (context?.db) {
     taskId = await persistTask({
       title: titlePart,
       deadline,
       rawExcerpt: trimmed,
       context,
-      now: context.now || new Date(),
+      now,
     });
+  }
+
+  // 3. If a time phrase was detected but failed to parse:
+  // Requirement: "If a time phrase fails to parse, reply 'Couldn't read that time, saved without a deadline [Set time]'. Never silently create an untimed task."
+  if (extracted.hasTimePhrase && extracted.parseError) {
+    return {
+      command: "add",
+      args,
+      success: true,
+      taskId,
+      deadline,
+      response: "Couldn't read that time, saved without a deadline [Set time]",
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            { text: "📅 Set time (+1h)", callback_data: `snooze:${taskId.slice(0, 13)}:1h` },
+            { text: "Tonight", callback_data: `snooze:${taskId.slice(0, 13)}:tonight` },
+            { text: "Tomorrow", callback_data: `snooze:${taskId.slice(0, 13)}:tomorrow` },
+          ],
+        ],
+      },
+    };
+  }
+
+  // 4. Successful task creation with optional deadline badge
+  let deadlineLabel = "";
+  if (deadline.kind === "timed" && deadline.localDate) {
+    deadlineLabel = ` (Due: ${deadline.localDate}${deadline.localTime ? ` ${deadline.localTime}` : ""})`;
+  } else if (deadline.kind === "date_only" && deadline.localDate) {
+    deadlineLabel = ` (Due: ${deadline.localDate})`;
   }
 
   return {
@@ -319,7 +345,7 @@ export async function handleAdd(args: string, context?: CommandContext): Promise
     success: true,
     taskId,
     deadline,
-    response: `Task created: "${titlePart}"`,
+    response: `Task created: "${titlePart}"${deadlineLabel}`,
   };
 }
 
@@ -649,7 +675,7 @@ export async function handleHealth(args: string, context?: CommandContext): Prom
 
   const [health, paused] = await Promise.all([
     context.db
-      .prepare(`SELECT consecutive_failures, last_scheduler_success_at, last_telegram_delivery_at, updated_at FROM system_health WHERE id = 1`)
+      .prepare(`SELECT consecutive_failures, last_scheduler_success_at, last_scheduler_start_at, last_telegram_delivery_at, updated_at FROM system_health WHERE id = 1`)
       .first<{
         consecutive_failures: number;
         last_scheduler_success_at: string | null;
@@ -669,8 +695,8 @@ export async function handleHealth(args: string, context?: CommandContext): Prom
     `Status: ${schedulerOk ? "ok" : "degraded"}`,
     `Paused: ${isPaused ? "yes" : "no"}`,
     `Consecutive failures: ${failures}`,
-    health?.last_scheduler_success_at
-      ? `Last scheduler run: ${health.last_scheduler_success_at}`
+    (health?.last_scheduler_success_at || (health as any)?.last_scheduler_start_at)
+      ? `Last scheduler run: ${health?.last_scheduler_success_at || (health as any)?.last_scheduler_start_at}`
       : "Last scheduler run: never",
     health?.last_telegram_delivery_at
       ? `Last Telegram delivery: ${health.last_telegram_delivery_at}`
