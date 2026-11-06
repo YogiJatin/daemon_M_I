@@ -19,7 +19,7 @@ export class WorkersAiOcrProvider implements OCRProvider {
       throw new Error('WorkersAiOcrProvider: Cloudflare AI binding not available');
     }
 
-    const input = [...new Uint8Array(imageData)];
+    const input = Array.from(new Uint8Array(imageData));
     const res = await this.aiBinding.run('@cf/meta/llama-3.2-11b-vision-instruct', {
       image: input,
       prompt: 'Extract and transcribe all legible text, dates, times, tasks, and key notes from this image verbatim without summarizing.',

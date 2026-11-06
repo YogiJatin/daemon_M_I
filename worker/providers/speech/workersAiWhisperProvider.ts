@@ -19,7 +19,7 @@ export class WorkersAiWhisperProvider implements SpeechProvider {
       throw new Error('WorkersAiWhisperProvider: Cloudflare AI binding not available');
     }
 
-    const input = [...new Uint8Array(audioData)];
+    const input = Array.from(new Uint8Array(audioData));
     const res = await this.aiBinding.run('@cf/openai/whisper', {
       audio: input,
     });

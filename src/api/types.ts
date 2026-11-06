@@ -133,14 +133,18 @@ export interface AuditEventItem {
 }
 
 export type OSMode =
-  | 'focus'     // / (Today / Briefing)
-  | 'memory'    // /tasks (Tasks List & Detail)
-  | 'academy'   // /timetable (Classes & Grid)
-  | 'timeline'  // /history (Audit Events)
-  | 'system'    // /health (Subsystems & QoS)
-  | 'settings'  // /settings (Preferences)
-  | 'pairing'   // /pair (Device Link)
-  | 'panel';    // /panel (Compact Floating Bar)
+  | 'focus'       // / (Today / Briefing)
+  | 'inbox'       // /inbox (Proposals Review)
+  | 'memory'      // /tasks (Tasks List & Detail)
+  | 'academy'     // /timetable (Classes & Grid)
+  | 'timeline'    // /history (Audit Events)
+  | 'teach'       // /teach (Teach Mode)
+  | 'safebrowser' // /safebrowser (Safe Browser)
+  | 'execution'   // /execution (Execution Queue & Approvals)
+  | 'system'      // /health (Subsystems & QoS)
+  | 'settings'    // /settings (Preferences)
+  | 'pairing'     // /pair (Device Link)
+  | 'panel';      // /panel (Compact Floating Bar)
 
 export type SystemPresence =
   | 'healthy'

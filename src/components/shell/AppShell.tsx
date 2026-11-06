@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { CommandLayer } from './CommandLayer';
@@ -27,6 +27,18 @@ export const AppShell: React.FC<AppShellProps> = ({
 }) => {
   const [isSidebarOpenMobile, setIsSidebarOpenMobile] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+
+  // Global Ctrl+K / Cmd+K listener
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   return (
     <div className={`min-h-screen bg-floor text-on-surface antialiased flex flex-col font-sans ${theme}`}>

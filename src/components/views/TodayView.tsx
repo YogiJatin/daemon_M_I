@@ -22,6 +22,11 @@ export const TodayView: React.FC<TodayViewProps> = ({
 }) => {
   const [snoozeTaskTarget, setSnoozeTaskTarget] = useState<Task | null>(null);
 
+  // AI Strategic Advisory State
+  const [advisoryLoading, setAdvisoryLoading] = useState(false);
+  const [advisoryResult, setAdvisoryResult] = useState<any | null>(null);
+  const [advisoryError, setAdvisoryError] = useState<string | null>(null);
+
   const handleDone = async (task: Task) => {
     try {
       await api.completeTask(task.id);
@@ -38,6 +43,19 @@ export const TodayView: React.FC<TodayViewProps> = ({
       onRefresh();
     } catch (err: any) {
       alert(`Could not snooze task: ${err.message}`);
+    }
+  };
+
+  const handleSuggestNext = async () => {
+    setAdvisoryLoading(true);
+    setAdvisoryError(null);
+    try {
+      const res = await api.callAssistant('suggest_next');
+      setAdvisoryResult(res);
+    } catch (err: any) {
+      setAdvisoryError(err.message || 'Advisory request failed');
+    } finally {
+      setAdvisoryLoading(false);
     }
   };
 
@@ -91,29 +109,31 @@ export const TodayView: React.FC<TodayViewProps> = ({
           </div>
           <button
             onClick={() => onInspectTask(overdue[0])}
-            className="font-mono text-xs text-error hover:underline px-2 py-1"
+            className="text-xs font-mono text-error hover:underline"
           >
-            [Inspect]
+            Inspect Oldest →
           </button>
         </section>
       )}
 
-      {/* 3. Main Operational Surface: 7 / 5 Column Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (7 Cols): Today's Active Tasks */}
+      {/* 3. Main Dashboard Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column (7 Cols): Primary Action Horizon */}
         <div className="lg:col-span-7 flex flex-col gap-6">
           {/* Overdue Section */}
           {overdue.length > 0 && (
-            <Card title="Overdue Tasks" badge={<span className="font-mono text-xs text-error">({overdue.length})</span>}>
+            <Card
+              title="Overdue Tasks"
+              badge={<span className="font-mono text-xs text-error font-semibold">({overdue.length})</span>}
+            >
               <div className="flex flex-col gap-2">
                 {overdue.map((t) => (
                   <EntityRow
                     key={t.id}
                     id={t.id}
                     title={t.title}
-                    subtitle={t.deadline_local_date ? `Deadline: ${t.deadline_local_date}` : undefined}
+                    subtitle={t.deadline_local_date ? `Due ${t.deadline_local_date} ${t.deadline_time_local || ''}` : 'No date'}
                     meta={t.priority}
-                    isUrgent={true}
                     priority={t.priority}
                     statusGlyph="error"
                     onDone={() => handleDone(t)}
@@ -155,7 +175,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
           </Card>
         </div>
 
-        {/* Right Column (5 Cols): Next Class & System Context */}
+        {/* Right Column (5 Cols): Next Class, Advisory & System Context */}
         <div className="lg:col-span-5 flex flex-col gap-6">
           {/* Next Class / Lecture Card */}
           <Card title="Academy — Next Lecture">
@@ -184,6 +204,51 @@ export const TodayView: React.FC<TodayViewProps> = ({
             ) : (
               <EmptyState title="No classes today" description="No lectures remain on the schedule for today." />
             )}
+          </Card>
+
+          {/* AI Strategic Advisory Card */}
+          <Card title="AI Strategic Advisory">
+            <div className="flex flex-col gap-3 font-mono text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-outline">Governed Advisor:</span>
+                <button
+                  onClick={handleSuggestNext}
+                  disabled={advisoryLoading}
+                  className="px-2.5 py-1 rounded bg-primary/10 text-primary hover:bg-primary hover:text-on-primary transition-colors text-[11px] font-bold border border-primary/20 disabled:opacity-50"
+                >
+                  {advisoryLoading ? 'Thinking...' : '✨ Suggest Next'}
+                </button>
+              </div>
+
+              {advisoryError && (
+                <div className="p-2 rounded bg-error-container text-on-error-container text-[11px] border border-error/30">
+                  {advisoryError}
+                </div>
+              )}
+
+              {advisoryResult && (
+                <div className="p-3 rounded-lg bg-surface-container-low border border-primary/20 space-y-2">
+                  <div className="flex items-center justify-between text-[10px] text-outline">
+                    <span>Model: {advisoryResult.provider} ({advisoryResult.duration_ms}ms)</span>
+                    {advisoryResult.fallback_triggered && <span className="text-warning">Fallback</span>}
+                  </div>
+                  <div className="font-sans text-xs font-semibold text-on-surface">
+                    👉 {advisoryResult.result?.next_action}
+                  </div>
+                  {advisoryResult.result?.rationale && (
+                    <p className="font-sans text-[11px] text-on-surface-variant leading-relaxed">
+                      {advisoryResult.result.rationale}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {!advisoryResult && !advisoryLoading && (
+                <p className="font-sans text-[11px] text-outline italic">
+                  Tap "Suggest Next" to query your governed AI stack for contextual prioritization based on current schedule and deadlines.
+                </p>
+              )}
+            </div>
           </Card>
 
           {/* Attention Budget Card */}

@@ -13,11 +13,19 @@ import { PairView } from './components/views/PairView';
 import { ShareTargetView } from './components/views/ShareTargetView';
 import { Inspector } from './components/primitives/Inspector';
 import { TaskInspectorContent } from './components/views/TaskInspectorContent';
+import { InboxView } from './components/views/InboxView';
+import { TeachModePanel } from './components/views/TeachModePanel';
+import { SafeBrowserPanel } from './components/views/SafeBrowserPanel';
+import { ExecutionQueuePanel } from './components/views/ExecutionQueuePanel';
 
 function getModeFromPath(pathname: string): OSMode {
+  if (pathname === '/inbox') return 'inbox';
   if (pathname === '/tasks') return 'memory';
   if (pathname === '/timetable') return 'academy';
   if (pathname === '/history') return 'timeline';
+  if (pathname === '/teach') return 'teach';
+  if (pathname === '/safebrowser') return 'safebrowser';
+  if (pathname === '/execution') return 'execution';
   if (pathname === '/health') return 'system';
   if (pathname === '/settings') return 'settings';
   if (pathname === '/pair') return 'pairing';
@@ -27,9 +35,13 @@ function getModeFromPath(pathname: string): OSMode {
 
 function getPathFromMode(mode: OSMode): string {
   switch (mode) {
+    case 'inbox': return '/inbox';
     case 'memory': return '/tasks';
     case 'academy': return '/timetable';
     case 'timeline': return '/history';
+    case 'teach': return '/teach';
+    case 'safebrowser': return '/safebrowser';
+    case 'execution': return '/execution';
     case 'system': return '/health';
     case 'settings': return '/settings';
     case 'pairing': return '/pair';
@@ -203,6 +215,12 @@ export function App() {
             />
           )}
 
+          {currentMode === 'inbox' && (
+            <InboxView
+              onTaskCreated={refreshCoreData}
+            />
+          )}
+
           {currentMode === 'panel' && (
             <QuickPanelView
               todayData={todayData}
@@ -229,6 +247,18 @@ export function App() {
             <AuditTimeline
               onInspectEvent={(ev) => setInspectedEvent(ev)}
             />
+          )}
+
+          {currentMode === 'teach' && (
+            <TeachModePanel />
+          )}
+
+          {currentMode === 'safebrowser' && (
+            <SafeBrowserPanel />
+          )}
+
+          {currentMode === 'execution' && (
+            <ExecutionQueuePanel />
           )}
 
           {currentMode === 'system' && <HealthDashboard />}

@@ -20,8 +20,9 @@ export class VoiceIngress {
   }
 
   static createDefault(env: Record<string, any>): VoiceIngress {
-    if (env.GROQ_API_KEY) {
-      return new VoiceIngress(new GroqWhisperProvider(env.GROQ_API_KEY));
+    const groqKey = env.GROQ_API_KEY_1 || env.GROQ_API_KEY;
+    if (groqKey) {
+      return new VoiceIngress(new GroqWhisperProvider(groqKey));
     }
     if (env.AI) {
       return new VoiceIngress(new WorkersAiWhisperProvider(env.AI));

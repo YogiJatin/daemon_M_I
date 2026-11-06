@@ -400,4 +400,23 @@ export const api = {
   async getObsidianWorkflows(): Promise<{ workflows: any[]; count: number; canonicalNotice: string }> {
     return request('/api/v1/obsidian/workflows');
   },
+
+  // AI Assistant Capabilities (Block 6.2 / Block 9)
+  async callAssistant(
+    capability: 'task_breakdown' | 'weekly_plan' | 'prioritize' | 'suggest_next',
+    input?: any,
+    privacyClass: string = 'personal'
+  ): Promise<{
+    capability: string;
+    result: any;
+    provider: string;
+    model: string;
+    duration_ms: number;
+    fallback_triggered?: boolean;
+  }> {
+    return request('/api/v1/assistant/action', {
+      method: 'POST',
+      body: JSON.stringify({ capability, input, privacy_class: privacyClass }),
+    });
+  },
 };

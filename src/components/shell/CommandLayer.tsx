@@ -33,7 +33,7 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         onClose();
       }
@@ -47,33 +47,13 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
 
   if (!isOpen) return null;
 
-  const quickCommands = [
-    { label: 'Capture Task / Note (Direct)', action: () => handleDirectCapture(query), shortcut: 'Enter' },
-    { label: 'Ingest via AI Pipeline (Proposal Draft)', action: () => handlePipelineIngress(query) },
-    { label: 'Upload Voice Note (Audio Ingress)', action: () => audioInputRef.current?.click() },
-    { label: 'Scan Image / Screenshot (OCR Ingress)', action: () => imageInputRef.current?.click() },
-    { label: 'Upload Document (PDF / DOCX Ingress)', action: () => docInputRef.current?.click() },
-    { label: 'Teach Mode: Workflow Learning', action: () => { onSelectMode('panel'); onClose(); }, shortcut: 'Ctrl+T' },
-    { label: 'Safe Browser Mode (Isolated Sandbox)', action: () => { onSelectMode('panel'); onClose(); } },
-    { label: 'Execution Queue & Approvals', action: () => { onSelectMode('panel'); onClose(); } },
-    { label: 'Search Memory OS (Knowledge Graph)', action: () => { onSelectMode('memory'); onClose(); }, shortcut: 'Ctrl+M' },
-    { label: 'Find Lecture Notes & Study Material', action: () => { onSelectMode('academy'); onClose(); } },
-    { label: 'Focus Mode (Today)', action: () => { onSelectMode('focus'); onClose(); } },
-    { label: 'Memory (All Tasks)', action: () => { onSelectMode('memory'); onClose(); } },
-    { label: 'Academy (Timetable)', action: () => { onSelectMode('academy'); onClose(); } },
-    { label: 'Timeline (Audit History)', action: () => { onSelectMode('timeline'); onClose(); } },
-    { label: 'System Health', action: () => { onSelectMode('system'); onClose(); } },
-    { label: 'Settings', action: () => { onSelectMode('settings'); onClose(); } },
-    { label: 'Pair Telegram Device', action: () => { onSelectMode('pairing'); onClose(); } },
-  ];
-
-  const filteredCommands = query
-    ? quickCommands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()))
-    : quickCommands;
-
   const handleDirectCapture = async (text: string) => {
     const title = text.trim();
-    if (!title) return;
+    if (!title) {
+      setFeedback('Type a directive or task in the search box above first.');
+      inputRef.current?.focus();
+      return;
+    }
     setIsSubmitting(true);
     setFeedback(null);
     try {
@@ -93,7 +73,11 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
 
   const handlePipelineIngress = async (text: string) => {
     const content = text.trim();
-    if (!content) return;
+    if (!content) {
+      setFeedback('Type or paste text to ingest in the search box above first.');
+      inputRef.current?.focus();
+      return;
+    }
     setIsSubmitting(true);
     setFeedback(null);
     try {
@@ -111,6 +95,31 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
       setIsSubmitting(false);
     }
   };
+
+  const quickCommands = [
+    { label: 'Capture Task / Note (Direct)', action: () => handleDirectCapture(query), shortcut: 'Enter' },
+    { label: 'Ingest via AI Pipeline (Proposal Draft)', action: () => handlePipelineIngress(query) },
+    { label: 'Upload Voice Note (Audio Ingress)', action: () => audioInputRef.current?.click() },
+    { label: 'Scan Image / Screenshot (OCR Ingress)', action: () => imageInputRef.current?.click() },
+    { label: 'Upload Document (PDF / DOCX Ingress)', action: () => docInputRef.current?.click() },
+    { label: '📥 Inbox & AI Proposals Review', action: () => { onSelectMode('inbox'); onClose(); }, shortcut: 'Ctrl+I' },
+    { label: 'Teach Mode: Workflow Learning', action: () => { onSelectMode('teach'); onClose(); }, shortcut: 'Ctrl+T' },
+    { label: 'Safe Browser Mode (Isolated Sandbox)', action: () => { onSelectMode('safebrowser'); onClose(); } },
+    { label: 'Execution Queue & Approvals', action: () => { onSelectMode('execution'); onClose(); } },
+    { label: 'Search Memory OS (Knowledge Graph)', action: () => { onSelectMode('memory'); onClose(); }, shortcut: 'Ctrl+M' },
+    { label: 'Find Lecture Notes & Study Material', action: () => { onSelectMode('academy'); onClose(); } },
+    { label: 'Focus Mode (Today)', action: () => { onSelectMode('focus'); onClose(); } },
+    { label: 'Memory (All Tasks)', action: () => { onSelectMode('memory'); onClose(); } },
+    { label: 'Academy (Timetable)', action: () => { onSelectMode('academy'); onClose(); } },
+    { label: 'Timeline (Audit History)', action: () => { onSelectMode('timeline'); onClose(); } },
+    { label: 'System Health', action: () => { onSelectMode('system'); onClose(); } },
+    { label: 'Settings', action: () => { onSelectMode('settings'); onClose(); } },
+    { label: 'Pair Telegram Device', action: () => { onSelectMode('pairing'); onClose(); } },
+  ];
+
+  const filteredCommands = query
+    ? quickCommands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()))
+    : quickCommands;
 
   const handleFileUpload = async (file: File, type: 'audio' | 'image' | 'document') => {
     setIsSubmitting(true);
@@ -139,9 +148,13 @@ export const CommandLayer: React.FC<CommandLayerProps> = ({
           setIsSubmitting(false);
         }
       };
+      reader.onerror = () => {
+        setFeedback('Failed to read file locally.');
+        setIsSubmitting(false);
+      };
       reader.readAsDataURL(file);
     } catch (err: any) {
-      setFeedback(`File read error: ${err.message}`);
+      setFeedback(`Upload failed: ${err.message}`);
       setIsSubmitting(false);
     }
   };
