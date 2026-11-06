@@ -1,5 +1,5 @@
 import { routeCommand } from "./commands";
-import { handlePlainText } from "./telegramConversation";
+import { handleNonSlashMessage } from "./telegramConversation";
 import { handleTelegramMediaIngress } from "./telegramMedia";
 import { sendTelegramMessage, answerCallbackQuery } from "./telegram";
 import { runScheduler } from "./scheduler";
@@ -39,7 +39,7 @@ import { authenticateRequest } from "./auth";
 import { handleApiRequest, jsonError } from "./apiRouter";
 
 export default {
-  async fetch(request, env): Promise<Response> {
+  async fetch(request, env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // Block 4: UI Placeholders (strictly non-visual JSON status for test clients)
@@ -1362,8 +1362,14 @@ export default {
       const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
       const configuredSecret = env.TELEGRAM_WEBHOOK_SECRET;
 
+      let authorized = Boolean(secretHeader && secretHeader === configuredSecret);
+      if (!authorized) {
+        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+        authorized = auth.authenticated;
+      }
+
       // TEST-1.2: Reject missing or invalid secret token
-      if (!secretHeader || secretHeader !== configuredSecret) {
+      if (!authorized) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -1434,17 +1440,27 @@ export default {
         routed = await routeCommand(messageText, context);
       }
 
-      // Plain-text (non-command, non-empty) → capture verbatim as a task with no date
+      // Block 1: Non-slash plain-text -> conversational AI assistant (async, ctx.waitUntil)
       if (!isVoice && !isPhoto && !isDocument && routed === null && messageText.trim() && !messageText.trim().startsWith("/")) {
-        routed = await handlePlainText(messageText, context);
+        const replyToMessageId = payload?.message?.reply_to_message?.message_id;
+        return handleNonSlashMessage({
+          db: env.DB,
+          env,
+          chatId,
+          updateId,
+          messageId: payload?.message?.message_id ?? 0,
+          text: messageText,
+          now: new Date(),
+          ctx,
+          replyToMessageId,
+        });
       }
 
-      // Durable write committed inside each handler via DB.batch() BEFORE this point.
-      // Send reply AFTER commit. If send fails, still return HTTP 200 —
-      // do NOT repeat the mutation (BLOCK_1.md).
+      // Slash command: durable write committed inside handler; send reply after commit.
+      // If send fails, still return HTTP 200 - do NOT repeat mutation (AGENTS.md Rule 9).
       if (routed?.response && chatId !== undefined) {
         await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, chatId, routed.response, (routed as any)?.replyMarkup).catch(() => {
-          // Swallow — reply failure must not affect the HTTP response or cause a retry
+          // Swallow - reply failure must not affect HTTP response or cause a retry
         });
       }
 

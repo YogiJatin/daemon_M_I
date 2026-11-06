@@ -308,6 +308,8 @@ export class AIAdapter {
     let fallbackTriggered = false;
     let lastErrorCode: any = "provider_unavailable";
     let lastErrorMessage = "All candidate providers failed or are unavailable";
+    // Sibling-slot skip: 503/model-wide errors block same model's other slot this invocation.
+    const blockedModels = new Set<string>();
 
     for (let i = 0; i < scoredCandidates.length; i++) {
       const candidate = scoredCandidates[i];
@@ -327,6 +329,12 @@ export class AIAdapter {
 
       // Check capability-specific allowlist if defined
       if (capability.providerAllowList && !capability.providerAllowList.includes(config.id)) {
+        continue;
+      }
+
+      // Skip sibling slot if same model already gave a 503/model-wide error
+      if (blockedModels.has(config.model)) {
+        fallbackTriggered = true;
         continue;
       }
 
@@ -426,6 +434,8 @@ export class AIAdapter {
         } else if (err.status >= 500 || err.message?.includes("503")) {
           failureCode = "503";
           cooldownMs = 30000;
+          // Block the other slot sharing this model for the current request
+          if (config.model) blockedModels.add(config.model);
         }
 
         // Permanent errors (bad key / decommissioned model): 24h disable + alert
@@ -822,40 +832,62 @@ private extractJsonPayload<T = any>(rawText: string): T {
     const apiKey = config.apiKey || this.resolveApiKey("gemini", config.keySlot || 1);
     if (!apiKey) throw new Error(`Gemini API key not configured for profile '${config.id}' (slot ${config.keySlot || 1})`);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${apiKey}`;
-    let response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          thinkingConfig: {
-            thinkingLevel: "low",
-          },
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 7000);
+
+    const payload = {
+      contents: [{ parts: [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        thinkingConfig: {
+          thinkingLevel: "low",
         },
-      }),
-    });
+      },
+    };
 
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${apiKey}`;
+      let response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
 
-
-    if (!response.ok) {
-      const errorBody = await response.text().catch(() => "(unreadable)");
-      console.error("[Gemini] HTTP", response.status, "error:", errorBody.slice(0, 300));
-      const err: any = new Error(`Gemini API error: ${response.status}`);
-      err.status = response.status;
-      err.body = errorBody;
-      if (response.status === 401 || response.status === 404 ||
-          errorBody.includes("decommissioned") || errorBody.includes("INVALID_ARGUMENT")) {
-        err.permanent = true;
+      if (!response.ok) {
+        const errorBody = await response.text().catch(() => "(unreadable)");
+        console.error("[Gemini] HTTP", response.status, "error:", errorBody.slice(0, 300));
+        let shapeNote = "";
+        if (response.status === 503) {
+          try {
+            const probe = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            const pBody = await probe.text().catch(() => "");
+            shapeNote = ` [shape probe gemini-2.5-flash: HTTP ${probe.status} ${pBody.slice(0, 150)}]`;
+          } catch (e: any) {
+            shapeNote = ` [shape probe error: ${e.message}]`;
+          }
+        }
+        const err: any = new Error(`Gemini API error: ${response.status}${shapeNote}`);
+        err.status = response.status;
+        err.body = errorBody + shapeNote;
+        if (response.status === 401 || response.status === 404 ||
+            errorBody.includes("decommissioned") || errorBody.includes("INVALID_ARGUMENT")) {
+          err.permanent = true;
+        }
+        throw err;
       }
-      throw err;
-    }
 
-    const resJson = (await response.json()) as any;
-    const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    const data = this.extractJsonPayload<TOutput>(rawText);
-    return { data, rawText };
+      const resJson = (await response.json()) as any;
+      const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      const data = this.extractJsonPayload<TOutput>(rawText);
+      return { data, rawText };
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   /**

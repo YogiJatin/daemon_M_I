@@ -376,6 +376,12 @@ RULES:
 });
 
 // ---------------------------------------------------------------------------
+// Block 1: Register telegram_assistant capability
+// ---------------------------------------------------------------------------
+import { registerTelegramAssistantCapability } from "./telegramAssistant";
+registerTelegramAssistantCapability();
+
+// ---------------------------------------------------------------------------
 AICapabilityRegistry.freeze();
 
 // AICapabilities Facade (Preserves exact Block 6 method signatures)
