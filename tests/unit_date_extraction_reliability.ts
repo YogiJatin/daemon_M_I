@@ -152,6 +152,27 @@ async function runTests() {
     .bind(fixedNow.toISOString(), fixedNow.toISOString())
     .run();
 
+  // Specific test: task due 14:03 created at 14:01:58
+  const created140158 = new Date("2026-11-06T08:31:58.812Z");
+  const due1403 = new Date("2026-11-06T08:33:58.812Z"); // 14:03:58 IST
+  const planTiming = await planNotification({
+    db: mockDb as any,
+    taskId: "task-near-deadline",
+    deadlineKind: "timed",
+    deadlineAtUtc: due1403.toISOString(),
+    deadlineVersion: 1,
+    now: created140158,
+  });
+  assert(planTiming.planned === true, "Task 14:03 created at 14:01:58 planned successfully");
+  assert(
+    new Date(planTiming.scheduledAt!).getTime() <= new Date("2026-11-06T08:33:00.000Z").getTime(),
+    "Reminder scheduled at or before 14:03:00 IST so 14:03 cron tick fires on time"
+  );
+  assert(
+    new Date(planTiming.scheduledAt!).getTime() <= due1403.getTime(),
+    "Reminder is NEVER scheduled after deadline"
+  );
+
   // Task created at 13:24:17 with deadline in 43s (13:25:00)
   const deadline43s = istToUtcDate(ist.localDate, "13:25").toISOString();
   const plan1 = await planNotification({

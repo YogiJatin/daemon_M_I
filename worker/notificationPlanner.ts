@@ -127,7 +127,13 @@ export async function planNotification(
   const deadlineDate = new Date(deadlineAtUtc);
   let targetInstant = deadlineDate;
   if (deadlineDate.getTime() <= now.getTime()) {
-    targetInstant = new Date(now.getTime() + 60 * 1000);
+    targetInstant = now;
+  } else {
+    // Rule: Reminders fire at or before deadline, never after.
+    // Align to the start of the deadline minute (:00s) so the cron tick
+    // inside that minute claims it immediately instead of deferring to the minute after.
+    const minuteAligned = new Date(Math.floor(deadlineDate.getTime() / 60000) * 60000);
+    targetInstant = minuteAligned.getTime() > now.getTime() ? minuteAligned : now;
   }
 
   // Quiet hours adjustment: move out of 22:00-06:30 IST window if needed (TEST-2B.3)

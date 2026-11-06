@@ -757,12 +757,44 @@ export class AIAdapter {
 
       const resJson = (await response.json()) as any;
       const rawText = resJson.choices?.[0]?.message?.content || "{}";
-      const data = JSON.parse(rawText) as TOutput;
+      const data = this.extractJsonPayload<TOutput>(rawText);
       return { data, rawText };
     } finally {
       clearTimeout(timeout);
     }
   }
+
+private extractJsonPayload<T = any>(rawText: string): T {
+  const trimmed = rawText.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {}
+
+  const match = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (match) {
+    try {
+      return JSON.parse(match[1].trim());
+    } catch {}
+  }
+
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    try {
+      return JSON.parse(trimmed.slice(start, end + 1));
+    } catch {}
+  }
+
+  const startArr = trimmed.indexOf("[");
+  const endArr = trimmed.lastIndexOf("]");
+  if (startArr !== -1 && endArr > startArr) {
+    try {
+      return JSON.parse(trimmed.slice(startArr, endArr + 1));
+    } catch {}
+  }
+
+  throw new Error(`Failed to parse JSON output: ${trimmed.slice(0, 150)}`);
+}
 
   private async callWorkersAiProvider<TOutput>(
     config: ProviderConfig,
@@ -779,7 +811,7 @@ export class AIAdapter {
     });
 
     const rawText = typeof response === "string" ? response : response?.response || JSON.stringify(response);
-    const data = JSON.parse(rawText) as TOutput;
+    const data = this.extractJsonPayload<TOutput>(rawText);
     return { data, rawText };
   }
 
@@ -791,14 +823,21 @@ export class AIAdapter {
     if (!apiKey) throw new Error(`Gemini API key not configured for profile '${config.id}' (slot ${config.keySlot || 1})`);
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
+    let response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: {
+          responseMimeType: "application/json",
+          thinkingConfig: {
+            thinkingLevel: "low",
+          },
+        },
       }),
     });
+
+
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "(unreadable)");
@@ -815,7 +854,7 @@ export class AIAdapter {
 
     const resJson = (await response.json()) as any;
     const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    const data = JSON.parse(rawText) as TOutput;
+    const data = this.extractJsonPayload<TOutput>(rawText);
     return { data, rawText };
   }
 
@@ -851,7 +890,7 @@ export class AIAdapter {
 
       const resJson = (await response.json()) as any;
       const rawText = resJson.response || "{}";
-      const data = JSON.parse(rawText) as TOutput;
+      const data = this.extractJsonPayload<TOutput>(rawText);
       return { data, rawText };
     } finally {
       clearTimeout(timeout);
@@ -936,7 +975,13 @@ export class AIAdapter {
    * Records results in provider_health. Never throws.
    */
   public async runCanary(now: Date = new Date()): Promise<Record<string, { ok: boolean; latencyMs: number; error?: string; permanent?: boolean }>> {
-    const providerOrder = this.getProviderOrder();
+    const targetProviders = [
+      "groq_primary",
+      "groq_secondary",
+      "gemini_primary",
+      "gemini_secondary",
+      "workers_ai",
+    ];
     const results: Record<string, { ok: boolean; latencyMs: number; error?: string; permanent?: boolean }> = {};
     const canaryRequest: AIRequest = {
       capability: "suggest_next",
@@ -945,7 +990,7 @@ export class AIAdapter {
       inputContext: { canary: true },
       privacyClass: "synthetic_test",
     };
-    for (const providerId of providerOrder) {
+    for (const providerId of targetProviders) {
       if (providerId === "mock") { results["mock"] = { ok: true, latencyMs: 0 }; continue; }
       const config = this.getProviderConfig(providerId);
       if (!config) continue;

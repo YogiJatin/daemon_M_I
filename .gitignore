@@ -34,3 +34,6 @@ dist-ssr
 desktop-agent/settings.json
 # PowerShell sync script — local only (contains vault config reference)
 scripts/obsidian-vault.conf
+
+backup_pre_block0.sql
+
