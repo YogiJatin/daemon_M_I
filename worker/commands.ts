@@ -22,6 +22,9 @@ import { getExportData } from "./exportService";
 import { AICapabilities } from "./aiCapabilities";
 import { listTaskProposals } from "./inboxService";
 
+import { getProfile, getMissingProfileKeys, setProfileKey } from "./dailyRhythm";
+import { handleCaptureCommand } from "./captureEngine";
+
 interface SnoozePresetResult {
   success: boolean;
   snoozedUntilUtc?: string;     // ISO UTC instant — always set on success
@@ -1478,6 +1481,90 @@ export async function handlePlan(args: string, context?: CommandContext): Promis
   };
 }
 
+// ---------------------------------------------------------------------------
+// /profile -- Interactive daily rhythm profile setup
+// ---------------------------------------------------------------------------
+async function handleProfile(args: string, context?: CommandContext): Promise<CommandResult> {
+  const db = context?.db;
+  if (!db) return { command: "profile", args, success: false, response: "No DB context." };
+
+  const now = new Date();
+
+  // If arg is "key=value", save it
+  if (args.includes("=")) {
+    const eqIdx = args.indexOf("=");
+    const key = args.slice(0, eqIdx).trim().toLowerCase();
+    const value = args.slice(eqIdx + 1).trim();
+
+    const ALLOWED: Record<string, string> = {
+      wake: "wake_time",
+      wake_time: "wake_time",
+      leave: "leave_home_time",
+      leave_home_time: "leave_home_time",
+      commute_to: "commute_to_college_min",
+      commute_to_college_min: "commute_to_college_min",
+      commute_home: "commute_home_min",
+      commute_home_min: "commute_home_min",
+      buffer: "buffer_after_class_min",
+      buffer_after_class_min: "buffer_after_class_min",
+      bedtime: "bedtime",
+      morning: "morning_anchor_time",
+      morning_anchor_time: "morning_anchor_time",
+      evening: "evening_anchor_time",
+      evening_anchor_time: "evening_anchor_time",
+    };
+
+    const resolvedKey = ALLOWED[key];
+    if (!resolvedKey) {
+      return { command: "profile", args, success: false, response: `Unknown profile key: "${key}". Use /profile to see options.` };
+    }
+
+    await setProfileKey(db, resolvedKey, value);
+    const profile = await getProfile(db);
+    const missing = getMissingProfileKeys(profile);
+
+    if (missing.length === 0) {
+      return { command: "profile", args, success: true, response: `Profile saved: ${resolvedKey} = ${value}\n\nYour daily rhythm profile is complete!` };
+    }
+    return {
+      command: "profile", args, success: true,
+      response: `Profile saved: ${resolvedKey} = ${value}\n\nStill missing: ${missing.join(", ")}\nUse /profile <key>=<value> to fill in.`,
+    };
+  }
+
+  // Show current profile
+  const profile = await getProfile(db);
+  const missing = getMissingProfileKeys(profile);
+
+  const lines: string[] = ["Your daily rhythm profile:", ""];
+  lines.push(`Wake time: ${profile.wake_time || "(not set)"}`);
+  lines.push(`Leave home: ${profile.leave_home_time || "(not set)"}`);
+  lines.push(`Commute to college: ${profile.commute_to_college_min ?? "(not set)"} min`);
+  lines.push(`Commute home: ${profile.commute_home_min ?? "(not set)"} min`);
+  lines.push(`Buffer after class: ${profile.buffer_after_class_min ?? "(not set)"} min`);
+  lines.push(`Bedtime: ${profile.bedtime || "(not set)"}`);
+  lines.push(`Morning anchor: ${profile.morning_anchor_time || "(not set)"}`);
+  lines.push(`Evening anchor: ${profile.evening_anchor_time || "(not set)"}`);
+  lines.push("");
+
+  if (missing.length > 0) {
+    lines.push(`Missing: ${missing.join(", ")}`);
+    lines.push("Set with: /profile wake_time=07:00  or  /profile commute_to=30");
+  } else {
+    lines.push("Profile complete!");
+  }
+
+  return { command: "profile", args, success: true, response: lines.join("\n") };
+}
+// ---------------------------------------------------------------------------
+// /capture -- Set implicit capture mode
+// ---------------------------------------------------------------------------
+async function handleCapture(args: string, context?: CommandContext): Promise<CommandResult> {
+  const db = context?.db;
+  if (!db) return { command: "capture", args, success: false, response: "No DB context." };
+  const response = await handleCaptureCommand(args, db, new Date());
+  return { command: "capture", args, success: true, response };
+}
 export async function routeCommand(text: string, context?: CommandContext): Promise<CommandResult | null> {
   const trimmed = text.trim();
   if (!trimmed.startsWith("/")) {

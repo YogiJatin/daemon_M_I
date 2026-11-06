@@ -30,7 +30,7 @@ const OBLIGATION_TRIGGERS = [
   /\bgotta\b/i,
   /\bplanning to\b/i,
   /\bneed to\b/i,
-  /\bhave to finish\b/i,
+  /\bhave to\b/i,
   /\bremember to\b/i,
   /\bremind me\b/i,
   /\bsubmit\b/i,
@@ -41,22 +41,39 @@ const OBLIGATION_TRIGGERS = [
   /\bhoga\b/i,
   /\bpadna hai\b/i,
   /\bdeni hai\b/i,
+  /\bdena hai\b/i,
   /\bbhejo\b/i,
+  /\bpadegi\b/i,
+  /\bnikalna hai\b/i,
+  /\bkarwana hai\b/i,
+  /\ble lena\b/i,
+  /\bprint karo\b/i,
   // Telugu patterns
   /\bcheyyali\b/i,
   /\bchestam\b/i,
   /\blevali\b/i,
+  /\bvellali\b/i,
+  /\bavali\b/i,
+  /\bchaduvukovali\b/i,
+  /\bteesukovali\b/i,
+  /\bcheyinchukovali\b/i,
 ];
 
-// Disqualifiers: questions, hypotheticals, past events, jokes, other people
+// Disqualifiers: questions, hypotheticals, past events, jokes, other people,
+// bodily states, wishes/routines (Capture Rubric a-d)
 const DISQUALIFIERS = [
   /\?$/,                        // ends in question mark
-  /^(did|does|do|is|are|was|were|have|has|can|could|should|would|will|won't|isn't)\b/i,
+  /^(did|does|do|is|are|was|were|can|could|should|would|will|won't|isn't)\b/i,
+  /^(have|has)\s+(you|we|they|he|she)\b/i,
   /\b(yesterday|last week|last month|ago|already|just did|finished|completed|done|kar diya|karega|karegi)\b/i,
   /\b(maybe|perhaps|might|could be|probably|if)\b/i,
-  /\b(he|she|they|we|dost|friend)\s+(need|have|should|must|will|submit|karega)\b/i,  // other people
+  /\b(he|she|they|we|dost|friend)\s+(needs?|has|have|should|must|will|submit|karega)\b/i,  // other people
   /\b(just kidding|lol|lmao|haha|joke)\b/i,
   /\bhypothetically\b/i,
+  // Bodily states (c) - must NOT be bodily state or feeling
+  /\b(sleep|sleeping|nap|napping|rest|resting|tired|exhausted|sick|hungry|thirsty|headache)\b/i,
+  // Wishes or vague routines - not concrete commitments (c)
+  /\b(wish|want to visit|someday|one day|usually|typically|everyday)\b/i,
 ];
 
 export function detectObligation(text: string): { detected: boolean; evidence: string } {

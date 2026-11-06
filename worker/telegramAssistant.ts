@@ -27,9 +27,18 @@ export type AssistantIntent =
   | "query_tasks"
   | "modify_pending"
   | "remember"
+  | "schedule_exception"
   | "unclear";
 
-export type AnchorType = "after_last_class" | "before_first_class" | "evening" | "morning" | "none";
+export type AnchorType =
+  | "after_last_class"
+  | "leaving_college"
+  | "reaching_home"
+  | "before_first_class"
+  | "leaving_home"
+  | "evening"
+  | "morning"
+  | "none";
 
 // ---------------------------------------------------------------------------
 // LLM output schema
@@ -100,19 +109,25 @@ export function buildAssistantSystemPrompt(ownerName: string): string {
 
 RULES:
 1. Classify the user's message into exactly one intent.
-2. intent enum: chat | explicit_task | explicit_reminder | implicit_commitment | query_schedule | query_tasks | modify_pending | remember | unclear
+2. intent enum: chat | explicit_task | explicit_reminder | implicit_commitment | query_schedule | query_tasks | modify_pending | remember | schedule_exception | unclear
 3. For tasks/reminders: extract up to 3 tasks. Time fields:
    - offset_days: integer (0=today, 1=tomorrow, negative=past). REQUIRED if time-related.
-   - hour, minute: 24-hour integers. Only set if explicitly stated or unambiguously deducible.
-   - anchor: use ONLY if user says "after class", "before class", "evening", "morning". Set anchor and leave hour/minute NULL.
+   - hour, minute: 24-hour integers. Only set if explicitly stated or unambiguously deducible. Do NOT guess from ambiguous times.
+   - anchor: use ONLY if user says "after class", "before class", "leaving college", "reaching home", "evening", "morning". Set anchor and leave hour/minute NULL. Code resolves anchor times; never invent them.
    - date_phrase: display label for the user (e.g. "tomorrow evening") -- DO NOT infer clock times from this.
-   - If time is ambiguous ("at 7"), do NOT set hour -- leave hour/minute null and set confidence < 0.6.
-4. For query_schedule / query_tasks: set query.type and query.date. reply_text is IGNORED for these intents.
-5. For implicit_commitment: only flag first-person future obligations. Ignore questions, hypotheticals, past events, jokes.
+   - If time is ambiguous ("at 7"), set hour/minute NULL and set confidence < 0.6.
+4. For query_schedule / query_tasks: set query.type and query.date. reply_text is DISCARDED for these intents (D1 renders result).
+5. CAPTURE RUBRIC for implicit_commitment. Suggest ONLY if ALL 4 conditions hold:
+   (a) first person singular (I / me / my)
+   (b) concrete action (not vague)
+   (c) commitment, not a wish, routine, or bodily state ("I need to sleep" = NO, "I need to file report" = YES)
+   (d) not a question, hypothetical, past event, joke, or someone else's task
+   If (a)-(d) all pass but no time is given: suggest with [Pick time]. If any fails: use chat intent, stay SILENT.
 6. confidence: 0.0..1.0. Set < 0.5 for unclear or ambiguous input.
-7. reply_text: conversational response (used for chat/unclear/remember). Keep it short and natural.
-8. NEVER invent schedule facts. NEVER create tasks on your own authority.
+7. reply_text: conversational (used for chat/unclear/remember). NEVER state facts about tasks, schedule, or progress. NEVER say "everything is on track" or similar claims.
+8. NEVER invent schedule facts. NEVER create tasks on your own authority. NEVER compute clock times for anchors.
 9. reason and evidence fields: brief, factual.
+10. For schedule_exception: user is reporting a change to their daily schedule (e.g. "class cancelled today", "leaving at 3pm today"). Classify and extract the change.
 
 OUTPUT: Valid JSON only, matching this schema exactly:
 {
@@ -187,7 +202,8 @@ function validateOutput(data: any, _ids: Set<string>): { valid: boolean; errors:
 
   const validIntents: AssistantIntent[] = [
     "chat", "explicit_task", "explicit_reminder", "implicit_commitment",
-    "query_schedule", "query_tasks", "modify_pending", "remember", "unclear",
+    "query_schedule", "query_tasks", "modify_pending", "remember",
+    "schedule_exception", "unclear",
   ];
   if (!validIntents.includes(data.intent)) {
     errors.push(`Invalid intent: ${data.intent}`);
@@ -545,8 +561,26 @@ export async function handleModifyPending(
     binds.push(newTask.title.trim().slice(0, 500));
   }
 
+  // Handle time change: "make it 8pm" sets proposed_local_time
+  if (newTask.hour !== undefined && newTask.hour !== null) {
+    const h = newTask.hour;
+    const m = newTask.minute ?? 0;
+    const localTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    updates.push("proposed_local_time = ?");
+    binds.push(localTime);
+    // Recalculate proposed_local_date if offset_days present
+    if (newTask.offset_days !== undefined) {
+      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+      const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+      const baseDate = new Date(istNow.getTime() + (newTask.offset_days ?? 0) * 86400000);
+      baseDate.setUTCHours(0, 0, 0, 0);
+      updates.push("proposed_local_date = ?");
+      binds.push(baseDate.toISOString().slice(0, 10));
+    }
+  }
+
   if (updates.length === 0) {
-    // Only time change
+    // No change detected
     updates.push("updated_at = ?");
     binds.push(nowStr);
   } else {

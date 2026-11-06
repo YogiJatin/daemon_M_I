@@ -1,4 +1,4 @@
-/**
+﻿/**
  * worker/aiAdapter.ts — Block 6.1 Central AI Capability Adapter & Failover Router
  *
  * Hardened Architecture:

@@ -428,13 +428,24 @@ async function handleConversation(
             .join("\n");
 
           if (isImplicit) {
-            // Compact suggestion line after reply
-            replyText = (result.reply_text ? result.reply_text + "\n\n" : "") +
-              `Looks like you have a task: ${result.tasks[0].title}`;
-            replyMarkup = makeInlineKeyboard([
-              { text: "Add task", callback_data: `confirm_proposal:${proposals[0]}` },
+            // Send normal reply first, then compact one-line implicit suggestion (Part 1 Item 3)
+            const task0 = result.tasks[0];
+            const resolvedTimeStr = (() => {
+              try {
+                const r = { localDate: task0.date_phrase || "today", localTime: task0.hour !== null && task0.hour !== undefined ? `${String(task0.hour).padStart(2,"0")}:${String(task0.minute||0).padStart(2,"0")}` : null };
+                if (r.localDate && r.localTime) return `${r.localDate} ${r.localTime}`;
+                if (r.localDate) return r.localDate;
+                return "Pick time";
+              } catch { return "Pick time"; }
+            })();
+            const chatPart = result.reply_text ? result.reply_text + "\n\n" : "";
+            replyText = chatPart +
+              `Picked up: ${task0.title}. Nudge you when?`;
+            replyMarkup = { inline_keyboard: [[
+              { text: resolvedTimeStr !== "Pick time" ? resolvedTimeStr : "Pick time", callback_data: `confirm_proposal:${proposals[0]}` },
+              { text: "Pick time", callback_data: `change_time:${proposals[0]}` },
               { text: "Not a task", callback_data: `not_a_task:${proposals[0]}` },
-            ]);
+            ]] };
           } else {
             replyText = `Got it! Here's what I'll save:\n${taskSummary}\n\nConfirm?`;
             replyMarkup = makeInlineKeyboard([
@@ -473,20 +484,25 @@ async function handleConversation(
 
       // -------------------------
       case "remember": {
-        // Store memory item
+        // remember goes through a confirm proposal like tasks (Part 1 Item 6)
         if (result.memory?.text) {
+          const memText = result.memory.text.slice(0, 500);
+          const propId = "prop_" + ulid();
+          const nowStr = now.toISOString();
           try {
-            const mid = "mem_" + ulid();
-            const nowStr = now.toISOString();
             await db
               .prepare(
-                `INSERT INTO memory_objects
-                   (id, type, title, content, source, created_at, updated_at)
-                 VALUES (?, 'note', ?, ?, 'telegram_conversation', ?, ?)`
+                `INSERT INTO task_proposals
+                   (id, title, date_role, status, advisory_confidence, created_at, updated_at)
+                 VALUES (?, ?, 'memory', 'pending', 0.9, ?, ?)`
               )
-              .bind(mid, result.memory.text.slice(0, 200), result.memory.text.slice(0, 2000), nowStr, nowStr)
+              .bind(propId, memText, nowStr, nowStr)
               .run();
-            replyText = result.reply_text || `Remembered: "${result.memory.text.slice(0, 100)}"`;
+            replyText = `Remember this?\n"${memText.slice(0, 150)}"`;
+            replyMarkup = makeInlineKeyboard([
+              { text: "Confirm", callback_data: `confirm_proposal:${propId}` },
+              { text: "Cancel", callback_data: `reject_proposal:${propId}` },
+            ]);
           } catch {
             replyText = "Couldn't save that memory right now.";
           }

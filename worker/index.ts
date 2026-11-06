@@ -1,4 +1,4 @@
-import { routeCommand } from "./commands";
+﻿import { routeCommand } from "./commands";
 import { handleNonSlashMessage } from "./telegramConversation";
 import { handleTelegramMediaIngress } from "./telegramMedia";
 import { sendTelegramMessage, answerCallbackQuery } from "./telegram";
