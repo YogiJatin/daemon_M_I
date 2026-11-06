@@ -93,7 +93,7 @@ export class AIAdapter {
    * Resolves the configured provider order respecting owner primacy.
    */
   public getProviderOrder(): string[] {
-    const custom = this.env?.AI_PROVIDER_ORDER || "groq,workers_ai,mock";
+    const custom = this.env?.AI_PROVIDER_ORDER || "groq_primary,groq_secondary,gemini_primary,gemini_secondary,workers_ai,mock";
     return custom
       .split(",")
       .map((s: string) => s.trim().toLowerCase())
@@ -137,7 +137,7 @@ export class AIAdapter {
         providerType: "groq",
         keySlot: 1,
         apiKey: this.resolveApiKey("groq", 1) || undefined,
-        model: this.env?.GROQ_MODEL || "llama-3.3-70b-versatile",
+        model: this.env?.GROQ_MODEL || "openai/gpt-oss-120b",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 6000,
       };
@@ -148,7 +148,7 @@ export class AIAdapter {
         providerType: "groq",
         keySlot: 2,
         apiKey: this.resolveApiKey("groq", 2) || undefined,
-        model: this.env?.GROQ_MODEL_SECONDARY || this.env?.GROQ_MODEL || "llama-3.3-70b-versatile",
+        model: this.env?.GROQ_MODEL_SECONDARY || this.env?.GROQ_MODEL || "openai/gpt-oss-20b",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 6000,
       };
@@ -161,7 +161,7 @@ export class AIAdapter {
         providerType: "gemini",
         keySlot: 1,
         apiKey: this.resolveApiKey("gemini", 1) || undefined,
-        model: this.env?.GEMINI_MODEL || "gemini-2.0-flash",
+        model: this.env?.GEMINI_MODEL || "gemini-3.8-flash",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity"],
         timeoutMs: 7000,
       };
@@ -172,7 +172,7 @@ export class AIAdapter {
         providerType: "gemini",
         keySlot: 2,
         apiKey: this.resolveApiKey("gemini", 2) || undefined,
-        model: this.env?.GEMINI_MODEL_SECONDARY || this.env?.GEMINI_MODEL || "gemini-2.0-flash",
+        model: this.env?.GEMINI_MODEL_SECONDARY || this.env?.GEMINI_MODEL || "gemini-3.8-flash",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity"],
         timeoutMs: 7000,
       };
@@ -183,7 +183,7 @@ export class AIAdapter {
       return {
         id: "workers_ai",
         providerType: "workers_ai",
-        model: this.env?.WORKERS_AI_MODEL || "@cf/meta/llama-3.1-8b-instruct",
+        model: this.env?.WORKERS_AI_MODEL || "@cf/meta/llama-3.1-8b-instruct-fast",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 8000,
       };
@@ -428,7 +428,13 @@ export class AIAdapter {
           cooldownMs = 30000;
         }
 
-        if (circuit.consecutiveFailures >= 3) {
+        // Permanent errors (bad key / decommissioned model): 24h disable + alert
+        if (err.permanent) {
+          failureCode = err.status === 401 ? "auth_failed" : "model_decommissioned";
+          cooldownMs = 24 * 60 * 60 * 1000;
+          circuit.consecutiveFailures = 99;
+          this.sendPermanentAlert(config.id, failureCode).catch(() => {});
+        } else if (circuit.consecutiveFailures >= 3) {
           cooldownMs = Math.max(cooldownMs, 300000);
         }
 
@@ -531,7 +537,13 @@ export class AIAdapter {
           cooldownMs = 30000;
         }
 
-        if (circuit.consecutiveFailures >= 3) {
+        // Permanent errors (bad key / decommissioned model): 24h disable + alert
+        if (err.permanent) {
+          failureCode = err.status === 401 ? "auth_failed" : "model_decommissioned";
+          cooldownMs = 24 * 60 * 60 * 1000;
+          circuit.consecutiveFailures = 99;
+          this.sendPermanentAlert(config.id, failureCode).catch(() => {});
+        } else if (circuit.consecutiveFailures >= 3) {
           cooldownMs = Math.max(cooldownMs, 300000);
         }
 
@@ -698,7 +710,8 @@ export class AIAdapter {
       };
     }
 
-    const rawText = JSON.stringify(mockResult);
+    // Mock output is explicitly labeled so callers can surface "AI offline" in UX
+    const rawText = JSON.stringify({ ...mockResult, _mock: true, _offline_label: "AI offline" });
     return { data: mockResult as TOutput, rawText };
   }
 
@@ -730,8 +743,15 @@ export class AIAdapter {
       });
 
       if (!response.ok) {
+        const errorBody = await response.text().catch(() => "(unreadable)");
+        console.error("[Groq] HTTP", response.status, "error:", errorBody.slice(0, 300));
         const err: any = new Error(`Groq API error: ${response.status}`);
         err.status = response.status;
+        err.body = errorBody;
+        if (response.status === 401 || response.status === 404 ||
+            errorBody.includes("decommissioned") || errorBody.includes("model_not_found")) {
+          err.permanent = true;
+        }
         throw err;
       }
 
@@ -776,13 +796,20 @@ export class AIAdapter {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.1 },
+        generationConfig: { responseMimeType: "application/json", temperature: 0.1, thinkingConfig: { thinkingBudget: 0 } },
       }),
     });
 
     if (!response.ok) {
+      const errorBody = await response.text().catch(() => "(unreadable)");
+      console.error("[Gemini] HTTP", response.status, "error:", errorBody.slice(0, 300));
       const err: any = new Error(`Gemini API error: ${response.status}`);
       err.status = response.status;
+      err.body = errorBody;
+      if (response.status === 401 || response.status === 404 ||
+          errorBody.includes("decommissioned") || errorBody.includes("INVALID_ARGUMENT")) {
+        err.permanent = true;
+      }
       throw err;
     }
 
@@ -882,4 +909,70 @@ export class AIAdapter {
       console.warn("[ProviderHealth Telemetry Warning]", e);
     }
   }
+
+  /**
+   * Sends a Telegram alert when a provider is permanently disabled.
+   * Best-effort: never throws.
+   */
+  private async sendPermanentAlert(providerId: string, reason: string): Promise<void> {
+    try {
+      const token = this.env?.TELEGRAM_BOT_TOKEN;
+      const chatId = this.env?.TELEGRAM_OWNER_ID;
+      if (!token || !chatId) return;
+      const msg = "[AI] Provider permanently disabled: " + providerId + " (" + reason + "). Check API key or update model config.";
+      await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: msg }),
+      });
+    } catch {
+      // best-effort
+    }
+  }
+
+  /**
+   * Canary: tiny structured-JSON ping through real adapter path per provider.
+   * Classifies permanent (401/404/decommissioned) vs transient errors.
+   * Records results in provider_health. Never throws.
+   */
+  public async runCanary(now: Date = new Date()): Promise<Record<string, { ok: boolean; latencyMs: number; error?: string; permanent?: boolean }>> {
+    const providerOrder = this.getProviderOrder();
+    const results: Record<string, { ok: boolean; latencyMs: number; error?: string; permanent?: boolean }> = {};
+    const canaryRequest: AIRequest = {
+      capability: "suggest_next",
+      systemPrompt: 'Reply with valid JSON: {"ok":true}',
+      userPrompt: "Canary ping",
+      inputContext: { canary: true },
+      privacyClass: "synthetic_test",
+    };
+    for (const providerId of providerOrder) {
+      if (providerId === "mock") { results["mock"] = { ok: true, latencyMs: 0 }; continue; }
+      const config = this.getProviderConfig(providerId);
+      if (!config) continue;
+      const start = Date.now();
+      try {
+        await this.callProvider(config, canaryRequest, now);
+        const latencyMs = Date.now() - start;
+        results[providerId] = { ok: true, latencyMs };
+        await this.recordProviderHealth(config.id, config.model, "healthy", 0, latencyMs, now);
+      } catch (err: any) {
+        const latencyMs = Date.now() - start;
+        const isPermanent = !!(err.permanent);
+        const errMsg = (err.message || "unknown") + (err.body ? " | body: " + String(err.body).slice(0, 200) : "");
+        results[providerId] = { ok: false, latencyMs, error: errMsg, permanent: isPermanent };
+        const failCode = isPermanent
+          ? (err.status === 401 ? "auth_failed" : "model_decommissioned")
+          : (err.status === 429 ? "429" : (err.status?.toString() || "error"));
+        await this.recordProviderHealth(config.id, config.model, isPermanent ? "cooldown" : "degraded", 99, latencyMs, now, failCode);
+        if (isPermanent) await this.sendPermanentAlert(config.id, failCode);
+      }
+    }
+    return results;
+  }
+
+
+  /**
+   * Sends a Telegram alert when a provider is permanently disabled.
+   * Best-effort: never throws.
+   */
 }

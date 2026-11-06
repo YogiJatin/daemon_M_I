@@ -1,4 +1,4 @@
-import { parseDateShorthand, ParsedDeadline, getISTDateParts, istToUtcDate } from "./dateParser";
+﻿import { parseDateShorthand, ParsedDeadline, getISTDateParts, istToUtcDate } from "./dateParser";
 import { planNotification, planCatchupDigest } from "./notificationPlanner";
 import {
   parseRecurrenceShorthand,
@@ -154,7 +154,7 @@ export function handleHelp(args: string, _context?: CommandContext): CommandResu
 // Shared task persistence — used by /add and plain-text capture
 // ---------------------------------------------------------------------------
 
-interface PersistTaskInput {
+export interface PersistTaskInput {
   title: string;
   deadline: ParsedDeadline;
   rawExcerpt: string;   // original user text (capped to 120 chars for excerpt)
@@ -162,7 +162,7 @@ interface PersistTaskInput {
   now: Date;
 }
 
-async function persistTask(input: PersistTaskInput): Promise<string> {
+export async function persistTask(input: PersistTaskInput): Promise<string> {
   const { title, deadline, rawExcerpt, context, now } = input;
   const taskId = crypto.randomUUID();
   const sourceEventId = crypto.randomUUID();
@@ -675,6 +675,9 @@ export async function handleHealth(args: string, context?: CommandContext): Prom
     health?.last_telegram_delivery_at
       ? `Last Telegram delivery: ${health.last_telegram_delivery_at}`
       : "Last Telegram delivery: never",
+    context?.env?.HEALTHCHECKS_PING_URL
+      ? "Healthchecks: configured"
+      : "Healthchecks: not configured",
   ];
 
   await context.db
@@ -1299,7 +1302,9 @@ export async function handleAI(args: string, context?: CommandContext): Promise<
     };
   }
 
-  const response = `🤖 *AI Suggestion* (${res.provider}/${res.model}):\n\n🎯 *Next Action*: ${res.data.next_action}\n💡 *Rationale*: ${res.data.rationale}\n📈 *Confidence*: ${Math.round(res.data.confidence * 100)}%`;
+  const isMock = res.provider === "mock" || (res.provider && res.provider.includes("mock"));
+  const header = isMock ? "🤖 *AI Offline* (Deterministic fallback)" : `🤖 *AI Suggestion* (${res.provider}/${res.model})`;
+  const response = `${header}:\n\n🎯 *Next Action*: ${res.data.next_action}\n💡 *Rationale*: ${res.data.rationale}\n📈 *Confidence*: ${Math.round(res.data.confidence * 100)}%`;
 
   return {
     command: "ai",

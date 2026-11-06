@@ -1,4 +1,5 @@
-import { routeCommand, handlePlainText } from "./commands";
+import { routeCommand } from "./commands";
+import { handlePlainText } from "./telegramConversation";
 import { handleTelegramMediaIngress } from "./telegramMedia";
 import { sendTelegramMessage, answerCallbackQuery } from "./telegram";
 import { runScheduler } from "./scheduler";

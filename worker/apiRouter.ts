@@ -1,4 +1,4 @@
-/**
+﻿/**
  * worker/apiRouter.ts — Personal AI OS Services Router
  *
  * Implements OS Services Architecture:
@@ -49,7 +49,8 @@ import { AuditService } from "./auditService";
 import { AuditVerifier } from "./auditVerifier";
 import { AuditReplay } from "./auditReplay";
 import { AICapabilities } from "./aiCapabilities";
-import { PrivacyClass } from "./aiAdapter";
+import { AIAdapter, PrivacyClass } from "./aiAdapter";
+import { sendTelegramMessage } from "./telegram";
 import {
   listTaskProposals,
   confirmProposal,
@@ -802,22 +803,6 @@ export async function handleApiRequest(
           nowIso
         ),
         env.DB.prepare(
-          `INSERT INTO inbox_items (
-             id, workspace_id, content_type, raw_payload, parsed_title,
-             parsed_deadline_local_date, parsed_deadline_time_local, status, task_id, created_at, updated_at
-           ) VALUES (?, 'default', ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`
-        ).bind(
-          inboxId,
-          contentType,
-          rawText,
-          candidateTitle,
-          candidateDeadline?.localDate || null,
-          candidateDeadline?.localTime || null,
-          taskId,
-          nowIso,
-          nowIso
-        ),
-        env.DB.prepare(
           `INSERT INTO audit_events (id, entity_type, entity_id, event_type, actor, details_json, created_at)
            VALUES (?, 'inbox', ?, 'inbox_item_captured', 'owner:web', ?, ?)`
         ).bind(crypto.randomUUID(), inboxId, JSON.stringify({ title: candidateTitle, content_type: contentType }), nowIso),
@@ -1181,6 +1166,7 @@ export async function handleApiRequest(
         telegram_configured: !!env.TELEGRAM_OWNER_ID,
         database_ready: true,
         scheduler_monitor: "active",
+        healthchecks: env.HEALTHCHECKS_PING_URL ? "configured" : "not_configured",
       });
     }
 
@@ -1345,6 +1331,13 @@ export async function handleApiRequest(
     // 14. AI CAPABILITIES & TASK PROPOSALS INBOX (Block 6)
     // =======================================================================
 
+    // GET /api/v1/ai/canary — Block 0: live provider canary check
+    if (method === "GET" && path === "/api/v1/ai/canary") {
+      const adapter = new AIAdapter(env, env.DB);
+      const results = await adapter.runCanary(now);
+      return jsonSuccess({ canary: results, timestamp: now.toISOString() });
+    }
+
     // GET /api/v1/ai/health
     if (method === "GET" && path === "/api/v1/ai/health") {
       const providers = await env.DB.prepare(
@@ -1452,6 +1445,13 @@ export async function handleApiRequest(
       const result = await confirmProposal(env.DB, proposalId, body.overrides, now);
       if (!result.success) {
         return jsonError("confirm_failed", result.error || "Failed to confirm proposal", 400);
+      }
+
+      // Block 0: send Telegram confirmation to owner after web approval
+      if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_OWNER_ID && result.task) {
+        const taskTitle = (result.task as any).title || "(task)";
+        const confirmMsg = `✅ *Task confirmed from web*\n📋 ${taskTitle}\nProposal #${proposalId.slice(0, 8)} accepted.`
+        await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_OWNER_ID, confirmMsg).catch(() => {});
       }
 
       return jsonSuccess({
