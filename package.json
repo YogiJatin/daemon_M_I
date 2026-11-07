@@ -10,7 +10,9 @@
     "preview": "npm run build && vite preview",
     "deploy": "npm run build && wrangler deploy",
     "cf-typegen": "wrangler types",
-    "agent": "tsx desktop-agent/obsidian-writer.ts"
+    "agent": "tsx desktop_agent/mirror_agent.ts",
+    "agent:pair": "tsx scripts/pair_desktop.ts",
+    "agent:mirror": "tsx desktop_agent/mirror_agent.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.3.0",

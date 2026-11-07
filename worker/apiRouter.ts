@@ -1,4 +1,4 @@
-﻿/**
+/**
  * worker/apiRouter.ts — Personal AI OS Services Router
  *
  * Implements OS Services Architecture:
@@ -1158,6 +1158,18 @@ export async function handleApiRequest(
       const pausedSetting = await env.DB.prepare("SELECT value FROM settings WHERE key = 'reminders_paused'").first<{ value: string }>();
       const isPaused = pausedSetting?.value === "true";
 
+      const desktopDevice = await env.DB.prepare(
+        "SELECT last_seen_at, agent_version FROM desktop_devices WHERE revoked_at IS NULL ORDER BY last_seen_at DESC LIMIT 1"
+      ).first<any>().catch(() => null);
+
+      const mirrorCounts = await env.DB.prepare(
+        "SELECT status, COUNT(*) as cnt FROM mirror_outbox GROUP BY status"
+      ).all<{ status: string; cnt: number }>().catch(() => ({ results: [] }));
+      const mirrorQueue: Record<string, number> = { pending: 0, delivered: 0, conflict: 0, failed: 0 };
+      for (const r of mirrorCounts.results || []) {
+        mirrorQueue[r.status] = r.cnt;
+      }
+
       return jsonSuccess({
         overall_status: isPaused ? "paused" : (healthRow?.consecutive_failures > 0 ? "degraded" : "healthy"),
         reminders_paused: isPaused,
@@ -1167,6 +1179,12 @@ export async function handleApiRequest(
         database_ready: true,
         scheduler_monitor: "active",
         healthchecks: env.HEALTHCHECKS_PING_URL ? "configured" : "not_configured",
+        desktop_agent: {
+          last_seen_at: desktopDevice?.last_seen_at || null,
+          version: desktopDevice?.agent_version || null,
+          paired: !!desktopDevice,
+        },
+        mirror_queue: mirrorQueue,
       });
     }
 
@@ -1330,6 +1348,28 @@ export async function handleApiRequest(
     // =======================================================================
     // 14. AI CAPABILITIES & TASK PROPOSALS INBOX (Block 6)
     // =======================================================================
+
+    // GET /api/v1/internal/test/gemini-probe
+    if (method === "GET" && path === "/api/v1/internal/test/gemini-probe") {
+      const apiKey = (env as any).GEMINI_API_KEY_1;
+      const model = (env as any).GEMINI_MODEL || "gemini-3.8-flash";
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 6000);
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] }),
+          signal: controller.signal,
+        });
+        clearTimeout(t);
+        const body = await res.text();
+        return jsonSuccess({ status: res.status, body: body.slice(0, 300) });
+      } catch (err: any) {
+        clearTimeout(t);
+        return jsonSuccess({ error: err.message });
+      }
+    }
 
     // GET /api/v1/ai/canary — Block 0: live provider canary check
     if (method === "GET" && path === "/api/v1/ai/canary") {

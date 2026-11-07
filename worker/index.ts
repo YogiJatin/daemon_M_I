@@ -1,8 +1,10 @@
-﻿import { routeCommand } from "./commands";
+import { routeCommand } from "./commands";
 import { handleNonSlashMessage } from "./telegramConversation";
+import { AIAdapter } from "./aiAdapter";
 import { handleTelegramMediaIngress } from "./telegramMedia";
 import { sendTelegramMessage, answerCallbackQuery } from "./telegram";
 import { runScheduler } from "./scheduler";
+import { sweepStaleChatMessages } from "./chatSweeper";
 import {
   updateTaskTitle,
   updateTaskDeadline,
@@ -37,6 +39,15 @@ import {
 import { getISTDateParts, istToUtcDate } from "./dateParser";
 import { authenticateRequest } from "./auth";
 import { handleApiRequest, jsonError } from "./apiRouter";
+import {
+  createPairingCode,
+  exchangePairingCode,
+  authenticateDesktopDevice,
+  claimPendingMirrorJobs,
+  acknowledgeMirrorJob,
+  enqueueMirrorJob,
+  handleRevokeDeviceCommand,
+} from "./desktopMirrorService";
 
 export default {
   async fetch(request, env, ctx: ExecutionContext): Promise<Response> {
@@ -103,7 +114,110 @@ export default {
       url.pathname === "/api/v1/auth/pair" ||
       url.pathname === "/api/v1/telegram/webhook" ||
       url.pathname === "/webhook" ||
-      url.pathname.startsWith("/api/v1/internal/");
+      url.pathname.startsWith("/api/v1/internal/") ||
+      url.pathname.startsWith("/api/v1/desktop/");
+
+    // -------------------------------------------------------------------------
+    // Block 3: Desktop Outbox Mirror & Isolation (B3.2, B3.3, B3-02)
+    // -------------------------------------------------------------------------
+    const authHeader = request.headers.get("Authorization") || "";
+    const isDesktopToken = authHeader.startsWith("Bearer dsk_");
+    const isDesktopRoute = url.pathname.startsWith("/api/v1/desktop/");
+
+    // B3-02: Device token on an owner route -> 403 Forbidden
+    if (isDesktopToken && !isDesktopRoute) {
+      return jsonError("forbidden", "Device token not permitted on owner routes", 403);
+    }
+
+    // B3-02: Owner token on a desktop route -> 403 Forbidden
+    if (isDesktopRoute && url.pathname !== "/api/v1/desktop/pair" && url.pathname !== "/api/v1/desktop/export-obsidian" && !isDesktopToken) {
+      return jsonError("forbidden", "Owner token not permitted on desktop routes", 403);
+    }
+
+    // Pairing endpoint: POST /api/v1/desktop/pair
+    if (request.method === "POST" && url.pathname === "/api/v1/desktop/pair") {
+      const body = (await request.json().catch(() => ({}))) as any;
+      if (body.action === "create_code") {
+        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+        if (!auth.authenticated) return jsonError("unauthorized", "Owner authentication required", 401);
+        const code = await createPairingCode(env.DB);
+        return Response.json({ ok: true, code });
+      }
+      const deviceName = body.device_name || body.name || "Desktop PC";
+      const result = await exchangePairingCode(env.DB, body.code || "", deviceName);
+      return Response.json({
+        success: result.success,
+        device_token: result.deviceToken,
+        device_id: result.deviceId,
+        error: result.error,
+      }, { status: result.success ? 200 : 400 });
+    }
+
+    // Revoke desktop device: POST /api/v1/desktop/devices/:id/revoke
+    if (request.method === "POST" && url.pathname.startsWith("/api/v1/desktop/devices/") && url.pathname.endsWith("/revoke")) {
+      const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+      if (!auth.authenticated) return jsonError("unauthorized", "Owner authentication required", 401);
+      const match = url.pathname.match(/\/api\/v1\/desktop\/devices\/([^/]+)\/revoke/);
+      const devId = match ? match[1] : "";
+      const msg = await handleRevokeDeviceCommand(env.DB, devId);
+      return Response.json({ ok: true, message: msg });
+    }
+
+    // Poll mirror jobs: GET /api/v1/desktop/mirror-jobs
+    if (request.method === "GET" && url.pathname === "/api/v1/desktop/mirror-jobs") {
+      const auth = await authenticateDesktopDevice(request, env.DB);
+      if (!auth.authenticated || !auth.device) {
+        return Response.json({ ok: false, error: auth.error }, { status: 401 });
+      }
+      const jobs = await claimPendingMirrorJobs(env.DB, auth.device.id, 10);
+      if (jobs.length === 0) {
+        return new Response(null, { status: 204 });
+      }
+      return Response.json({ ok: true, jobs });
+    }
+
+    // ACK mirror job: POST /api/v1/desktop/mirror-jobs/:id/ack OR POST /api/v1/desktop/ack
+    if (
+      request.method === "POST" &&
+      (url.pathname === "/api/v1/desktop/ack" ||
+        (url.pathname.startsWith("/api/v1/desktop/mirror-jobs/") && url.pathname.endsWith("/ack")))
+    ) {
+      const auth = await authenticateDesktopDevice(request, env.DB);
+      if (!auth.authenticated) {
+        return Response.json({ ok: false, error: auth.error }, { status: 401 });
+      }
+      const body = (await request.json().catch(() => ({}))) as any;
+      let jobId = body.jobId;
+      if (!jobId) {
+        const match = url.pathname.match(/\/api\/v1\/desktop\/mirror-jobs\/([^/]+)\/ack/);
+        jobId = match ? match[1] : "";
+      }
+      const ackResult = await acknowledgeMirrorJob(env.DB, jobId, {
+        status: body.status,
+        writtenPath: body.writtenPath || body.written_path,
+        conflictPath: body.conflictPath || body.conflict_path,
+        error: body.error || body.last_error,
+      });
+      return Response.json(ackResult, { status: ackResult.success ? 200 : 400 });
+    }
+
+    // Internal test enqueue endpoint & export-obsidian producer
+    if (
+      request.method === "POST" &&
+      (url.pathname === "/api/v1/internal/test/enqueue-mirror" || url.pathname === "/api/v1/desktop/export-obsidian")
+    ) {
+      const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+      if (!auth.authenticated) return jsonError("unauthorized", "Owner authentication required", 401);
+      const body = (await request.json().catch(() => ({}))) as any;
+      const jobId = await enqueueMirrorJob(env.DB, {
+        dedupeKey: body.dedupeKey || body.dedupe_key,
+        targetFolder: body.targetFolder || body.target_folder || "Knowledge/Mirror",
+        filename: body.filename,
+        content: body.content,
+        isUntrusted: Boolean(body.isUntrusted),
+      });
+      return Response.json({ ok: true, jobId });
+    }
 
     if (!isExempt && url.pathname.startsWith("/api/v1/")) {
       const auth = await authenticateRequest(
@@ -179,6 +293,28 @@ export default {
       return Response.json({ ok: true, task, notifs: notifs.results });
     }
 
+    // Internal test endpoint for fast D1 test queries (authenticated by webhook secret or session)
+    if (request.method === "POST" && url.pathname === "/api/v1/internal/test/d1-query") {
+      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
+      let authorized = Boolean(secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET);
+      if (!authorized) {
+        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+        authorized = auth.authenticated;
+      }
+      if (!authorized) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      const body = (await request.json()) as any;
+      const binds = Array.isArray(body.binds) ? body.binds : [];
+      try {
+        const stmt = env.DB.prepare(body.sql);
+        const result = binds.length > 0 ? await stmt.bind(...binds).all() : await stmt.all();
+        return Response.json({ ok: true, results: result.results || [] });
+      } catch (err: any) {
+        return Response.json({ ok: false, error: err.message }, { status: 500 });
+      }
+    }
+
     // Block 2B: Test endpoints for quiet hours, prep digest & catchup digest
     if (request.method === "POST" && url.pathname === "/api/v1/internal/test/block2b") {
       const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
@@ -212,6 +348,86 @@ export default {
       }
 
       return Response.json({ ok: false, error: "unknown_action" });
+    }
+
+    // 0.7 Provider Audit & Live Canary Endpoint
+    if (request.method === "POST" && url.pathname === "/api/v1/internal/test/provider-audit") {
+      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
+      let authorized = Boolean(secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET);
+      if (!authorized) {
+        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+        authorized = auth.authenticated;
+      }
+      if (!authorized) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+
+      const results: any = {};
+      const envAny = env as any;
+      const groqKey = envAny.GROQ_API_KEY_1 || envAny.GROQ_API_KEY;
+      if (groqKey) {
+        try {
+          const resp = await fetch("https://api.groq.com/openai/v1/models", {
+            headers: { Authorization: `Bearer ${groqKey}` },
+          });
+          const data: any = await resp.json();
+          results.groq = {
+            status: resp.status,
+            models: (data.data || []).map((m: any) => m.id),
+          };
+        } catch (e: any) {
+          results.groq = { error: e.message };
+        }
+      } else {
+        results.groq = { missingKey: true };
+      }
+
+      const geminiKey = envAny.GEMINI_API_KEY_1 || envAny.GEMINI_API_KEY;
+      if (geminiKey) {
+        try {
+          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`);
+          const data: any = await resp.json();
+          results.gemini = {
+            status: resp.status,
+            models: (data.models || []).map((m: any) => ({
+              name: m.name,
+              supportedGenerationMethods: m.supportedGenerationMethods,
+            })),
+          };
+        } catch (e: any) {
+          results.gemini = { error: e.message };
+        }
+      } else {
+        results.gemini = { missingKey: true };
+      }
+
+      // Live Canary run via AIAdapter
+      const now = new Date();
+      const adapter = new AIAdapter(env, env.DB);
+      const canaryRes = await adapter.runCanary(now);
+      results.canary = canaryRes;
+
+      const workersAiModels = [
+        "@cf/meta/llama-3.1-8b-instruct",
+        "@cf/meta/llama-3.1-8b-instruct-fast",
+        "@cf/meta/llama-3.2-3b-instruct",
+        "@cf/meta/llama-3.2-1b-instruct",
+        "@cf/mistral/mistral-7b-instruct-v0.2",
+      ];
+      results.workers_ai_probe = {};
+      for (const m of workersAiModels) {
+        try {
+          const r: any = await (env as any).AI.run(m, {
+            messages: [{ role: "user", content: "hi" }],
+            max_tokens: 10,
+          });
+          results.workers_ai_probe[m] = { ok: true, resp: r?.response };
+        } catch (e: any) {
+          results.workers_ai_probe[m] = { ok: false, error: e.message };
+        }
+      }
+
+      return Response.json({ ok: true, results });
     }
 
     // ==========================================
@@ -1357,7 +1573,49 @@ export default {
       return Response.json({ ok: true, allPassed, results: testResults });
     }
 
-    // Telegram webhook endpoint and command routing
+    // Internal test endpoint: Telegram Webhook Diagnostic (Fix Brief 0 F7 & Step 1 item 2)
+    if (url.pathname === "/api/v1/internal/test/telegram-webhook-info") {
+      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
+      let authorized = Boolean(secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET);
+      if (!authorized) {
+        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+        authorized = auth.authenticated;
+      }
+      if (!authorized) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+
+      if (!env.TELEGRAM_BOT_TOKEN || env.TELEGRAM_BOT_TOKEN.startsWith("mock:")) {
+        return Response.json({ ok: false, error: "Bot token not configured or mock" });
+      }
+
+      try {
+        const drop = url.searchParams.get("drop_pending_updates") === "1";
+        if (drop) {
+          const dropResp = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=true`);
+          const dropData = (await dropResp.json().catch(() => ({}))) as any;
+          const setResp = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              url: `https://personal-ai-os.jatin-personal-ai.workers.dev/api/v1/telegram/webhook`,
+              secret_token: env.TELEGRAM_WEBHOOK_SECRET,
+              allowed_updates: ["message", "callback_query"],
+            }),
+          });
+          const setData = (await setResp.json().catch(() => ({}))) as any;
+          return Response.json({ ok: true, dropped: dropData, setWebhook: setData });
+        }
+
+        const infoResp = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/getWebhookInfo`);
+        const infoData = (await infoResp.json().catch(() => ({}))) as any;
+        return Response.json({ ok: true, webhookInfo: infoData?.result || infoData });
+      } catch (err: any) {
+        return Response.json({ ok: false, error: err.message }, { status: 500 });
+      }
+    }
+
+    // Telegram webhook endpoint and command routing (F1 Resilient Webhook)
     if (request.method === "POST" && (url.pathname === "/api/v1/telegram/webhook" || url.pathname === "/webhook")) {
       const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
       const configuredSecret = env.TELEGRAM_WEBHOOK_SECRET;
@@ -1368,7 +1626,7 @@ export default {
         authorized = auth.authenticated;
       }
 
-      // TEST-1.2: Reject missing or invalid secret token
+      // TEST-1.2: Reject missing or invalid secret token (reject once, do no work)
       if (!authorized) {
         return new Response("Unauthorized", { status: 401 });
       }
@@ -1385,7 +1643,7 @@ export default {
         return new Response("Invalid update_id", { status: 400 });
       }
 
-      // TEST-1.1: Verify owner ID — no DB mutation, no meaningful reply
+      // TEST-1.1: Verify owner ID — non-owner: reject once, do no work
       const senderId = payload?.message?.from?.id ?? payload?.callback_query?.from?.id;
       const chatId = payload?.message?.chat?.id ?? payload?.callback_query?.message?.chat?.id;
       const ownerId = env.TELEGRAM_OWNER_ID;
@@ -1393,88 +1651,147 @@ export default {
         return Response.json({ ok: true, ignored: true });
       }
 
-      // TEST-1.4: Inbound ledger deduplication
-      const existing = await env.DB.prepare(
-        "SELECT update_id, status FROM telegram_updates WHERE update_id = ?"
-      )
-        .bind(updateId)
-        .first();
+      // F1: Wrap all processing in try/catch to ALWAYS return 200 within 1s
+      try {
+        // F1: Insert update_id into telegram_updates FIRST with INSERT OR IGNORE
+        // If it already exists, return 200 and do nothing.
+        const insertRes = await env.DB.prepare(
+          "INSERT OR IGNORE INTO telegram_updates (update_id, status, received_at) VALUES (?, 'received', datetime('now'))"
+        )
+          .bind(updateId)
+          .run();
 
-      if (existing) {
-        return Response.json({ ok: true, duplicate: true });
-      }
-
-      // Record update receipt in ledger
-      await env.DB.prepare(
-        "INSERT INTO telegram_updates (update_id, status, received_at) VALUES (?, 'received', datetime('now'))"
-      )
-        .bind(updateId)
-        .run();
-
-      // Block 2A & 2B: Handle callback_query (Done, Snooze, Details inline buttons)
-      if (payload?.callback_query) {
-        const callbackResult = await handleCallbackQuery(payload.callback_query, env, updateId);
-        if (payload.callback_query.id) {
-          await answerCallbackQuery(env.TELEGRAM_BOT_TOKEN, payload.callback_query.id, callbackResult.message);
+        const changes = (insertRes as any)?.meta?.changes ?? (insertRes as any)?.changes ?? 1;
+        if (changes === 0) {
+          return Response.json({ ok: true, duplicate: true });
         }
+
+        // Check test headers if enabled in env or settings
+        let now = new Date();
+        let testStubs = false;
+        let testStubPayload: any = null;
+
+        const testClockHeader = request.headers.get("X-Test-Clock");
+        const testStubsHeader = request.headers.get("X-Test-Stubs");
+        const testStubPayloadHeader = request.headers.get("X-Test-Stub-Payload");
+
+        if (testClockHeader || testStubsHeader) {
+          const testSettings = await env.DB.prepare(
+            "SELECT key, value FROM settings WHERE key IN ('allow_test_clock', 'allow_test_stubs')"
+          )
+            .all<{ key: string; value: string }>()
+            .catch(() => ({ results: [] }));
+          const settingsMap: Record<string, string> = {};
+          for (const r of testSettings.results || []) {
+            settingsMap[r.key] = r.value;
+          }
+
+          if (testClockHeader && ((env as any).ALLOW_TEST_CLOCK === "1" || settingsMap.allow_test_clock === "1")) {
+            const parsedClock = new Date(testClockHeader);
+            if (!isNaN(parsedClock.getTime())) {
+              now = parsedClock;
+            }
+          }
+
+          if (testStubsHeader === "1" && ((env as any).ALLOW_TEST_STUBS === "1" || settingsMap.allow_test_stubs === "1")) {
+            testStubs = true;
+            if (testStubPayloadHeader) {
+              try {
+                testStubPayload = JSON.parse(testStubPayloadHeader);
+              } catch {}
+            }
+          }
+        }
+
+        // Block 2A & 2B: Handle callback_query (Done, Snooze, Details inline buttons)
+        if (payload?.callback_query) {
+          const callbackResult = await handleCallbackQuery(payload.callback_query, env, updateId);
+          if (payload.callback_query.id) {
+            await answerCallbackQuery(env.TELEGRAM_BOT_TOKEN, payload.callback_query.id, callbackResult.message, { testStubs });
+          }
+          return Response.json({
+            ok: true,
+            routed: true,
+            callback: callbackResult,
+            result: callbackResult.message,
+          });
+        }
+
+        // Route command if present; otherwise capture plain-text as task (BLOCK_1.md)
+        const messageText = typeof payload?.message?.text === "string" ? payload.message.text : "";
+        const context = { db: env.DB, updateId, senderId, chatId, env, now, testStubs, testStubPayload };
+
+        const isVoice = Boolean(payload?.message?.voice);
+        const isPhoto = Boolean(payload?.message?.photo && payload?.message?.photo.length > 0);
+        const isDocument = Boolean(payload?.message?.document);
+
+        let routed: any = null;
+        if (isVoice || isPhoto || isDocument) {
+          routed = await handleTelegramMediaIngress(payload.message, context);
+        } else {
+          routed = await routeCommand(messageText, context);
+        }
+
+        // Block 1: Non-slash plain-text -> conversational AI assistant (async, ctx.waitUntil)
+        if (!isVoice && !isPhoto && !isDocument && routed === null && messageText.trim() && !messageText.trim().startsWith("/")) {
+          const replyToMessageId = payload?.message?.reply_to_message?.message_id;
+          const isForwarded = Boolean(payload?.message?.forward_date || payload?.message?.forward_from || payload?.message?.forward_origin);
+          return handleNonSlashMessage({
+            db: env.DB,
+            env,
+            chatId,
+            updateId,
+            messageId: payload?.message?.message_id ?? 0,
+            text: messageText,
+            now,
+            ctx,
+            replyToMessageId,
+            testStubs,
+            testStubPayload,
+            isForwarded,
+          });
+        }
+
+        // Slash command: durable write committed inside handler; send reply after commit.
+        // If send fails, still return HTTP 200 - do NOT repeat mutation (AGENTS.md Rule 9).
+        if (routed?.response && chatId !== undefined) {
+          const sendRes = await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, chatId, routed.response, (routed as any)?.replyMarkup, { testStubs, db: env.DB }).catch(() => null);
+          try {
+            const nowIsoStr = (now || new Date()).toISOString();
+            const markupStr = (routed as any)?.replyMarkup ? JSON.stringify((routed as any).replyMarkup) : null;
+            await env.DB.prepare(
+              `INSERT INTO chat_messages (id, update_id, chat_id, message_id, role, text, intent, confidence, status, outcome, reply_markup, telegram_message_id, attempts, last_attempt_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, 'assistant', ?, 'slash_command', 1.0, 'sent', 'command_executed', ?, ?, 1, ?, ?, ?)`
+            ).bind(
+              "msg_" + Math.random().toString(36).slice(2, 10).toUpperCase(),
+              updateId,
+              String(chatId),
+              payload?.message?.message_id ?? 0,
+              routed.response.slice(0, 4000),
+              markupStr,
+              sendRes?.telegramMessageId ?? null,
+              nowIsoStr,
+              nowIsoStr,
+              nowIsoStr
+            ).run();
+          } catch {}
+        }
+
         return Response.json({
           ok: true,
-          routed: true,
-          callback: callbackResult,
-          result: callbackResult.message,
+          routed: routed !== null,
+          command: routed?.command ?? null,
+          success: routed?.success ?? true,
+          taskId: routed?.taskId ?? null,
+          deadline: routed?.deadline ?? null,
+          tasks: routed?.tasks ?? null,
+          proposals: (routed as any)?.proposals ?? null,
+          result: routed?.response ?? null,
         });
+      } catch (err: any) {
+        console.error("[Webhook Handler] Unhandled error caught; returning 200 to prevent redelivery loop:", err);
+        return Response.json({ ok: true, recovered: true });
       }
-
-      // Route command if present; otherwise capture plain-text as task (BLOCK_1.md)
-      const messageText = typeof payload?.message?.text === "string" ? payload.message.text : "";
-      const context = { db: env.DB, updateId, senderId, chatId, env };
-
-      const isVoice = Boolean(payload?.message?.voice);
-      const isPhoto = Boolean(payload?.message?.photo && payload?.message?.photo.length > 0);
-      const isDocument = Boolean(payload?.message?.document);
-
-      let routed: any = null;
-      if (isVoice || isPhoto || isDocument) {
-        routed = await handleTelegramMediaIngress(payload.message, context);
-      } else {
-        routed = await routeCommand(messageText, context);
-      }
-
-      // Block 1: Non-slash plain-text -> conversational AI assistant (async, ctx.waitUntil)
-      if (!isVoice && !isPhoto && !isDocument && routed === null && messageText.trim() && !messageText.trim().startsWith("/")) {
-        const replyToMessageId = payload?.message?.reply_to_message?.message_id;
-        return handleNonSlashMessage({
-          db: env.DB,
-          env,
-          chatId,
-          updateId,
-          messageId: payload?.message?.message_id ?? 0,
-          text: messageText,
-          now: new Date(),
-          ctx,
-          replyToMessageId,
-        });
-      }
-
-      // Slash command: durable write committed inside handler; send reply after commit.
-      // If send fails, still return HTTP 200 - do NOT repeat mutation (AGENTS.md Rule 9).
-      if (routed?.response && chatId !== undefined) {
-        await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, chatId, routed.response, (routed as any)?.replyMarkup).catch(() => {
-          // Swallow - reply failure must not affect HTTP response or cause a retry
-        });
-      }
-
-      return Response.json({
-        ok: true,
-        routed: routed !== null,
-        command: routed?.command ?? null,
-        success: routed?.success ?? true,
-        taskId: routed?.taskId ?? null,
-        deadline: routed?.deadline ?? null,
-        tasks: routed?.tasks ?? null,
-        proposals: (routed as any)?.proposals ?? null,
-        result: routed?.response ?? null,
-      });
     }
 
     return new Response(null, { status: 404 });
@@ -1488,6 +1805,13 @@ export default {
       ownerId: env.TELEGRAM_OWNER_ID,
       ownerType: typeof env.TELEGRAM_OWNER_ID,
     });
+    // Cron sweeper for stale chat messages (Part A1 + Fix Brief 0 F4)
+    await sweepStaleChatMessages(env.DB, env.TELEGRAM_BOT_TOKEN, scheduledTime, env.TELEGRAM_OWNER_ID);
+
+    // P0-11: 30-day retention cleanup for chat_messages
+    const thirtyDaysAgo = new Date(scheduledTime.getTime() - 30 * 24 * 3600 * 1000).toISOString();
+    await env.DB.prepare("DELETE FROM chat_messages WHERE created_at < ?").bind(thirtyDaysAgo).run().catch(() => {});
+
     await runScheduler(env.DB, scheduledTime, undefined, {
       botToken: env.TELEGRAM_BOT_TOKEN,
       ownerChatId: env.TELEGRAM_OWNER_ID,

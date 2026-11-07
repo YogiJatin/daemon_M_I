@@ -1,0 +1,77 @@
+[
+  {
+    "id": "M01",
+    "status": "FAIL",
+    "rawOutput": "[]"
+  },
+  {
+    "id": "M02",
+    "status": "PASS",
+    "detail": "Secrets guard refused write, 0 rows stored"
+  },
+  {
+    "id": "M03",
+    "status": "FAIL",
+    "rawOutput": "memory_proposal row not found"
+  },
+  {
+    "id": "M04",
+    "status": "PASS",
+    "detail": "Forwarded text produced 0 memory proposals and 0 memory rows"
+  },
+  {
+    "id": "M05",
+    "status": "FAIL",
+    "rawOutput": "Found rows: props=[]"
+  },
+  {
+    "id": "M06",
+    "status": "PASS",
+    "detail": "D1 memories template returned successfully with all AI offline"
+  },
+  {
+    "id": "M07",
+    "status": "FAIL",
+    "rawOutput": "Row still exists: [{\"id\":\"mem_test_to_forget\",\"type\":\"fact\",\"title\":\"test fact\",\"canonical_text\":\"Temporary fact to forget\",\"summary\":null,\"attachment_id\":null,\"source\":\"telegram_manual\",\"metadata_json\":null,\"created_at\":\"2026-11-06 17:38:46\",\"updated_at\":\"2026-11-06 17:38:46\",\"trust\":\"high\",\"sensitivity\":\"normal\",\"tags\":null,\"last_used_at\":null,\"expires_at\":null}]"
+  },
+  {
+    "id": "M08",
+    "status": "FAIL",
+    "rawOutput": "[]"
+  },
+  {
+    "id": "M09",
+    "status": "PASS",
+    "detail": "Memory injection completed"
+  },
+  {
+    "id": "M10",
+    "status": "PASS",
+    "detail": "Injected exactly 5 memories (<= 5 cap enforced; ranked by keyword match and recency)"
+  },
+  {
+    "id": "M11",
+    "status": "PASS",
+    "detail": "Time resolved from timetable schedule: {\"intent\":\"chat\",\"confidence\":0,\"reply_text\":\"AI is offline right now. Your message was not lost.\",\""
+  },
+  {
+    "id": "M12",
+    "status": "PASS",
+    "detail": "Private memory was excluded from retrieval and prompt injection"
+  },
+  {
+    "id": "M13",
+    "status": "PASS",
+    "detail": "Verified: buildAssistantUserPrompt contains zero memory tags; memory injected strictly downstream in answer path"
+  },
+  {
+    "id": "M14",
+    "status": "PASS",
+    "detail": "Verified: suggest_next and task_breakdown contextBuilder queries memory_objects with sensitivity != 'private' and limit 5"
+  },
+  {
+    "id": "M15",
+    "status": "PASS",
+    "detail": "Standing context saved (60 chars <= 600 max), injected on answer path"
+  }
+]

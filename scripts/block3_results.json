@@ -1,0 +1,86 @@
+[
+  {
+    "id": "B3-01",
+    "name": "Pairing code lifecycle",
+    "status": "FAIL",
+    "rawOutput": "Unexpected end of JSON input"
+  },
+  {
+    "id": "B3-02",
+    "name": "Route isolation",
+    "status": "FAIL",
+    "rawOutput": "Unexpected end of JSON input"
+  },
+  {
+    "id": "B3-03",
+    "name": "Enqueue -> write -> ack",
+    "status": "FAIL",
+    "rawOutput": "Unexpected end of JSON input"
+  },
+  {
+    "id": "B3-04",
+    "name": "Job coalescing",
+    "status": "FAIL",
+    "rawOutput": "pending=0, superseded=0"
+  },
+  {
+    "id": "B3-05",
+    "name": "Claim & ACK idempotency",
+    "status": "FAIL",
+    "rawOutput": "Unexpected end of JSON input"
+  },
+  {
+    "id": "B3-06",
+    "name": "Path attack rejections",
+    "status": "FAIL",
+    "rawOutput": "Cannot find module 'C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\desktop_agent\\mirror_agent' imported from C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\scripts\\run_block3_tests.ts"
+  },
+  {
+    "id": "B3-07",
+    "name": "Conflict detection",
+    "status": "FAIL",
+    "rawOutput": "Unexpected end of JSON input"
+  },
+  {
+    "id": "B3-08",
+    "name": "Content neutralization",
+    "status": "FAIL",
+    "rawOutput": "Cannot find module 'C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\worker\\desktopMirrorService' imported from C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\scripts\\run_block3_tests.ts"
+  },
+  {
+    "id": "B3-09",
+    "name": "Device revocation",
+    "status": "FAIL",
+    "rawOutput": "Unexpected end of JSON input"
+  },
+  {
+    "id": "B3-10",
+    "name": "Backoff recovery",
+    "status": "PASS",
+    "detail": "Exponential backoff capped at 30s on upstream failures."
+  },
+  {
+    "id": "B3-11",
+    "name": "Health observability",
+    "status": "FAIL",
+    "rawOutput": "{\"ok\":true,\"data\":{\"overall_status\":\"healthy\",\"reminders_paused\":false,\"last_scheduler_run\":\"2026-11-07T05:25:27.142Z\",\"consecutive_failures\":0,\"telegram_configured\":true,\"database_ready\":true,\"scheduler_monitor\":\"active\",\"healthchecks\":\"not_configured\"}}"
+  },
+  {
+    "id": "B3-12",
+    "name": "Port 27124 closed",
+    "status": "FAIL",
+    "rawOutput": "Port 27124 is unexpectedly open"
+  },
+  {
+    "id": "B3-13",
+    "name": "Single instance lock",
+    "status": "FAIL",
+    "rawOutput": "Cannot find module 'C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\desktop_agent\\mirror_agent' imported from C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\scripts\\run_block3_tests.ts"
+  },
+  {
+    "id": "B3-14",
+    "name": "Zero AI in scheduler",
+    "status": "PASS",
+    "detail": "worker/scheduler.ts imports zero AI modules. Non-negotiable Rule 5 invariant upheld."
+  }
+]
