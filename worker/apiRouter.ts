@@ -1163,7 +1163,7 @@ export async function handleApiRequest(
       ).first<any>().catch(() => null);
 
       const mirrorCounts = await env.DB.prepare(
-        "SELECT status, COUNT(*) as cnt FROM mirror_outbox GROUP BY status"
+        "SELECT status, COUNT(*) as cnt FROM desktop_mirror_outbox GROUP BY status"
       ).all<{ status: string; cnt: number }>().catch(() => ({ results: [] }));
       const mirrorQueue: Record<string, number> = { pending: 0, delivered: 0, conflict: 0, failed: 0 };
       for (const r of mirrorCounts.results || []) {

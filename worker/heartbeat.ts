@@ -17,7 +17,7 @@ import { canDispatchAttention, logAttentionSend } from "./attention";
 import { sendTelegramMessage } from "./telegram";
 
 export interface HeartbeatIssue {
-  type: "overdue_tasks" | "stale_proposals" | "desktop_offline" | "provider_outage";
+  type: "overdue_tasks" | "stale_proposals" | "desktop_offline" | "provider_outage" | "backup_stale";
   description: string;
 }
 
@@ -112,6 +112,20 @@ export async function runDeterministicHeartbeat(
     issues.push({
       type: "provider_outage",
       description: `AI Provider (${pNames}) degraded/outage for > 60 minutes`,
+    });
+  }
+
+  // 5. Check backup older than 36 hours (Phase 3)
+  const thirtySixHoursAgo = new Date(now.getTime() - 36 * 3600 * 1000).toISOString();
+  const backupRow = await db
+    .prepare("SELECT value FROM settings WHERE key = 'last_backup_at'")
+    .first<{ value: string }>()
+    .catch(() => null);
+
+  if (backupRow?.value && backupRow.value < thirtySixHoursAgo) {
+    issues.push({
+      type: "backup_stale",
+      description: `Latest database backup is older than 36 hours (${backupRow.value})`,
     });
   }
 
