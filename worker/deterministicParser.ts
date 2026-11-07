@@ -322,21 +322,19 @@ export function splitMessageClauses(text: string): string[] {
   if (!trimmed) return [];
 
   // Patterns that delimit clauses:
-  // 1. ", and "
-  // 2. ", also "
+  // 1. ", and " or ", also "
+  // 2. ", " when followed by typical verbs or question words (e.g. ", buy milk")
   // 3. " and " / " also " when followed by typical verbs or question words
   // 4. "\n"
   // 5. "; "
-  const rawParts = trimmed.split(/,\s*(?:and|also)\s+|\s+also\s+|;\s*|\n+/i);
+  const delimiterRegex = /,\s*(?:and\s+|also\s+)?(?=(?:remind|buy|submit|call|meet|what|how|i\s+need|i\s+must|i\s+will)\b)|,\s*(?:and|also)\s+|\s+and\s+(?=(?:remind|buy|submit|call|meet|what|how|i\s+need|i\s+must|i\s+will)\b)|\s+also\s+|;\s*|\n+/i;
 
+  const rawParts = trimmed.split(delimiterRegex);
   const clauses: string[] = [];
   for (const part of rawParts) {
-    const subParts = part.split(/\s+and\s+(?=(?:remind|buy|submit|call|what|how|i\s+need|i\s+must|i\s+will)\b)/i);
-    for (const sub of subParts) {
-      const s = sub.trim();
-      if (s.length > 0) {
-        clauses.push(s);
-      }
+    const s = part.trim();
+    if (s.length > 0) {
+      clauses.push(s);
     }
   }
 
