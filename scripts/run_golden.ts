@@ -18,7 +18,7 @@ const DEPLOYED_WEBHOOK_URL = `${DEPLOYED_URL}/api/v1/telegram/webhook`;
 const GOLDEN_JSON_PATH = path.resolve(ROOT_DIR, "tests/golden.json");
 
 function computeSha256(filePath: string): string {
-  const content = fs.readFileSync(filePath);
+  const content = fs.readFileSync(filePath, "utf8").replace(/\r\n/g, "\n");
   return crypto.createHash("sha256").update(content).digest("hex");
 }
 

@@ -1,0 +1,18 @@
+[
+  { "id": "P01", "name": "8 first-fire reminders in one IST day", "expected": "all 8 sent, all counted=0, none suppressed" },
+  { "id": "P02", "name": "reminder unacknowledged", "expected": "re-nudges at +10 and +30 min, never a third; a Done tap stops them; quiet hours stop them" },
+  { "id": "P03", "name": "pool_a_renudge_cap=4", "expected": "5th re-nudge suppressed and logged" },
+  { "id": "P04", "name": "morning briefing at 08:00 (fixture + override)", "expected": "classes with override applied, due today, overdue, proposals; identical with AI down" },
+  { "id": "P05", "name": "cron fires twice in one minute, then worker restart", "expected": "exactly one briefing" },
+  { "id": "P06", "name": "cron down 2h vs 30 min", "expected": "2h: skipped and logged; 30 min: sent" },
+  { "id": "P07", "name": "empty day, send_when_empty=0", "expected": "nothing sent" },
+  { "id": "P08", "name": "overdue >24h + proposal pending >24h", "expected": "both piggyback on the next briefing, no standalone, notified once per 24h" },
+  { "id": "P09", "name": "high-priority task overdue >2h", "expected": "exactly one standalone alert; a second one the same day piggybacks" },
+  { "id": "P10", "name": "agent unseen >48h", "expected": "finding if ever paired; no finding if never paired" },
+  { "id": "P11", "name": "snooze count", "expected": "resets after complete and after reschedule" },
+  { "id": "P12", "name": "quiet hours 23:00-07:00", "expected": "briefings, heartbeat and re-nudges suppressed; first-fire reminders still sent" },
+  { "id": "P13", "name": "Telegram 403 on a high-priority reminder", "expected": "one push sent and the payload decrypts with the test subscription keys; low-priority gets no push" },
+  { "id": "P14", "name": "push endpoint returns 410", "expected": "subscription removed" },
+  { "id": "P15", "name": "morning briefing", "expected": "exactly one mirror job per date with dedupe_key" },
+  { "id": "P16", "name": "transitive import graph from scheduler.ts", "expected": "zero AI modules; /attention, /status, /briefing identical with AI down" }
+]

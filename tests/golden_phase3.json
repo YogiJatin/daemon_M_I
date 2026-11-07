@@ -1,0 +1,10 @@
+[
+  { "id": "O01", "name": "/status command and /health fields", "expected": "D1 template, AI down OK, displays scheduler, providers, desktop mirror, budgets" },
+  { "id": "O02", "name": "backup verification", "expected": "last 3 backups verified with valid size and timestamps" },
+  { "id": "O03", "name": "restore drill on temporary D1 database", "expected": "core table row counts match between source and restore" },
+  { "id": "O04", "name": "backup-age heartbeat gate", "expected": "flags finding if backup older than 36h" },
+  { "id": "O05", "name": "RUNBOOK.md completeness", "expected": "max 150 lines, secret rotation, incident response, disaster recovery" },
+  { "id": "O06", "name": "free-tier headroom calculation", "expected": "7-day projections against official limits, all below 50%" },
+  { "id": "O07", "name": "privacy ledger", "expected": "every external fetch host cataloged with data classification and privacy controls" },
+  { "id": "O08", "name": "eval candidate export script", "expected": "exports sanitized evaluation candidate pairs without secret leakage" }
+]
