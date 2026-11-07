@@ -77,6 +77,14 @@ const DISQUALIFIERS = [
 export function detectObligation(text: string): { detected: boolean; evidence: string } {
   const trimmed = text.trim();
 
+  // Bodily states (not a commitment) unless it refers to a concrete work item like "the rest of" (A3, F02, F03)
+  if (/\b(sleep early|so tired|take a nap|exhausted|headache|feeling sleepy|rest my eyes|need some sleep)\b/i.test(trimmed)) {
+    return { detected: false, evidence: "" };
+  }
+  if (/\b(need to rest|need some rest|feel sick)\b/i.test(trimmed) && !/\brest of\b/i.test(trimmed)) {
+    return { detected: false, evidence: "" };
+  }
+
   // Check disqualifiers first
   for (const pattern of DISQUALIFIERS) {
     if (pattern.test(trimmed)) {
