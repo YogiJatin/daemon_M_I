@@ -53,7 +53,7 @@ async function main() {
   // 0. Seed owner auth session
   const seedSql = `INSERT OR REPLACE INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES ('${sessionId}', '${ownerTokenHash}', '${TEST_SENDER_ID}', 'default', '${expiresAt}', '${nowIso}', '${nowIso}');`;
   const { execSync } = await import("child_process");
-  execSync(`npx wrangler d1 execute personal-ai-os-db --remote --command="${seedSql}"`, { stdio: "inherit" });
+  const tempSql = path.resolve(process.cwd(), ".tmp_b3_sess.sql"); fs.writeFileSync(tempSql, seedSql, "utf8"); execSync(`npx wrangler d1 execute personal-ai-os-db --remote --file="${tempSql}"`, { stdio: "inherit" }); try { fs.unlinkSync(tempSql); } catch {}
 
   // ---------------------------------------------------------------------------
   // B3-01: Pairing code lifecycle (works once, expires, locks at 5 failures, D1 holds only hashes)

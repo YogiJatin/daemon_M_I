@@ -1,0 +1,62 @@
+[
+  {
+    "id": "V01",
+    "name": "direct voice note, stubbed ASR",
+    "status": "PASS",
+    "details": "Emitted 'Heard: ...' prefix and interactive proposal with buttons"
+  },
+  {
+    "id": "V02",
+    "name": "voice longer than media_max_voice_sec",
+    "status": "PASS",
+    "details": "Voice notes over 120s ceiling are rejected without download"
+  },
+  {
+    "id": "V03",
+    "name": "forwarded voice with prompt injection",
+    "status": "PASS",
+    "details": "Treated strictly as untrusted DATA; 0 memories or overrides written"
+  },
+  {
+    "id": "V04",
+    "name": "photo, stubbed OCR",
+    "status": "PASS",
+    "details": "OCR produces task proposal awaiting owner confirmation tap"
+  },
+  {
+    "id": "V05",
+    "name": "photo with no vision-capable provider",
+    "status": "PASS",
+    "details": "Polite refusal returned; zero state created in D1"
+  },
+  {
+    "id": "V06",
+    "name": "PDF document rejection",
+    "status": "PASS",
+    "details": "Heavy PDF parsing rejected honestly; suggests text paste"
+  },
+  {
+    "id": "V07",
+    "name": "album coalescing and deduplication",
+    "status": "PASS",
+    "details": "Second photo in same media_group_id coalesced into single response"
+  },
+  {
+    "id": "V08",
+    "name": "media_calls cap exhausted",
+    "status": "PASS",
+    "details": "Enforces 10 calls/day cap; text commands remain operational"
+  },
+  {
+    "id": "V09",
+    "name": "token and file-URL hygiene",
+    "status": "PASS",
+    "details": "Telegram file URLs with embedded bot tokens are never logged or stored"
+  },
+  {
+    "id": "V10",
+    "name": "transcript containing secrets/OTP",
+    "status": "PASS",
+    "details": "Secrets guard fires before LLM call; redacted and refused"
+  }
+]

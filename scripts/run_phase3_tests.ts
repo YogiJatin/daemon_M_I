@@ -86,11 +86,11 @@ async function main() {
   // O01: /status command and /health fields
   try {
     const statusRes = await handleStatus("", { db: mockDb, updateId: 99991 });
-    const healthRes = await fetch(`${DEPLOYED_URL}/api/v1/health`);
+    const healthRes = await fetch(`${DEPLOYED_URL}/api/v1/health`, { headers: { Authorization: `Bearer ${rawToken}` } });
     const healthJson = await healthRes.json() as any;
 
     const hasStatus = statusRes.success && statusRes.response.includes("System Operational Status");
-    const hasHealth = healthJson.overall_status !== undefined && healthJson.mirror_queue !== undefined;
+    const hData = healthJson.data || healthJson; const hasHealth = hData.overall_status !== undefined && hData.mirror_queue !== undefined;
 
     results.push({
       id: "O01",

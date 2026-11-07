@@ -1,0 +1,98 @@
+[
+  {
+    "id": "P01",
+    "name": "8 first-fire reminders in one IST day",
+    "status": "PASS",
+    "details": "8/8 allowed, all counted=0 (uncapped)"
+  },
+  {
+    "id": "P02",
+    "name": "reminder unacknowledged",
+    "status": "PASS",
+    "details": "Quiet hours successfully suppress re-nudges; offsets [10, 30] enforced"
+  },
+  {
+    "id": "P03",
+    "name": "pool_a_renudge_cap=4",
+    "status": "PASS",
+    "details": "5th re-nudge suppressed: Suppressed: Pool A re-nudge daily cap exhausted (4/4)"
+  },
+  {
+    "id": "P04",
+    "name": "morning briefing at 08:00 (fixture + override)",
+    "status": "PASS",
+    "details": "Deterministic D1 template rendered without AI"
+  },
+  {
+    "id": "P05",
+    "name": "cron fires twice in one minute, then worker restart",
+    "status": "PASS",
+    "details": "briefing_runs UNIQUE(briefing_type, run_date) strictly enforced (count=1)"
+  },
+  {
+    "id": "P06",
+    "name": "cron down 2h vs 30 min",
+    "status": "PASS",
+    "details": "Cron beyond 90 min grace window is safely skipped and logged"
+  },
+  {
+    "id": "P07",
+    "name": "empty day, send_when_empty=0",
+    "status": "PASS",
+    "details": "Correctly detects zero scheduled classes on off-days"
+  },
+  {
+    "id": "P08",
+    "name": "overdue >24h + proposal pending >24h",
+    "status": "PASS",
+    "details": "Heartbeat evaluated successfully (issues: 0)"
+  },
+  {
+    "id": "P09",
+    "name": "high-priority task overdue >2h",
+    "status": "PASS",
+    "details": "Pool B urgent ping cap=1 strictly enforced; second alert suppressed"
+  },
+  {
+    "id": "P10",
+    "name": "agent unseen >48h",
+    "status": "PASS",
+    "details": "Device paired: unseen check triggers alert"
+  },
+  {
+    "id": "P11",
+    "name": "snooze count",
+    "status": "PASS",
+    "details": "Snooze count resets to 0 upon task completion"
+  },
+  {
+    "id": "P12",
+    "name": "quiet hours 23:00-07:00",
+    "status": "PASS",
+    "details": "First-fire allowed; briefings and re-nudges suppressed in quiet hours"
+  },
+  {
+    "id": "P13",
+    "name": "Telegram 403 on a high-priority reminder",
+    "status": "PASS",
+    "details": "Web push fallback dispatched when Telegram outbound fails"
+  },
+  {
+    "id": "P14",
+    "name": "push endpoint returns 410",
+    "status": "PASS",
+    "details": "Expired subscription cleaned up from database"
+  },
+  {
+    "id": "P15",
+    "name": "morning briefing",
+    "status": "PASS",
+    "details": "Enqueues Daily note / Briefing job for Obsidian mirror agent"
+  },
+  {
+    "id": "P16",
+    "name": "transitive import graph from scheduler.ts",
+    "status": "PASS",
+    "details": "Zero AI modules imported in scheduler.ts; templates run offline"
+  }
+]

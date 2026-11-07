@@ -2,7 +2,7 @@
   {
     "id": "M01",
     "status": "PASS",
-    "detail": "Saved memory mem_MW61YQ7PLW4L1RYU with source=telegram_manual, trust=high"
+    "detail": "Saved memory mem_MW63VEK50R13ODPJ with source=telegram_manual, trust=high"
   },
   {
     "id": "M02",
@@ -12,7 +12,7 @@
   {
     "id": "M03",
     "status": "PASS",
-    "detail": "Proposal accepted -> mem mem_MW61YWITMK7WRSS7 source=telegram_ai_suggested, trust=medium"
+    "detail": "Proposal accepted -> mem mem_MW63VMWX92LLERFU source=telegram_ai_suggested, trust=medium"
   },
   {
     "id": "M04",

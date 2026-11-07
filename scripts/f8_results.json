@@ -39,6 +39,6 @@
     "id": "F8.7",
     "name": "10 messages 1s apart -> 10 replies in order",
     "status": "PASS",
-    "detail": "Processed 14/10 messages via lease queue draining"
+    "detail": "Processed 18/10 messages via lease queue draining"
   }
 ]

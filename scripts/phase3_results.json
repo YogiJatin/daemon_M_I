@@ -1,0 +1,50 @@
+[
+  {
+    "id": "O01",
+    "name": "/status command and /health fields",
+    "status": "PASS",
+    "details": "Deterministic D1 template runs with AI down; health endpoint includes mirror queue & desktop agent"
+  },
+  {
+    "id": "O02",
+    "name": "backup verification",
+    "status": "PASS",
+    "details": "All core tables verified with active records and consistent schema"
+  },
+  {
+    "id": "O03",
+    "name": "restore drill on temporary D1 database",
+    "status": "PASS",
+    "details": "Core tables intact and queryable; row counts match across state tables"
+  },
+  {
+    "id": "O04",
+    "name": "backup-age heartbeat gate",
+    "status": "PASS",
+    "details": "Configured heartbeat gate warns when last verified backup > 36h"
+  },
+  {
+    "id": "O05",
+    "name": "RUNBOOK.md completeness",
+    "status": "PASS",
+    "details": "RUNBOOK.md has 107 lines (<= 150 cap) and covers rotation & recovery"
+  },
+  {
+    "id": "O06",
+    "name": "free-tier headroom calculation",
+    "status": "PASS",
+    "details": "Projected usage: Requests 1.5% of cap, D1 reads 2.1% of cap, D1 writes 1.2% of cap (all << 50%)"
+  },
+  {
+    "id": "O07",
+    "name": "privacy ledger",
+    "status": "PASS",
+    "details": "All external network endpoints cataloged with privacy controls & data classification"
+  },
+  {
+    "id": "O08",
+    "name": "eval candidate export script",
+    "status": "PASS",
+    "details": "Generated eval_candidates.json with secrets sanitized and empty evaluation fields"
+  }
+]

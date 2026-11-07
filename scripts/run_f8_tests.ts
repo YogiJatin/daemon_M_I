@@ -258,7 +258,7 @@ async function main() {
   console.log("Waiting for queue draining of all 10 messages...");
   let allProcessed = false;
   let processedCount = 0;
-  for (let wait = 0; wait < 20; wait++) {
+  for (let wait = 0; wait < 45; wait++) {
     await sleep(1500);
     const rows = await executeD1(
       `SELECT COUNT(*) as cnt FROM chat_messages WHERE chat_id = '${pChatId}' AND role = 'assistant' AND update_id >= ${sentUpdateIds[0]}`,

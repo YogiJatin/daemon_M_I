@@ -39,7 +39,7 @@
     "id": "B3-07",
     "name": "Conflict detection",
     "status": "PASS",
-    "detail": "Detected local modification, created 'meeting_notes.conflict-2026-11-07T06-14-31-224Z.md', reported conflict to D1."
+    "detail": "Detected local modification, created 'meeting_notes.conflict-2026-11-07T07-51-30-762Z.md', reported conflict to D1."
   },
   {
     "id": "B3-08",
@@ -51,7 +51,7 @@
     "id": "B3-09",
     "name": "Device revocation",
     "status": "PASS",
-    "detail": "Device dev_MW60DJ46NIHIBPU0 revoked by owner; subsequent poll rejected with HTTP 401."
+    "detail": "Device dev_MW63U9F3N0Q4XRIE revoked by owner; subsequent poll rejected with HTTP 401."
   },
   {
     "id": "B3-10",
