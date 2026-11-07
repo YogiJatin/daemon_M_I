@@ -70,8 +70,6 @@ const DISQUALIFIERS = [
   /\b(he|she|they|we|dost|friend)\s+(needs?|has|have|should|must|will|submit|karega)\b/i,  // other people
   /\b(just kidding|lol|lmao|haha|joke)\b/i,
   /\bhypothetically\b/i,
-  // Bodily states (c) - must NOT be bodily state or feeling
-  /\b(sleep|sleeping|nap|napping|rest|resting|tired|exhausted|sick|hungry|thirsty|headache)\b/i,
   // Wishes or vague routines - not concrete commitments (c)
   /\b(wish|want to visit|someday|one day|usually|typically|everyday)\b/i,
 ];

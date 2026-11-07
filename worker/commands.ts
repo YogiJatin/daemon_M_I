@@ -1,4 +1,4 @@
-﻿import { parseDateShorthand, ParsedDeadline, getISTDateParts, istToUtcDate, extractTimeAndTitle } from "./dateParser";
+import { parseDateShorthand, ParsedDeadline, getISTDateParts, istToUtcDate, extractTimeAndTitle } from "./dateParser";
 import { planNotification, planCatchupDigest } from "./notificationPlanner";
 import {
   parseRecurrenceShorthand,
@@ -24,6 +24,17 @@ import { listTaskProposals } from "./inboxService";
 
 import { getProfile, getMissingProfileKeys, setProfileKey } from "./dailyRhythm";
 import { handleCaptureCommand } from "./captureEngine";
+import {
+  handleRememberCommand,
+  handleMemoriesCommand,
+  handleForgetCommand,
+  handleAboutCommand,
+} from "./memoryService";
+import {
+  createPairingCode,
+  handleListDevicesCommand,
+  handleRevokeDeviceCommand,
+} from "./desktopMirrorService";
 
 interface SnoozePresetResult {
   success: boolean;
@@ -300,6 +311,41 @@ export async function handleAdd(args: string, context?: CommandContext): Promise
   const extracted = extractTimeAndTitle(trimmed, now);
   const titlePart = extracted.title || trimmed;
   const deadline = extracted.deadline;
+
+  // Past time check for timed commands (G32)
+  if (
+    extracted.hasTimePhrase &&
+    !extracted.parseError &&
+    deadline.kind === "timed" &&
+    deadline.utcInstant &&
+    new Date(deadline.utcInstant).getTime() < now.getTime()
+  ) {
+    let propId = "prop_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    if (context?.db) {
+      await context.db
+        .prepare(
+          "INSERT INTO task_proposals (id, title, status, advisory_confidence, created_at, updated_at) VALUES (?, ?, 'pending', 0.8, ?, ?)"
+        )
+        .bind(propId, titlePart, now.toISOString(), now.toISOString())
+        .run()
+        .catch(() => {});
+    }
+    const timeLabel = deadline.localTime || "13:25";
+    return {
+      command: "add",
+      args,
+      success: true,
+      response: "That time is already past. When did you want this?",
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            { text: "in 30 min", callback_data: `reschedule:${propId}:+30m` },
+            { text: `tomorrow ${timeLabel}`, callback_data: `reschedule:${propId}:+1d` },
+          ],
+        ],
+      },
+    };
+  }
 
   let taskId = crypto.randomUUID(); // fallback if no DB
   if (context?.db) {
@@ -676,7 +722,7 @@ export async function handleHealth(args: string, context?: CommandContext): Prom
     return { command: "health", args, success: true, response: "Status: ok (no DB)" };
   }
 
-  const [health, paused] = await Promise.all([
+  const [health, paused, desktopDev, outboxCounts, redelivRows, mockRows, offlineRows] = await Promise.all([
     context.db
       .prepare(`SELECT consecutive_failures, last_scheduler_success_at, last_scheduler_start_at, last_telegram_delivery_at, updated_at FROM system_health WHERE id = 1`)
       .first<{
@@ -688,6 +734,29 @@ export async function handleHealth(args: string, context?: CommandContext): Prom
     context.db
       .prepare(`SELECT value FROM settings WHERE key = 'paused'`)
       .first<{ value: string }>(),
+    context.db
+      .prepare(`SELECT MAX(last_seen_at) as last_seen FROM desktop_devices WHERE revoked_at IS NULL`)
+      .first<{ last_seen: string | null }>()
+      .catch(() => null),
+    context.db
+      .prepare(`SELECT 
+                  SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_cnt,
+                  SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_cnt
+                FROM mirror_outbox`)
+      .first<{ pending_cnt: number | null; failed_cnt: number | null }>()
+      .catch(() => null),
+    context.db
+      .prepare(`SELECT COUNT(*) as cnt FROM (SELECT update_id FROM telegram_updates GROUP BY update_id HAVING COUNT(*) > 1)`)
+      .first<{ cnt: number }>()
+      .catch(() => ({ cnt: 0 })),
+    context.db
+      .prepare(`SELECT COUNT(*) as cnt FROM chat_messages WHERE provider = 'mock' AND created_at >= datetime('now', '-1 day')`)
+      .first<{ cnt: number }>()
+      .catch(() => ({ cnt: 0 })),
+    context.db
+      .prepare(`SELECT COUNT(*) as cnt FROM chat_messages WHERE outcome IN ('ai_offline', 'budget_exceeded') AND created_at >= datetime('now', '-1 day')`)
+      .first<{ cnt: number }>()
+      .catch(() => ({ cnt: 0 })),
   ]);
 
   const isPaused = paused?.value === "true";
@@ -707,6 +776,14 @@ export async function handleHealth(args: string, context?: CommandContext): Prom
     context?.env?.HEALTHCHECKS_PING_URL
       ? "Healthchecks: configured"
       : "Healthchecks: not configured",
+    "",
+    `Desktop Agent: ${desktopDev?.last_seen ? "Last seen " + desktopDev.last_seen : "Never connected"}`,
+    `Mirror Queue: ${outboxCounts?.pending_cnt ?? 0} pending, ${outboxCounts?.failed_cnt ?? 0} failed`,
+    "",
+    "Observability (24h):",
+    `• Telegram redeliveries: ${redelivRows?.cnt ?? 0}`,
+    `• Mock answers: ${mockRows?.cnt ?? 0}`,
+    `• Offline replies: ${offlineRows?.cnt ?? 0}`,
   ];
 
   await context.db
@@ -1224,6 +1301,17 @@ export async function handlePair(args: string, context?: CommandContext): Promis
     };
   }
 
+  // Block 3: Desktop Outbox Mirror pairing (/pair desktop)
+  if (args.trim().toLowerCase() === "desktop") {
+    const code = await createPairingCode(context.db);
+    return {
+      command: "pair desktop",
+      args,
+      success: true,
+      response: `🖥️ Desktop Pairing Code Generated\n\nYour one-time code: ${code}\nValid for 10 minutes.\n\nOn your PC run:\nnpm run agent:pair -- --code ${code}`,
+    };
+  }
+
   const ownerId = String(context.senderId ?? context.chatId ?? "owner");
   const now = context.now ?? new Date();
   const challenge = await createPairingChallenge(context.db, ownerId, "default", now);
@@ -1617,6 +1705,16 @@ export async function routeCommand(text: string, context?: CommandContext): Prom
       return await handleMaterials(args, context);
     case "pair":
       return await handlePair(args, context);
+    case "devices": {
+      if (!context?.db) return { command: "devices", args, success: false, response: "No DB." };
+      const res = await handleListDevicesCommand(context.db);
+      return { command: "devices", args, success: true, response: res };
+    }
+    case "revoke": {
+      if (!context?.db) return { command: "revoke", args, success: false, response: "No DB." };
+      const res = await handleRevokeDeviceCommand(context.db, args);
+      return { command: "revoke", args, success: true, response: res };
+    }
     case "suggestions":
       return await handleSuggestions(args, context);
     case "export":
@@ -1630,6 +1728,26 @@ export async function routeCommand(text: string, context?: CommandContext): Prom
       return await handleBreakdown(args, context);
     case "plan":
       return await handlePlan(args, context);
+    case "remember": {
+      if (!context?.db) return { command: "remember", args, success: false, response: "No DB." };
+      const res = await handleRememberCommand(args, context.db, context.now);
+      return { command: "remember", args, success: res.success, response: res.response };
+    }
+    case "memories": {
+      if (!context?.db) return { command: "memories", args, success: false, response: "No DB." };
+      const res = await handleMemoriesCommand(context.db, context.now);
+      return { command: "memories", args, success: res.success, response: res.response };
+    }
+    case "forget": {
+      if (!context?.db) return { command: "forget", args, success: false, response: "No DB." };
+      const res = await handleForgetCommand(args, context.db);
+      return { command: "forget", args, success: res.success, response: res.response, replyMarkup: res.replyMarkup } as any;
+    }
+    case "about": {
+      if (!context?.db) return { command: "about", args, success: false, response: "No DB." };
+      const res = await handleAboutCommand(args, context.db, context.now);
+      return { command: "about", args, success: res.success, response: res.response };
+    }
     default:
       return null;
   }

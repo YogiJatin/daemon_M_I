@@ -1,23 +1,22 @@
 /**
- * worker/telegramAssistant.ts - Block 1 telegram_assistant AI Capability
+ * worker/telegramAssistant.ts - telegram_assistant AI Capability
  *
- * Defines the structured JSON output schema, system prompt, validator,
- * time resolution, proposal creation, query rendering, and modify_pending.
- *
- * Hard invariants:
- * - LLM NEVER computes clock times for anchors; code resolves from D1.
- * - LLM reply_text is DISCARDED for query intents; D1 rows are rendered.
- * - All user/external content wrapped in <DATA type="..."> blocks.
- * - Owner name from settings, never hardcoded.
- * - Workers AI and mock are excluded from implicit capture via providerAllowList.
+ * Requirements:
+ * - Multi-intent (actions[] max 3 items)
+ * - Persona prompt with friendly dry humor & register matching
+ * - Capture rubric: commitment vs bodily state / wish / joke
+ * - Lookup intent spec (weather | web)
+ * - General question intent
+ * - Schedule query renderer with keyword fallback (never "couldn't understand")
+ * - Formatted confirmation dates: "Fri 6 Nov, 3:00 PM"
+ * - Separate due_at and remind_at
+ * - D1 owns all facts; LLM reply_text discarded for schedule queries
  */
 
 import { AICapabilityRegistry } from "./aiCapabilityRegistry";
-import { AIContextBuilder } from "./aiContextBuilder";
+import { getCapabilityManifest, renderHelpResponse } from "./capabilityManifest";
+import { resolveExtendedAnchor, ExtendedAnchor } from "./dailyRhythm";
 
-// ---------------------------------------------------------------------------
-// Intent enum (extensible string union)
-// ---------------------------------------------------------------------------
 export type AssistantIntent =
   | "chat"
   | "explicit_task"
@@ -28,6 +27,8 @@ export type AssistantIntent =
   | "modify_pending"
   | "remember"
   | "schedule_exception"
+  | "general_question"
+  | "lookup"
   | "unclear";
 
 export type AnchorType =
@@ -40,22 +41,19 @@ export type AnchorType =
   | "morning"
   | "none";
 
-// ---------------------------------------------------------------------------
-// LLM output schema
-// ---------------------------------------------------------------------------
 export interface AssistantTask {
   title: string;
-  date_phrase?: string;      // display label only; numeric fields are authoritative
-  offset_days?: number;       // 0 = today, 1 = tomorrow, etc.
-  hour?: number;              // 0-23 (null if anchor-based)
-  minute?: number;            // 0-59
-  anchor?: AnchorType;        // LLM never computes clock times for anchors
+  date_phrase?: string;
+  offset_days?: number;
+  hour?: number | null;
+  minute?: number | null;
+  anchor?: AnchorType;
   priority?: "low" | "normal" | "high" | "urgent";
 }
 
 export interface AssistantQuery {
-  type: "today" | "week" | "pending" | "overdue" | "search";
-  date?: string;   // YYYY-MM-DD ISO
+  type: "today" | "tomorrow" | "week" | "pending" | "overdue" | "summary" | "classes" | "search";
+  date?: string;
   keyword?: string;
 }
 
@@ -63,20 +61,36 @@ export interface AssistantMemory {
   text: string;
 }
 
-export interface TelegramAssistantOutput {
-  intent: AssistantIntent;
-  confidence: number;             // 0..1
-  reply_text: string;             // For chat/unclear; discarded for query intents
-  tasks?: AssistantTask[];        // max 3
-  query?: AssistantQuery;         // for query_schedule / query_tasks
-  memory?: AssistantMemory;       // for remember
-  reason?: string;                // why this intent
-  evidence?: string;              // evidence phrase from user message
+export interface AssistantLookup {
+  kind: "weather" | "web";
+  query: string;
+  place?: string;
+  when?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Input (passed into the capability)
-// ---------------------------------------------------------------------------
+export interface AssistantAction {
+  intent: AssistantIntent;
+  confidence?: number;
+  tasks?: AssistantTask[];
+  query?: AssistantQuery;
+  lookup?: AssistantLookup;
+  memory?: AssistantMemory;
+  reply_text?: string;
+}
+
+export interface TelegramAssistantOutput {
+  intent: AssistantIntent;
+  confidence: number;
+  reply_text: string;
+  tasks?: AssistantTask[];
+  query?: AssistantQuery;
+  memory?: AssistantMemory;
+  lookup?: AssistantLookup;
+  actions?: AssistantAction[];
+  reason?: string;
+  evidence?: string;
+}
+
 export interface TelegramAssistantInput {
   userText: string;
   chatId: string;
@@ -85,70 +99,125 @@ export interface TelegramAssistantInput {
   replyToMessageId?: number;
   db: D1Database;
   env: any;
+  settings?: Record<string, string>;
+  recentChat?: string[];
+  replyToProposal?: any;
 }
 
 // ---------------------------------------------------------------------------
-// Time resolution result
+// Confirmation Date Formatter: "Fri 6 Nov, 3:00 PM"
 // ---------------------------------------------------------------------------
-export interface ResolvedTime {
-  ok: boolean;
-  needsInfo?: boolean;
-  question?: string;
-  buttons?: any;
-  utcInstant?: Date;
-  localDate?: string;
-  localTime?: string;
-  proposalId?: string;
+export function formatConfirmationDate(dateIst: string, timeIst?: string | null): string {
+  try {
+    const [y, m, d] = dateIst.split("-").map(Number);
+    // Construct local midday to extract day of week and month
+    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const dayStr = dayNames[dt.getUTCDay()];
+    const monStr = monthNames[m - 1];
+
+    let timeStr = "";
+    if (timeIst) {
+      const [hStr, minStr] = timeIst.split(":");
+      let h = parseInt(hStr, 10);
+      const ampm = h >= 12 ? "PM" : "AM";
+      h = h % 12;
+      if (h === 0) h = 12;
+      timeStr = `, ${h}:${minStr.padStart(2, "0")} ${ampm}`;
+    }
+
+    return `${dayStr} ${d} ${monStr}${timeStr}`;
+  } catch {
+    return dateIst + (timeIst ? ` ${timeIst}` : "");
+  }
 }
 
 // ---------------------------------------------------------------------------
-// System prompt builder
+// System Prompt Builder with Persona & Rubric
 // ---------------------------------------------------------------------------
-export function buildAssistantSystemPrompt(ownerName: string): string {
-  return `You are a personal AI assistant for ${ownerName}. You understand English, Hinglish, and Telugu-mixed messages.
+export function buildAssistantSystemPrompt(ownerName: string, manifest: string): string {
+  return `You are Antigravity OS, the personal AI assistant for ${ownerName}. You understand English, Hinglish, and Telugu-mixed messages.
 
-RULES:
-1. Classify the user's message into exactly one intent.
-2. intent enum: chat | explicit_task | explicit_reminder | implicit_commitment | query_schedule | query_tasks | modify_pending | remember | schedule_exception | unclear
-3. For tasks/reminders: extract up to 3 tasks. Time fields:
-   - offset_days: integer (0=today, 1=tomorrow, negative=past). REQUIRED if time-related.
-   - hour, minute: 24-hour integers. Only set if explicitly stated or unambiguously deducible. Do NOT guess from ambiguous times.
-   - anchor: use ONLY if user says "after class", "before class", "leaving college", "reaching home", "evening", "morning". Set anchor and leave hour/minute NULL. Code resolves anchor times; never invent them.
-   - date_phrase: display label for the user (e.g. "tomorrow evening") -- DO NOT infer clock times from this.
-   - If time is ambiguous ("at 7"), set hour/minute NULL and set confidence < 0.6.
-4. For query_schedule / query_tasks: set query.type and query.date. reply_text is DISCARDED for these intents (D1 renders result).
-5. CAPTURE RUBRIC for implicit_commitment. Suggest ONLY if ALL 4 conditions hold:
-   (a) first person singular (I / me / my)
-   (b) concrete action (not vague)
-   (c) commitment, not a wish, routine, or bodily state ("I need to sleep" = NO, "I need to file report" = YES)
-   (d) not a question, hypothetical, past event, joke, or someone else's task
-   If (a)-(d) all pass but no time is given: suggest with [Pick time]. If any fails: use chat intent, stay SILENT.
-6. confidence: 0.0..1.0. Set < 0.5 for unclear or ambiguous input.
-7. reply_text: conversational (used for chat/unclear/remember). NEVER state facts about tasks, schedule, or progress. NEVER say "everything is on track" or similar claims.
-8. NEVER invent schedule facts. NEVER create tasks on your own authority. NEVER compute clock times for anchors.
-9. reason and evidence fields: brief, factual.
-10. For schedule_exception: user is reporting a change to their daily schedule (e.g. "class cancelled today", "leaving at 3pm today"). Classify and extract the change.
+PERSONA:
+- Replies are 1-3 sentences unless asked for more.
+- Friendly, dry humor. Match user's language mix (English / Hinglish / Telugu-mixed).
+- Treat sarcasm, exaggeration, and jokes as jokes and play along lightly.
+- Never answer with only "I can't". Say what is missing in one clause, then give nearest useful thing.
+- Only claim abilities listed in the capability manifest below.
+- Never state facts about user's tasks, schedule, or progress (code renders them).
+- Never use the words "task", "schedule", "track", "progress", or "todo" in chat replies unless the user explicitly asked about them.
+- Never invent live facts; use the lookup path.
 
-OUTPUT: Valid JSON only, matching this schema exactly:
+CAPABILITIES:
+${manifest}
+
+INTENTS:
+- chat: greetings, banter, insults, sarcasm, complaints.
+- explicit_task: user explicitly commands adding a task ("add task...", "order groceries at 5pm").
+- explicit_reminder: user explicitly commands a reminder ("remind me at 6pm about dentist appointment").
+- implicit_commitment: first-person future obligation passing ALL rubric points below.
+- query_schedule: asking about classes, timetable, or day's commitments.
+- query_tasks: asking about pending tasks, progress.
+- modify_pending: replying to an existing proposal to change title or time.
+- remember: user wants to save a durable note, fact, or preference.
+- schedule_exception: user reporting a change to today's schedule ("leaving early today", "class cancelled").
+- general_question: question answerable from general knowledge.
+- lookup: questions needing live data (weather or web prices/facts).
+- unclear: ambiguous input.
+
+ANCHOR MAPPINGS (use anchor property in tasks[]):
+- "after college" / "after class" -> "after_last_class"
+- "on the way home" / "leaving college" -> "leaving_college"
+- "when I get home" / "reaching home" -> "reaching_home"
+- "before college" / "leaving home" -> "leaving_home"
+- "tonight" / "by tonight" -> "evening"
+- "tomorrow morning" / "kal subah" -> "morning"
+- other / specific clock time -> "none"
+
+SPECIAL INSTRUCTIONS:
+- If user says "remind me at <time>" without specifying what (e.g. "remind me at 4"), set intent: "explicit_reminder", tasks: [{ "title": "Reminder", "hour": 4, "offset_days": 0 }].
+- For schedule questions, set intent: "query_schedule" with query.type: "today" or "tomorrow".
+- For task progress/summary questions, set intent: "query_tasks" with query.type: "summary".
+- "remember <fact>" -> intent: "remember", memory: { "text": "<fact>" }.
+- Hindi/Telugu task commitments (e.g. "kal subah office jaana hai" / "repu project ivvali") -> intent: "implicit_commitment" with appropriate anchor or offset_days.
+- When an input specifies a relative anchor like evening or morning, map to the corresponding anchor ("morning", "evening", "leaving_college", "reaching_home", "after_last_class").
+
+CAPTURE RUBRIC for implicit_commitment:
+Suggest ONLY if ALL 4 hold:
+(a) First person singular ("I / me / my / nenu / mujhe")
+(b) Concrete action (not vague)
+(c) Real commitment, NOT a bodily state ("sleep", "tired", "nap", "sick"), NOT a wish ("wish", "someday"), NOT a routine ("usually")
+(d) Not a question, hypothetical, past event, joke, or someone else's task.
+Orders addressed to assistant are chat, NOT implicit_commitment.
+Partial phrases like "the rest of the work" or "remaining part" are valid task phrases.
+
+MULTI-INTENT:
+If message has multiple distinct requests (e.g. 2 reminders + 1 class query), output "actions" array (max 3), each with its own intent and fields.
+
+OUTPUT FORMAT (JSON only):
 {
-  "intent": "<intent>",
+  "intent": "<primary_intent>",
   "confidence": <0..1>,
-  "reply_text": "<text>",
+  "reply_text": "<conversational reply>",
   "tasks": [{ "title": "", "date_phrase": "", "offset_days": 0, "hour": null, "minute": null, "anchor": "none", "priority": "normal" }],
-  "query": { "type": "", "date": "" },
+  "query": { "type": "today|tomorrow|week|summary|classes", "date": "" },
+  "lookup": { "kind": "weather|web", "query": "", "place": "", "when": "now|today|tomorrow" },
   "memory": { "text": "" },
-  "reason": "",
-  "evidence": ""
-}
-Omit fields that are not relevant. tasks[] max 3 items.`;
+  "actions": []
+}`;
 }
 
+// ---------------------------------------------------------------------------
+// User Prompt Builder with Recent Chat Context
+// ---------------------------------------------------------------------------
 export function buildAssistantUserPrompt(
   userText: string,
   now: Date,
   settings: Record<string, string>,
   recentTasks: any[],
-  replyToProposal?: any
+  replyToProposal?: any,
+  recentChat: string[] = []
 ): string {
   const ist = new Intl.DateTimeFormat("en-IN", {
     timeZone: "Asia/Kolkata",
@@ -162,9 +231,20 @@ export function buildAssistantUserPrompt(
   lines.push(`Current time (IST): ${ist}`);
   lines.push(`Day of week: ${now.toLocaleDateString("en-IN", { weekday: "long", timeZone: "Asia/Kolkata" })}`);
   if (settings?.owner_name) lines.push(`Owner: ${settings.owner_name}`);
-  if (settings?.morning_hour) lines.push(`Morning anchor: ${settings.morning_hour}:${(settings?.morning_minute || "00").padStart(2, "0")}`);
-  if (settings?.evening_hour) lines.push(`Evening anchor: ${settings.evening_hour}:${(settings?.evening_minute || "00").padStart(2, "0")}`);
+  if (settings?.home_city) lines.push(`Home city: ${settings.home_city}`);
+  lines.push(`Morning anchor: ${settings?.morning_anchor_time || "08:00"}`);
+  lines.push(`Evening anchor: ${settings?.evening_anchor_time || "20:00"}`);
+  lines.push(`Buffer after class: ${settings?.buffer_after_class_min || "15"} min`);
+  lines.push(`Commute home: ${settings?.commute_home_min || "40"} min`);
   lines.push(`</DATA>`);
+
+  if (recentChat.length > 0) {
+    lines.push(`<DATA type="recent_chat">`);
+    for (const turn of recentChat.slice(-8)) {
+      lines.push(turn);
+    }
+    lines.push(`</DATA>`);
+  }
 
   if (recentTasks.length > 0) {
     lines.push(`<DATA type="recent_tasks">`);
@@ -178,7 +258,8 @@ export function buildAssistantUserPrompt(
     lines.push(`<DATA type="referenced_proposal">`);
     lines.push(`id: ${replyToProposal.id}`);
     lines.push(`title: ${replyToProposal.title}`);
-    lines.push(`status: ${replyToProposal.status}`);
+    lines.push(`date: ${replyToProposal.proposed_local_date || "today"}`);
+    lines.push(`time: ${replyToProposal.proposed_local_time || "none"}`);
     lines.push(`</DATA>`);
   }
 
@@ -186,515 +267,502 @@ export function buildAssistantUserPrompt(
   lines.push(userText);
   lines.push(`</DATA>`);
 
-  lines.push(`\nClassify the message and reply as instructed.`);
-
+  lines.push(`\nClassify and respond in valid JSON.`);
   return lines.join("\n");
 }
 
 // ---------------------------------------------------------------------------
-// Validator (runs inside AICapabilityRegistry)
+// Validator
 // ---------------------------------------------------------------------------
-function validateOutput(data: any, _ids: Set<string>): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
+export function validateAssistantOutput(data: any): { valid: boolean; errors: string[] } {
   if (!data || typeof data !== "object") {
-    return { valid: false, errors: ["Output is not an object"] };
+    return { valid: false, errors: ["Output must be an object"] };
   }
 
   const validIntents: AssistantIntent[] = [
     "chat", "explicit_task", "explicit_reminder", "implicit_commitment",
     "query_schedule", "query_tasks", "modify_pending", "remember",
-    "schedule_exception", "unclear",
+    "schedule_exception", "general_question", "lookup", "unclear",
   ];
+
   if (!validIntents.includes(data.intent)) {
-    errors.push(`Invalid intent: ${data.intent}`);
+    return { valid: false, errors: [`Invalid intent: ${data.intent}`] };
   }
 
   if (typeof data.confidence !== "number" || data.confidence < 0 || data.confidence > 1) {
-    errors.push("confidence must be a number 0..1");
+    return { valid: false, errors: ["confidence must be 0..1"] };
   }
 
-  if (data.tasks !== undefined) {
-    if (!Array.isArray(data.tasks)) {
-      errors.push("tasks must be an array");
-    } else if (data.tasks.length > 3) {
-      errors.push("tasks[] must have at most 3 items");
-    } else {
-      for (const t of data.tasks) {
-        if (!t.title || typeof t.title !== "string") {
-          errors.push("Each task must have a string title");
-        }
-        if (t.hour !== undefined && t.hour !== null && (typeof t.hour !== "number" || t.hour < 0 || t.hour > 23)) {
-          errors.push(`Invalid hour: ${t.hour}`);
-        }
-        if (t.minute !== undefined && t.minute !== null && (typeof t.minute !== "number" || t.minute < 0 || t.minute > 59)) {
-          errors.push(`Invalid minute: ${t.minute}`);
-        }
-      }
-    }
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-
-export function validateAssistantOutput(data: any): { valid: boolean; errors: string[] } {
-  return validateOutput(data, new Set());
+  return { valid: true, errors: [] };
 }
 
 // ---------------------------------------------------------------------------
-// Anchor time resolution (LLM never computes; code resolves from D1)
+// Clock & Anchor Time Resolution in Code
 // ---------------------------------------------------------------------------
-export async function resolveAnchorTime(
+export async function resolveTaskTime(
   db: D1Database,
   task: AssistantTask,
   now: Date,
-  env: any
-): Promise<ResolvedTime & { proposalId: string }> {
-  const propId = "prop_" + Math.random().toString(36).slice(2).toUpperCase();
-  const anchor = task.anchor || "none";
+  env: any,
+  settings: Record<string, string> = {}
+): Promise<{
+  ok: boolean;
+  needsInfo?: boolean;
+  question?: string;
+  buttons?: any;
+  localDate: string;
+  localTime: string | null;
+  utcInstant?: Date;
+  proposalId: string;
+  anchor: string;
+  dueAtFormatted: string;
+  remindAtFormatted?: string;
+}> {
+  const propId = "prop_" + Math.random().toString(36).slice(2, 10).toUpperCase();
 
-  // IST offset: UTC+5:30
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
   const istNow = new Date(now.getTime() + IST_OFFSET_MS);
 
-  const offsetDays = task.offset_days ?? 0;
-  // Base date in IST
+  let offsetDays = task.offset_days ?? 0;
+
+  // Named day-of-week resolution from date_phrase (G16: "by Monday", "by Tuesday", etc.)
+  const datePhraseLower = (task.date_phrase || "").toLowerCase();
+  const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const dayMatch = dayNames.findIndex((d) => datePhraseLower.includes(d));
+  if (dayMatch !== -1 && offsetDays === 0) {
+    const todayJsDay = istNow.getUTCDay(); // 0=Sun
+    let diff = dayMatch - todayJsDay;
+    if (diff <= 0) diff += 7; // always next occurrence
+    offsetDays = diff;
+  }
+
   const baseDate = new Date(istNow);
   baseDate.setUTCHours(0, 0, 0, 0);
   baseDate.setTime(baseDate.getTime() + offsetDays * 86400000);
+  const dateIst = baseDate.toISOString().slice(0, 10);
 
-  // Ambiguous clock time: "at 7" — hour given, no anchor, ambiguous AM/PM
-  // Rule: Next occurrence if within 12h, else ask [7 AM][7 PM]
-  if (task.hour !== undefined && task.hour !== null && anchor === "none") {
-    const h = task.hour;
-    const m = task.minute ?? 0;
+  let anchor = task.anchor || "none";
+  if (anchor === "none") {
+    const textToCheck = ((task.title || "") + " " + (task.date_phrase || "")).toLowerCase();
+    if (/on the way home|leaving college/i.test(textToCheck)) {
+      anchor = "leaving_college";
+    } else if (/after college|after class/i.test(textToCheck)) {
+      anchor = "after_last_class";
+    } else if (/when i get home|reaching home/i.test(textToCheck)) {
+      anchor = "reaching_home";
+    } else if (/tonight|by tonight/i.test(textToCheck)) {
+      anchor = "evening";
+    } else if (/tomorrow morning|kal subah/i.test(textToCheck)) {
+      anchor = "morning";
+    }
+  }
 
-    if (h <= 12) {
-      // Two candidates: AM (h) and PM (h + 12 % 24)
-      const amTime = new Date(baseDate.getTime() + (h === 12 ? 0 : h) * 3600000 + m * 60000);
-      const pmTime = new Date(baseDate.getTime() + (h === 12 ? 12 : h + 12) * 3600000 + m * 60000);
-
-      const utcAm = new Date(amTime.getTime() - IST_OFFSET_MS);
-      const utcPm = new Date(pmTime.getTime() - IST_OFFSET_MS);
-
-      const diffAm = utcAm.getTime() - now.getTime();
-      const diffPm = utcPm.getTime() - now.getTime();
-
-      // Check if AM is in the next 12 hours
-      if (diffAm > 0 && diffAm <= 12 * 3600000) {
-        return { ok: true, utcInstant: utcAm, localDate: baseDate.toISOString().slice(0, 10), localTime: `${String(h === 12 ? 0 : h).padStart(2, "0")}:${String(m).padStart(2, "0")}`, proposalId: propId };
-      }
-      // Check if PM is in the next 12 hours
-      if (diffPm > 0 && diffPm <= 12 * 3600000) {
-        const pmHour = h === 12 ? 12 : h + 12;
-        return { ok: true, utcInstant: utcPm, localDate: baseDate.toISOString().slice(0, 10), localTime: `${String(pmHour).padStart(2, "0")}:${String(m).padStart(2, "0")}`, proposalId: propId };
-      }
-
-      // Neither occurrence is within 12h: ask [7 AM][7 PM]
+  // Case 1: Extended routine anchor
+  if (anchor !== "none") {
+    const resolved = await resolveExtendedAnchor(db, anchor as ExtendedAnchor, dateIst, now);
+    if (!resolved.ok && resolved.needsInfo) {
       return {
         ok: false,
         needsInfo: true,
-        question: `Did you mean ${h} AM or ${h} PM?`,
-        buttons: {
-          inline_keyboard: [[
-            { text: `${h} AM`, callback_data: `set_time:${propId}:${h}:${m}:am` },
-            { text: `${h} PM`, callback_data: `set_time:${propId}:${h}:${m}:pm` },
-          ]],
-        },
+        question: resolved.question,
+        buttons: resolved.buttons,
+        localDate: dateIst,
+        localTime: null,
         proposalId: propId,
+        anchor,
+        dueAtFormatted: formatConfirmationDate(dateIst),
       };
     }
-
-    // Unambiguous 24h time (> 12)
-    const candidate24 = new Date(baseDate.getTime() + h * 3600000 + m * 60000);
-    const utcInstant = new Date(candidate24.getTime() - IST_OFFSET_MS);
-    return { ok: true, utcInstant, localDate: baseDate.toISOString().slice(0, 10), localTime: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`, proposalId: propId };
+    const clock = resolved.clockTime;
+    const formatted = formatConfirmationDate(dateIst, clock);
+    return {
+      ok: true,
+      localDate: dateIst,
+      localTime: clock,
+      utcInstant: resolved.utcInstant,
+      proposalId: propId,
+      anchor,
+      dueAtFormatted: formatted,
+      remindAtFormatted: formatted,
+    };
   }
 
-  if (anchor === "none") {
-    // No time specified
-    return { ok: true, utcInstant: undefined, proposalId: propId };
-  }
+  // Case 2: Clock time given (e.g. hour/minute)
+  if (task.hour !== undefined && task.hour !== null) {
+    let h = task.hour;
+    const m = task.minute ?? 0;
 
-  // Resolve anchor from D1 / settings
-  if (anchor === "morning") {
-    const mh = parseInt(env?.MORNING_HOUR || "7", 10);
-    const mm = parseInt(env?.MORNING_MINUTE || "0", 10);
-    const utcInstant = new Date(baseDate.getTime() + mh * 3600000 + mm * 60000 - IST_OFFSET_MS);
-    return { ok: true, utcInstant, localDate: baseDate.toISOString().slice(0, 10), localTime: `${String(mh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`, proposalId: propId };
-  }
+    // Disambiguation for 12h clock: "at 3", "at 7"
+    if (h <= 12) {
+      // Current hour in IST
+      const curH = istNow.getUTCHours();
+      const curM = istNow.getUTCMinutes();
+      const curMinutes = curH * 60 + curM;
 
-  if (anchor === "evening") {
-    const eh = parseInt(env?.EVENING_HOUR || "19", 10);
-    const em = parseInt(env?.EVENING_MINUTE || "0", 10);
-    const utcInstant = new Date(baseDate.getTime() + eh * 3600000 + em * 60000 - IST_OFFSET_MS);
-    return { ok: true, utcInstant, localDate: baseDate.toISOString().slice(0, 10), localTime: `${String(eh).padStart(2,"0")}:${String(em).padStart(2,"0")}`, proposalId: propId };
-  }
+      const amMinutes = (h === 12 ? 0 : h) * 60 + m;
+      const pmMinutes = (h === 12 ? 12 : h + 12) * 60 + m;
 
-  // after_last_class / before_first_class: look up timetable
-  if (anchor === "after_last_class" || anchor === "before_first_class") {
-    const targetDateIST = baseDate.toISOString().slice(0, 10);
-    const dayOfWeek = new Date(baseDate.getTime()).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
-
-    try {
-      let slot: { start_time: string; end_time: string } | null = null;
-      if (anchor === "after_last_class") {
-        slot = await db
-          .prepare(
-            `SELECT start_time, end_time FROM timetable_slots
-             WHERE day_of_week = ? ORDER BY end_time DESC LIMIT 1`
-          )
-          .bind(dayOfWeek)
-          .first<{ start_time: string; end_time: string }>();
-      } else {
-        slot = await db
-          .prepare(
-            `SELECT start_time, end_time FROM timetable_slots
-             WHERE day_of_week = ? ORDER BY start_time ASC LIMIT 1`
-          )
-          .bind(dayOfWeek)
-          .first<{ start_time: string; end_time: string }>();
+      // Nearest future occurrence today
+      let chosenH = h;
+      if (offsetDays === 0) {
+        if (pmMinutes > curMinutes && (amMinutes <= curMinutes || amMinutes < 7 * 60)) {
+          chosenH = h === 12 ? 12 : h + 12;
+        } else if (amMinutes > curMinutes && amMinutes >= 7 * 60) {
+          chosenH = h === 12 ? 0 : h;
+        } else if (pmMinutes > curMinutes) {
+          chosenH = h === 12 ? 12 : h + 12;
+        }
       }
 
-      if (!slot) {
+      // Check quiet hours (23:00 - 07:00 IST)
+      if (chosenH >= 23 || chosenH < 7) {
+        // Ask AM or PM
         return {
           ok: false,
           needsInfo: true,
-          question: `I don't have your class schedule for ${dayOfWeek}. What time works?`,
+          question: `Did you mean ${h} AM or ${h} PM?`,
+          buttons: {
+            inline_keyboard: [[
+              { text: `${h} AM`, callback_data: `resched_time:${propId}:${dateIst}:${String(h === 12 ? 0 : h).padStart(2, "0")}:${String(m).padStart(2, "0")}` },
+              { text: `${h} PM`, callback_data: `resched_time:${propId}:${dateIst}:${String(h === 12 ? 12 : h + 12).padStart(2, "0")}:${String(m).padStart(2, "0")}` },
+            ]],
+          },
+          localDate: dateIst,
+          localTime: null,
           proposalId: propId,
+          anchor: "none",
+          dueAtFormatted: formatConfirmationDate(dateIst),
         };
       }
 
-      // Parse HH:MM from slot
-      const timeStr = anchor === "after_last_class" ? slot.end_time : slot.start_time;
-      const [hh, mm] = timeStr.split(":").map(Number);
-      const utcInstant = new Date(baseDate.getTime() + hh * 3600000 + mm * 60000 - IST_OFFSET_MS);
-      return { ok: true, utcInstant, localDate: targetDateIST, localTime: timeStr.slice(0, 5), proposalId: propId };
-    } catch {
-      return {
-        ok: false,
-        needsInfo: true,
-        question: "What time works for you? I couldn't load your class schedule.",
-        proposalId: propId,
-      };
+      h = chosenH;
     }
+
+    const clockStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    const dt = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate(), h, m, 0) - IST_OFFSET_MS);
+    const formatted = formatConfirmationDate(dateIst, clockStr);
+
+    return {
+      ok: true,
+      localDate: dateIst,
+      localTime: clockStr,
+      utcInstant: dt,
+      proposalId: propId,
+      anchor: "none",
+      dueAtFormatted: formatted,
+      remindAtFormatted: formatted,
+    };
   }
 
-  return { ok: true, proposalId: propId };
+  // Case 3: No time given -> proposal with date, ask time
+  const morningAnchor = settings?.morning_anchor_time || "08:00";
+  const eveningAnchor = settings?.evening_anchor_time || "20:00";
+  return {
+    ok: true,
+    needsInfo: true,
+    localDate: dateIst,
+    localTime: null,
+    proposalId: propId,
+    anchor: "none",
+    dueAtFormatted: formatConfirmationDate(dateIst),
+    question: `Picked up: ${task.title}. Nudge you when?`,
+    buttons: {
+      inline_keyboard: [[
+        { text: `Tonight (${eveningAnchor})`, callback_data: `resched_time:${propId}:${dateIst}:${eveningAnchor}` },
+        { text: `Tomorrow (${morningAnchor})`, callback_data: `resched_time:${propId}:${new Date(baseDate.getTime() + 86400000).toISOString().slice(0, 10)}:${morningAnchor}` },
+        { text: "Pick time", callback_data: `change_time:${propId}` },
+      ]],
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Proposal creation
+// Schedule Query Renderer from D1 (B1, G17, G18, G48)
+// ---------------------------------------------------------------------------
+export async function renderD1ScheduleQuery(
+  db: D1Database,
+  query: AssistantQuery | undefined,
+  userText: string,
+  now: Date
+): Promise<string> {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+  const todayIST = istNow.toISOString().slice(0, 10);
+  const tomorrowIST = new Date(istNow.getTime() + 86400000).toISOString().slice(0, 10);
+
+  // Keyword-based type inference fallback (B1)
+  const lower = userText.toLowerCase();
+  let queryType = query?.type || "today";
+  if (lower.includes("how am i doing") || lower.includes("progress")) {
+    queryType = "summary";
+  } else if (lower.includes("tomorrow")) {
+    queryType = lower.includes("class") ? "classes" : "tomorrow";
+  } else if (lower.includes("today")) {
+    queryType = "today";
+  }
+
+  const targetDate = (queryType === "tomorrow" || queryType === "classes") ? tomorrowIST : todayIST;
+  const targetWeekday = (() => {
+    const [y, m, d] = targetDate.split("-").map(Number);
+    const day = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    return day === 0 ? 7 : day;
+  })();
+
+  try {
+    // 1. Task progress summary (G48)
+    if (queryType === "summary") {
+      const pendingRows = await db
+        .prepare("SELECT COUNT(*) as cnt FROM tasks WHERE status NOT IN ('done', 'cancelled')")
+        .first<{ cnt: number }>();
+      const overdueRows = await db
+        .prepare("SELECT COUNT(*) as cnt FROM tasks WHERE status NOT IN ('done', 'cancelled') AND deadline_local_date < ?")
+        .bind(todayIST)
+        .first<{ cnt: number }>();
+      const doneRows = await db
+        .prepare("SELECT COUNT(*) as cnt FROM tasks WHERE status = 'done' AND completed_at >= ?")
+        .bind(todayIST + "T00:00:00.000Z")
+        .first<{ cnt: number }>();
+      const nextTask = await db
+        .prepare("SELECT title, deadline_local_date, deadline_time_local FROM tasks WHERE status NOT IN ('done', 'cancelled') ORDER BY deadline_local_date ASC NULLS LAST, deadline_time_local ASC NULLS LAST LIMIT 1")
+        .first<{ title: string; deadline_local_date: string | null; deadline_time_local: string | null }>();
+
+      const openCount = pendingRows?.cnt ?? 0;
+      const overdueCount = overdueRows?.cnt ?? 0;
+      const doneCount = doneRows?.cnt ?? 0;
+
+      let nextDueStr = "None scheduled";
+      if (nextTask) {
+        nextDueStr = `${nextTask.title}${nextTask.deadline_time_local ? " at " + nextTask.deadline_time_local : ""}`;
+      }
+
+      return `Task Progress:\n• Open tasks: ${openCount}\n• Overdue: ${overdueCount}\n• Completed today: ${doneCount}\n• Next due: ${nextDueStr}`;
+    }
+
+    // 2. Classes for tomorrow (G18)
+    if (queryType === "classes" || (queryType === "tomorrow" && lower.includes("class"))) {
+      const slots = await db
+        .prepare("SELECT start_time, end_time, room FROM timetable_slots WHERE weekday = ? AND active = 1 ORDER BY start_time ASC")
+        .bind(targetWeekday)
+        .all<{ start_time: string; end_time: string; room: string | null }>();
+
+      if (!slots.results.length) {
+        return `You have no classes scheduled for tomorrow (${targetDate}).`;
+      }
+      const lines = slots.results.map((s) => `• ${s.start_time} - ${s.end_time}${s.room ? " (" + s.room + ")" : ""}`);
+      return `Classes tomorrow (${targetDate}):\n${lines.join("\n")}`;
+    }
+
+    // 3. Daily schedule and tasks render (G17)
+    const [slots, tasks, overdue] = await Promise.all([
+      db.prepare("SELECT start_time, end_time, room FROM timetable_slots WHERE weekday = ? AND active = 1 ORDER BY start_time ASC")
+        .bind(targetWeekday)
+        .all<{ start_time: string; end_time: string; room: string | null }>(),
+      db.prepare("SELECT title, deadline_time_local, priority FROM tasks WHERE deadline_local_date = ? AND status NOT IN ('done', 'cancelled') ORDER BY deadline_time_local ASC NULLS LAST")
+        .bind(targetDate)
+        .all<{ title: string; deadline_time_local: string | null; priority: string }>(),
+      db.prepare("SELECT title, deadline_local_date FROM tasks WHERE deadline_local_date < ? AND status NOT IN ('done', 'cancelled') ORDER BY deadline_local_date ASC LIMIT 5")
+        .bind(todayIST)
+        .all<{ title: string; deadline_local_date: string | null }>(),
+    ]);
+
+    const sections: string[] = [];
+    const dateLabel = targetDate === todayIST ? "Today" : "Tomorrow";
+
+    if (slots.results.length > 0) {
+      const cLines = slots.results.map((s) => `  • ${s.start_time} - ${s.end_time}${s.room ? " (" + s.room + ")" : ""}`);
+      sections.push(`Classes ${dateLabel} (${targetDate}):\n${cLines.join("\n")}`);
+    } else {
+      sections.push(`Classes ${dateLabel}: None`);
+    }
+
+    if (tasks.results.length > 0) {
+      const tLines = tasks.results.map((t) => `  • ${t.title}${t.deadline_time_local ? " at " + t.deadline_time_local : ""}`);
+      sections.push(`Tasks Due:\n${tLines.join("\n")}`);
+    } else {
+      sections.push(`Tasks Due: None`);
+    }
+
+    if (overdue.results.length > 0) {
+      const oLines = overdue.results.map((o) => `  • ${o.title} (${o.deadline_local_date})`);
+      sections.push(`⚠️ Overdue Tasks:\n${oLines.join("\n")}`);
+    }
+
+    return sections.join("\n\n");
+  } catch (e) {
+    return "Couldn't load schedule right now. Try /today.";
+  }
+}
+
+export { resolveTaskTime as resolveAnchorTime };
+
+// ---------------------------------------------------------------------------
+// Create Proposal from Task (B2, B3)
 // ---------------------------------------------------------------------------
 export async function createProposalFromTask(
   db: D1Database,
   task: AssistantTask,
-  resolved: ResolvedTime & { proposalId?: string },
+  resolved: { localDate: string; localTime: string | null; anchor?: string; proposalId?: string },
   intent: AssistantIntent,
   now: Date
 ): Promise<string> {
-  const id = resolved.proposalId || ("prop_" + Math.random().toString(36).slice(2).toUpperCase());
+  const propId = resolved.proposalId || "prop_" + Math.random().toString(36).slice(2, 10).toUpperCase();
   const nowStr = now.toISOString();
-
-  const dateRole = intent === "explicit_reminder" ? "reminder_time" : "deadline";
+  const dateRole = intent === "implicit_commitment" ? "implicit_suggestion" : "manual";
 
   await db
     .prepare(
       `INSERT INTO task_proposals
-         (id, title, date_role, proposed_local_date, proposed_local_time,
-          advisory_confidence, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+         (id, title, proposed_local_date, proposed_local_time, anchor_key, date_role,
+          status, advisory_confidence, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', 0.85, ?, ?)`
     )
     .bind(
-      id,
+      propId,
       task.title.trim().slice(0, 500),
+      resolved.localDate || null,
+      resolved.localTime || null,
+      resolved.anchor || null,
       dateRole,
-      resolved.localDate ?? null,
-      resolved.localTime ?? null,
-      task.anchor && task.anchor !== "none" ? 0.85 : 0.95,
       nowStr,
       nowStr
     )
-    .run();
+    .run()
+    .catch(() => {});
 
-  return id;
+  return propId;
 }
 
 // ---------------------------------------------------------------------------
-// Query answer renderer (LLM reply_text discarded for query intents)
-// ---------------------------------------------------------------------------
-export async function renderQueryAnswer(
-  db: D1Database,
-  query: AssistantQuery | undefined,
-  now: Date,
-  _env: any
-): Promise<string> {
-  if (!query) return "I'm not sure what schedule you want to see. Try /today.";
-
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
-  const todayIST = istNow.toISOString().slice(0, 10);
-
-  try {
-    if (query.type === "today") {
-      const tasks = await db
-        .prepare(
-          `SELECT title, deadline_local_time, priority, status FROM tasks
-           WHERE (deadline_local_date = ? OR deadline_local_date IS NULL)
-             AND status NOT IN ('done', 'cancelled')
-           ORDER BY deadline_local_time ASC NULLS LAST LIMIT 10`
-        )
-        .bind(todayIST)
-        .all<{ title: string; deadline_local_time: string | null; priority: string; status: string }>();
-
-      if (!tasks.results.length) return "Nothing due today!";
-      const lines = tasks.results.map((t) =>
-        `- ${t.title}${t.deadline_local_time ? " at " + t.deadline_local_time : ""}`
-      );
-      return `Today's tasks:\n${lines.join("\n")}`;
-    }
-
-    if (query.type === "pending" || query.type === "overdue") {
-      const isOverdue = query.type === "overdue";
-      const tasks = await db
-        .prepare(
-          `SELECT title, deadline_local_date, deadline_local_time, priority FROM tasks
-           WHERE status NOT IN ('done', 'cancelled')
-             ${isOverdue ? "AND deadline_local_date < ?" : ""}
-           ORDER BY deadline_local_date ASC NULLS LAST, deadline_local_time ASC NULLS LAST
-           LIMIT 10`
-        )
-        .bind(...(isOverdue ? [todayIST] : []))
-        .all<{ title: string; deadline_local_date: string | null; deadline_local_time: string | null; priority: string }>();
-
-      if (!tasks.results.length) return isOverdue ? "No overdue tasks!" : "No pending tasks.";
-      const lines = tasks.results.map((t) =>
-        `- ${t.title}${t.deadline_local_date ? " (" + t.deadline_local_date + (t.deadline_local_time ? " " + t.deadline_local_time : "") + ")" : ""}`
-      );
-      return `${isOverdue ? "Overdue" : "Pending"} tasks:\n${lines.join("\n")}`;
-    }
-
-    if (query.type === "week") {
-      const weekEnd = new Date(istNow.getTime() + 7 * 86400000).toISOString().slice(0, 10);
-      const tasks = await db
-        .prepare(
-          `SELECT title, deadline_local_date, deadline_local_time FROM tasks
-           WHERE status NOT IN ('done', 'cancelled')
-             AND deadline_local_date BETWEEN ? AND ?
-           ORDER BY deadline_local_date ASC, deadline_local_time ASC NULLS LAST
-           LIMIT 15`
-        )
-        .bind(todayIST, weekEnd)
-        .all<{ title: string; deadline_local_date: string | null; deadline_local_time: string | null }>();
-
-      if (!tasks.results.length) return "Nothing due this week!";
-      const lines = tasks.results.map((t) =>
-        `- ${t.title}${t.deadline_local_date ? " (" + t.deadline_local_date + (t.deadline_local_time ? " " + t.deadline_local_time : "") + ")" : ""}`
-      );
-      return `This week:\n${lines.join("\n")}`;
-    }
-
-    if (query.type === "search" && query.keyword) {
-      const kw = "%" + query.keyword + "%";
-      const tasks = await db
-        .prepare(
-          `SELECT title, deadline_local_date, deadline_local_time FROM tasks
-           WHERE title LIKE ? AND status NOT IN ('done', 'cancelled')
-           ORDER BY deadline_local_date ASC NULLS LAST LIMIT 10`
-        )
-        .bind(kw)
-        .all<{ title: string; deadline_local_date: string | null; deadline_local_time: string | null }>();
-
-      if (!tasks.results.length) return `No tasks matching "${query.keyword}".`;
-      const lines = tasks.results.map((t) => `- ${t.title}`);
-      return `Found:\n${lines.join("\n")}`;
-    }
-
-    return "I couldn't understand what to look up. Try /today.";
-  } catch (e) {
-    console.error("[QueryAnswer] Error:", e);
-    return "Couldn't load your tasks right now.";
-  }
-}
-
-// ---------------------------------------------------------------------------
-// modify_pending handler
+// Handle Modify Pending Proposals (G20)
 // ---------------------------------------------------------------------------
 export async function handleModifyPending(
   db: D1Database,
   output: TelegramAssistantOutput,
   replyToMessageId: number | undefined,
-  now: Date
+  now: Date,
+  userText?: string
 ): Promise<{ message: string; proposalId?: string }> {
-  if (!replyToMessageId) {
-    return { message: "To edit a task, reply to the bot message containing the proposal." };
+  let row: { id: string; title: string; status: string } | null = null;
+  if (replyToMessageId) {
+    row = await db
+      .prepare(
+        `SELECT p.id, p.title, p.status FROM task_proposals p
+         JOIN chat_messages cm ON cm.text LIKE '%' || p.id || '%' OR cm.reply_markup LIKE '%' || p.id || '%'
+         WHERE cm.message_id = ? AND p.status = 'pending'
+         LIMIT 1`
+      )
+      .bind(replyToMessageId)
+      .first<{ id: string; title: string; status: string }>()
+      .catch(() => null);
   }
-
-  // Find the pending proposal associated with this bot message
-  // We store the message_id in chat_messages when we sent the proposal buttons
-  const row = await db
-    .prepare(
-      `SELECT p.id, p.title, p.status FROM task_proposals p
-       JOIN chat_messages cm ON cm.text LIKE '%' || p.id || '%'
-       WHERE cm.message_id = ? AND p.status = 'pending'
-       LIMIT 1`
-    )
-    .bind(replyToMessageId)
-    .first<{ id: string; title: string; status: string }>()
-    .catch(() => null);
 
   if (!row) {
-    return { message: "No pending proposal found for that message. The proposal may have already been confirmed or cancelled." };
+    row = await db
+      .prepare("SELECT id, title, status FROM task_proposals WHERE status = 'pending' ORDER BY created_at DESC LIMIT 1")
+      .first<{ id: string; title: string; status: string }>()
+      .catch(() => null);
   }
 
-  // Apply modification from task[0]
+  if (!row) {
+    return { message: "No pending proposal found. Create a new task with /add or by typing it." };
+  }
+
   const newTask = output.tasks?.[0];
-  if (!newTask) {
-    return { message: "What would you like to change about the task?", proposalId: row.id };
-  }
-
   const nowStr = now.toISOString();
-  const updates: string[] = [];
-  const binds: any[] = [];
 
-  if (newTask.title && newTask.title !== row.title) {
-    updates.push("title = ?");
-    binds.push(newTask.title.trim().slice(0, 500));
-  }
-
-  // Handle time change: "make it 8pm" sets proposed_local_time
-  if (newTask.hour !== undefined && newTask.hour !== null) {
-    const h = newTask.hour;
+  // If new time is given (e.g. "make it 8pm" -> hour 20, minute 0)
+  if (newTask && newTask.hour !== undefined && newTask.hour !== null) {
+    let h = newTask.hour;
     const m = newTask.minute ?? 0;
-    const localTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-    updates.push("proposed_local_time = ?");
-    binds.push(localTime);
-    // Recalculate proposed_local_date if offset_days present
-    if (newTask.offset_days !== undefined) {
-      const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-      const istNow = new Date(now.getTime() + IST_OFFSET_MS);
-      const baseDate = new Date(istNow.getTime() + (newTask.offset_days ?? 0) * 86400000);
-      baseDate.setUTCHours(0, 0, 0, 0);
-      updates.push("proposed_local_date = ?");
-      binds.push(baseDate.toISOString().slice(0, 10));
-    }
+    // h < 7 means AM hours 1-6, everything else in range 7-12 is ambiguous.
+    // If the LLM returns h=8 for "8pm" it already does so only when it has pm context.
+    // Guard: if h is 1-6 and no context forces AM, treat as PM for evening-only intents.
+    // If h is 7-11 and IST current hour > h (past AM slot), treat as PM.
+    if (h < 7) h += 12; // 1am-6am range: very unlikely PM shortcuts -> treat as evening
+    // If userText contains explicit "pm" and h is 1-12, treat as PM
+    if (userText && /\d\s*pm/i.test(userText) && h <= 12) h = h < 12 ? h + 12 : 12;
+    const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    const todayIst = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+
+    await db
+      .prepare(
+        "UPDATE task_proposals SET proposed_local_date = ?, proposed_local_time = ?, updated_at = ? WHERE id = ? AND status = 'pending'"
+      )
+      .bind(todayIst, timeStr, nowStr, row.id)
+      .run()
+      .catch(() => {});
+
+    const dateFormatted = formatConfirmationDate(todayIst, timeStr);
+    return {
+      message: `Updated time to ${dateFormatted}. Confirm?`,
+      proposalId: row.id,
+    };
   }
 
-  if (updates.length === 0) {
-    // No change detected
-    updates.push("updated_at = ?");
-    binds.push(nowStr);
-  } else {
-    updates.push("updated_at = ?");
-    binds.push(nowStr);
+  if (newTask && newTask.title && newTask.title !== row.title) {
+    await db
+      .prepare("UPDATE task_proposals SET title = ?, updated_at = ? WHERE id = ? AND status = 'pending'")
+      .bind(newTask.title.trim().slice(0, 500), nowStr, row.id)
+      .run()
+      .catch(() => {});
+    return {
+      message: `Updated title to "${newTask.title}". Confirm?`,
+      proposalId: row.id,
+    };
   }
 
-  binds.push(row.id);
-  await db
-    .prepare(`UPDATE task_proposals SET ${updates.join(", ")} WHERE id = ? AND status = 'pending'`)
-    .bind(...binds)
-    .run()
-    .catch(() => {});
-
-  const updated = newTask.title || row.title;
   return {
-    message: `Updated: "${updated}"`,
+    message: `What would you like to change about "${row.title}"?`,
     proposalId: row.id,
   };
 }
 
 // ---------------------------------------------------------------------------
-// Register the capability (called once at startup in aiCapabilities.ts)
+// Register Capability in AICapabilityRegistry
 // ---------------------------------------------------------------------------
 export function registerTelegramAssistantCapability(): void {
-  // Avoid double-registration during hot reload
   if (AICapabilityRegistry.get("telegram_assistant")) return;
 
   AICapabilityRegistry.register<TelegramAssistantInput, TelegramAssistantOutput>({
     id: "telegram_assistant",
-    promptId: "telegram_assistant_v1",
-    promptVersion: "1.0.0",
-    checksum: "block1-telegram-assistant",
+    promptId: "telegram_assistant_v2",
+    promptVersion: "2.0.0",
+    checksum: "block2-intelligence-assistant",
     dependencies: ["tasks", "timetable"],
-    supportedPrivacyClasses: ["personal"],
-    // Exclude workers_ai and mock from implicit capture (enforced by conversation layer)
-    // Explicit task creation allowed from all providers
-    providerAllowList: undefined, // allow all; conversation layer handles per-intent exclusion
-    maxContextTokens: 2000,
-    maxOutputTokens: 512,
+    supportedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
+    maxContextTokens: 2500,
+    maxOutputTokens: 600,
     timeoutMs: 15000,
 
-    systemRules: buildAssistantSystemPrompt("the owner"),
-
+    systemRules: buildAssistantSystemPrompt("the owner", getCapabilityManifest()),
     outputContract: JSON.stringify({
       intent: "string",
       confidence: "number 0..1",
       reply_text: "string",
-      tasks: "array max 3",
+      tasks: "array optional",
       query: "object optional",
+      lookup: "object optional",
       memory: "object optional",
+      actions: "array optional",
     }),
 
-    contextBuilder: async (db, input: TelegramAssistantInput, builder, now) => {
-      // Load settings
-      let settings: Record<string, string> = {};
-      try {
-        const rows = await db
-          .prepare("SELECT key, value FROM settings LIMIT 50")
-          .all<{ key: string; value: string }>();
-        for (const r of rows.results) settings[r.key] = r.value;
-      } catch {}
-
-      // Load recent tasks
-      let recentTasks: any[] = [];
-      try {
-        const r = await db
-          .prepare(
-            `SELECT id, title, status, deadline_local_date, deadline_local_time
-             FROM tasks WHERE status NOT IN ('done', 'cancelled')
-             ORDER BY created_at DESC LIMIT 5`
-          )
-          .all();
-        recentTasks = r.results;
-      } catch {}
-
-      // Load referenced proposal if replyToMessageId is set
-      let replyToProposal: any = null;
-      if (input.replyToMessageId) {
-        try {
-          replyToProposal = await db
-            .prepare(
-              `SELECT p.id, p.title, p.status FROM task_proposals p
-               JOIN chat_messages cm ON cm.text LIKE '%' || p.id || '%'
-               WHERE cm.message_id = ? AND p.status = 'pending'
-               LIMIT 1`
-            )
-            .bind(input.replyToMessageId)
-            .first();
-        } catch {}
-      }
-
-      // Update system prompt with actual owner name
-      const ownerName = settings["owner_name"] || "the owner";
-      builder.setSystemRules(buildAssistantSystemPrompt(ownerName));
-
-      // Build user prompt
-      const userPrompt = buildAssistantUserPrompt(
+    contextBuilder: async (_db, input, builder, now) => {
+      const prompt = buildAssistantUserPrompt(
         input.userText,
         now,
-        settings,
-        recentTasks,
-        replyToProposal
+        input.settings || {},
+        [],
+        input.replyToProposal,
+        input.recentChat || []
       );
-
-      builder.setOwnerRequest(userPrompt);
+      builder.setOwnerRequest(prompt);
     },
 
-    validator: validateOutput,
+    validator: validateAssistantOutput,
 
-    handler: async (_db, validatedOutput, _input, _now) => {
-      // The conversation handler (telegramConversation.ts) does all side effects.
-      // The capability handler just passes through the validated output.
-      return validatedOutput;
-    },
+    handler: async (_db, parsed) => parsed,
   });
 }
+
+// Auto-register upon module load
+registerTelegramAssistantCapability();

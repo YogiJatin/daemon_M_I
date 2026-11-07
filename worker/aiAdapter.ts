@@ -1,4 +1,4 @@
-﻿/**
+/**
  * worker/aiAdapter.ts — Block 6.1 Central AI Capability Adapter & Failover Router
  *
  * Hardened Architecture:
@@ -18,11 +18,12 @@ import { AIContextBuilder } from "./aiContextBuilder";
 import { AIPromptCache } from "./aiPromptCache";
 import { AIProviderScoring } from "./aiProviderScoring";
 import { AIVerifier } from "./aiVerifier";
+import { sendTelegramMessage } from "./telegram";
 
 export type PrivacyClass = "synthetic_test" | "low_sensitivity" | "personal" | "restricted";
 
 export interface AIRequest<TInput = any> {
-  capability: "task_breakdown" | "weekly_plan" | "prioritize" | "suggest_next" | "propose_task";
+  capability: "task_breakdown" | "weekly_plan" | "prioritize" | "suggest_next" | "propose_task" | "telegram_assistant";
   systemPrompt: string;
   userPrompt: string;
   inputContext: TInput;
@@ -93,11 +94,19 @@ export class AIAdapter {
    * Resolves the configured provider order respecting owner primacy.
    */
   public getProviderOrder(): string[] {
-    const custom = this.env?.AI_PROVIDER_ORDER || "groq_primary,groq_secondary,gemini_primary,gemini_secondary,workers_ai,mock";
-    return custom
+    const isGeminiParked = this.env?.GEMINI_ENABLED !== "1";
+    const defaultOrder = isGeminiParked
+      ? "groq_primary,groq_secondary,workers_ai"
+      : "groq_primary,groq_secondary,gemini_primary,gemini_secondary,workers_ai";
+    const custom = this.env?.AI_PROVIDER_ORDER || defaultOrder;
+    let list = custom
       .split(",")
       .map((s: string) => s.trim().toLowerCase())
       .filter(Boolean);
+    if (isGeminiParked) {
+      list = list.filter((p: string) => !p.includes("gemini"));
+    }
+    return list;
   }
 
   /**
@@ -162,8 +171,8 @@ export class AIAdapter {
         keySlot: 1,
         apiKey: this.resolveApiKey("gemini", 1) || undefined,
         model: this.env?.GEMINI_MODEL || "gemini-3.8-flash",
-        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity"],
-        timeoutMs: 7000,
+        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
+        timeoutMs: 15000,
       };
     }
     if (id === "gemini_secondary" || id === "gemini_slot2") {
@@ -173,8 +182,8 @@ export class AIAdapter {
         keySlot: 2,
         apiKey: this.resolveApiKey("gemini", 2) || undefined,
         model: this.env?.GEMINI_MODEL_SECONDARY || this.env?.GEMINI_MODEL || "gemini-3.8-flash",
-        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity"],
-        timeoutMs: 7000,
+        allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
+        timeoutMs: 15000,
       };
     }
 
@@ -288,16 +297,26 @@ export class AIAdapter {
     }
 
     // 4. Provider Scoring & Selection (Owner Primacy)
-    const ownerOrder = this.getProviderOrder();
+    let ownerOrder = this.getProviderOrder();
+    if (this.db) {
+      try {
+        const setting = await this.db.prepare("SELECT value FROM settings WHERE key = 'disabled_providers'").first<{ value: string }>();
+        if (setting?.value) {
+          const disabledList = setting.value.toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
+          ownerOrder = ownerOrder.filter(p => !disabledList.some(d => p.toLowerCase().includes(d)));
+        }
+      } catch {}
+    }
+    const isGeminiParked = this.env?.GEMINI_ENABLED !== "1";
     // Expand default candidates into configured profiles (including multiple key slots and local Ollama)
+    // Note: mock is only included if explicitly requested via simulatedFailure, never as an active candidate (P0-3)
     const profileIds = [
       "groq_primary",
       "groq_secondary",
       "workers_ai",
-      "gemini_primary",
-      "gemini_secondary",
+      ...(isGeminiParked ? [] : ["gemini_primary", "gemini_secondary"]),
       "ollama",
-      "mock",
+      ...(simulatedFailure ? ["mock"] : []),
     ];
     const allConfigs = profileIds
       .map((id) => this.getProviderConfig(id))
@@ -430,7 +449,7 @@ export class AIAdapter {
           cooldownMs = 15000;
         } else if (err.status === 429 || err.message?.includes("429")) {
           failureCode = "429";
-          cooldownMs = err.retryAfterMs || 60000;
+          cooldownMs = err.retryAfterMs || 10000;
         } else if (err.status >= 500 || err.message?.includes("503")) {
           failureCode = "503";
           cooldownMs = 30000;
@@ -448,7 +467,7 @@ export class AIAdapter {
           cooldownMs = Math.max(cooldownMs, 300000);
         }
 
-        circuit.cooldownUntil = now.getTime() + cooldownMs;
+        circuit.cooldownUntil = Date.now() + cooldownMs;
         await this.recordProviderHealth(
           config.id,
           config.model,
@@ -541,7 +560,7 @@ export class AIAdapter {
           cooldownMs = 15000;
         } else if (err.status === 429 || err.message?.includes("429")) {
           failureCode = "429";
-          cooldownMs = err.retryAfterMs || 60000;
+          cooldownMs = err.retryAfterMs || 10000;
         } else if (err.status >= 500 || err.message?.includes("503")) {
           failureCode = "503";
           cooldownMs = 30000;
@@ -557,7 +576,7 @@ export class AIAdapter {
           cooldownMs = Math.max(cooldownMs, 300000);
         }
 
-        circuit.cooldownUntil = now.getTime() + cooldownMs;
+        circuit.cooldownUntil = Date.now() + cooldownMs;
         await this.recordProviderHealth(
           config.id,
           config.model,
@@ -642,7 +661,14 @@ export class AIAdapter {
   ): Promise<{ data: TOutput; rawText: string }> {
     let mockResult: any;
 
-    if (request.capability === "task_breakdown") {
+    if (request.capability === "telegram_assistant") {
+      mockResult = {
+        intent: "chat",
+        confidence: 0,
+        reply_text: "AI is offline right now. Your message was not lost.",
+        offline: true,
+      };
+    } else if (request.capability === "task_breakdown") {
       const taskTitle = request.inputContext?.title || "Project Milestone";
       mockResult = {
         summary: `Decomposed "${taskTitle}" into 3 concrete steps`,
@@ -709,6 +735,29 @@ export class AIAdapter {
         evidence: "Earliest deadline and high priority tag",
         affected_record_ids: [firstTaskId],
       };
+    } else if ((request.capability as string) === "telegram_assistant") {
+      const uText = (request.inputContext?.userText || "").toLowerCase();
+      if (/weather|temperature/i.test(uText)) {
+        mockResult = {
+          intent: "lookup",
+          confidence: 0.95,
+          reply_text: "Checking weather...",
+          lookup: { kind: "weather", query: request.inputContext?.userText || "" },
+        };
+      } else if (/remind|task|buy|pick up|study|submit|groceries/i.test(uText)) {
+        mockResult = {
+          intent: "explicit_task",
+          confidence: 0.95,
+          reply_text: "Got it.",
+          tasks: [{ title: request.inputContext?.userText?.slice(0, 40) || "Task", offset_days: 0, anchor: "none" }],
+        };
+      } else {
+        mockResult = {
+          intent: "chat",
+          confidence: 0.95,
+          reply_text: "Hey! What's up?",
+        };
+      }
     } else {
       mockResult = {
         next_action: "Review upcoming timetable and tackle overdue items",
@@ -774,8 +823,9 @@ export class AIAdapter {
     }
   }
 
-private extractJsonPayload<T = any>(rawText: string): T {
-  const trimmed = rawText.trim();
+private extractJsonPayload<T = any>(rawText: any): T {
+  const textStr = typeof rawText === "string" ? rawText : JSON.stringify(rawText || "{}");
+  const trimmed = textStr.trim();
   try {
     return JSON.parse(trimmed);
   } catch {}
@@ -813,14 +863,16 @@ private extractJsonPayload<T = any>(rawText: string): T {
     const aiBinding = this.env?.AI;
     if (!aiBinding) throw new Error("Cloudflare Workers AI binding (env.AI) not configured");
 
-    const promptText = `${request.systemPrompt}\n\nIMPORTANT: Return valid JSON only.\n\n${request.userPrompt}`;
     const response: any = await aiBinding.run(config.model, {
-      prompt: promptText,
+      messages: [
+        { role: "system", content: `${request.systemPrompt}\n\nIMPORTANT: Return valid JSON only.` },
+        { role: "user", content: request.userPrompt },
+      ],
       max_tokens: 1024,
       temperature: 0.1,
     });
 
-    const rawText = typeof response === "string" ? response : response?.response || JSON.stringify(response);
+    const rawText = typeof response === "string" ? response : typeof response?.response === "string" ? response.response : JSON.stringify(response);
     const data = this.extractJsonPayload<TOutput>(rawText);
     return { data, rawText };
   }
@@ -833,15 +885,13 @@ private extractJsonPayload<T = any>(rawText: string): T {
     if (!apiKey) throw new Error(`Gemini API key not configured for profile '${config.id}' (slot ${config.keySlot || 1})`);
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 7000);
+    const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 15000);
 
-    const payload = {
+    const payload: any = {
       contents: [{ parts: [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }] }],
       generationConfig: {
         responseMimeType: "application/json",
-        thinkingConfig: {
-          thinkingLevel: "low",
-        },
+        thinkingConfig: { thinkingBudget: 0 },
       },
     };
 
@@ -860,13 +910,13 @@ private extractJsonPayload<T = any>(rawText: string): T {
         let shapeNote = "";
         if (response.status === 503) {
           try {
-            const probe = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            const probe = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
             });
             const pBody = await probe.text().catch(() => "");
-            shapeNote = ` [shape probe gemini-2.5-flash: HTTP ${probe.status} ${pBody.slice(0, 150)}]`;
+            shapeNote = ` [shape probe gemini-3.8-flash: HTTP ${probe.status} ${pBody.slice(0, 150)}]`;
           } catch (e: any) {
             shapeNote = ` [shape probe error: ${e.message}]`;
           }
@@ -987,15 +1037,41 @@ private extractJsonPayload<T = any>(rawText: string): T {
    */
   private async sendPermanentAlert(providerId: string, reason: string): Promise<void> {
     try {
+      // F5: No alerts for test runs
+      if (this.env?.ALLOW_TEST_STUBS === "1") return;
+
       const token = this.env?.TELEGRAM_BOT_TOKEN;
       const chatId = this.env?.TELEGRAM_OWNER_ID;
       if (!token || !chatId) return;
-      const msg = "[AI] Provider permanently disabled: " + providerId + " (" + reason + "). Check API key or update model config.";
-      await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: chatId, text: msg }),
-      });
+
+      // F5: Check D1 provider_alerts for max 1 per state change and max 1 per 24h
+      if (this.db) {
+        const existing = await this.db
+          .prepare("SELECT last_state, last_alert_at FROM provider_alerts WHERE provider = ?")
+          .bind(providerId)
+          .first<{ last_state: string; last_alert_at: string }>()
+          .catch(() => null);
+
+        if (existing) {
+          const hoursSinceLast = (Date.now() - new Date(existing.last_alert_at).getTime()) / (1000 * 3600);
+          if (existing.last_state === reason && hoursSinceLast < 24) {
+            return; // Deduplicated
+          }
+        }
+
+        const nowIso = new Date().toISOString();
+        await this.db
+          .prepare(
+            `INSERT OR REPLACE INTO provider_alerts (provider, last_state, last_alert_at, updated_at)
+             VALUES (?, ?, ?, ?)`
+          )
+          .bind(providerId, reason, nowIso, nowIso)
+          .run()
+          .catch(() => {});
+      }
+
+      const msg = `[AI] Provider state change: ${providerId} (${reason}).`;
+      await sendTelegramMessage(token, chatId, msg);
     } catch {
       // best-effort
     }
@@ -1007,11 +1083,11 @@ private extractJsonPayload<T = any>(rawText: string): T {
    * Records results in provider_health. Never throws.
    */
   public async runCanary(now: Date = new Date()): Promise<Record<string, { ok: boolean; latencyMs: number; error?: string; permanent?: boolean }>> {
+    const isGeminiParked = this.env?.GEMINI_ENABLED !== "1";
     const targetProviders = [
       "groq_primary",
       "groq_secondary",
-      "gemini_primary",
-      "gemini_secondary",
+      ...(isGeminiParked ? [] : ["gemini_primary", "gemini_secondary"]),
       "workers_ai",
     ];
     const results: Record<string, { ok: boolean; latencyMs: number; error?: string; permanent?: boolean }> = {};

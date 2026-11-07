@@ -43,7 +43,7 @@ export class AIProviderScoring {
     now: Date = new Date()
   ): ScoredCandidate[] {
     const candidates: ScoredCandidate[] = [];
-    const nowMs = now.getTime();
+    const nowMs = Date.now();
 
     // Map provider to its position in owner's preferred order
     const ownerRankMap = new Map<string, number>();

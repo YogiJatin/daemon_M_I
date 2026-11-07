@@ -19,6 +19,7 @@ import { recordRejectionFeedback } from "./captureEngine";
 import { setProfileKey } from "./dailyRhythm";
 import { applyReminderShifts, findRemindersToShift } from "./dailyRhythm";
 import { sendTelegramMessage } from "./telegram";
+import { handleSaveMemoryProposalCallback, handleDeleteMemoryCallback } from "./memoryService";
 
 export interface CallbackResult {
   success: boolean;
@@ -352,6 +353,44 @@ export async function handleCallbackQuery(
   // I. Legacy proposal shortcuts: p_conf/p_rej with short prefix IDs
   // ---------------------------------------------------------------------------
   // (handled above by confirm_proposal / reject_proposal blocks)
+
+  // ---------------------------------------------------------------------------
+  // Memory callbacks: save_memory, reject_memory, delete_memory, cancel_forget
+  // ---------------------------------------------------------------------------
+  if (action === "save_memory") {
+    const propId = payload;
+    const msg = await handleSaveMemoryProposalCallback(env.DB, propId, now);
+    await clearKeyboard(botToken, chatId, messageId);
+    await env.DB.prepare("UPDATE telegram_updates SET status = 'processed', processed_at = ? WHERE update_id = ?")
+      .bind(nowIso, updateId).run().catch(() => {});
+    return { success: true, action, message: msg };
+  }
+
+  if (action === "reject_memory") {
+    const propId = payload;
+    await env.DB.prepare("UPDATE memory_proposals SET status = 'rejected', updated_at = ? WHERE id = ?")
+      .bind(nowIso, propId).run().catch(() => {});
+    await clearKeyboard(botToken, chatId, messageId);
+    await env.DB.prepare("UPDATE telegram_updates SET status = 'processed', processed_at = ? WHERE update_id = ?")
+      .bind(nowIso, updateId).run().catch(() => {});
+    return { success: true, action, message: "Memory proposal cancelled." };
+  }
+
+  if (action === "delete_memory") {
+    const memId = payload;
+    const msg = await handleDeleteMemoryCallback(env.DB, memId);
+    await clearKeyboard(botToken, chatId, messageId);
+    await env.DB.prepare("UPDATE telegram_updates SET status = 'processed', processed_at = ? WHERE update_id = ?")
+      .bind(nowIso, updateId).run().catch(() => {});
+    return { success: true, action, message: msg };
+  }
+
+  if (action === "cancel_forget") {
+    await clearKeyboard(botToken, chatId, messageId);
+    await env.DB.prepare("UPDATE telegram_updates SET status = 'processed', processed_at = ? WHERE update_id = ?")
+      .bind(nowIso, updateId).run().catch(() => {});
+    return { success: true, action, message: "Cancelled." };
+  }
 
   // ---------------------------------------------------------------------------
   // J. Task-level actions: done, snooze, details
