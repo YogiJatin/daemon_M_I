@@ -1,3 +1,5 @@
+import { generatePKCE, buildConsentUrl, exchangeCodeForTokens, revokeGmailAccess } from "./gmailService";
+import { encryptToken } from "./gmailCrypto";
 /**
  * worker/apiRouter.ts — Personal AI OS Services Router
  *
@@ -225,6 +227,92 @@ export async function handleApiRequest(
         "Set-Cookie": createClearSessionCookie(),
       });
     }
+
+    // GET /api/v1/auth/gmail/connect (Protected)
+    if (method === "GET" && path === "/api/v1/auth/gmail/connect") {
+      if (!session) return jsonError("unauthorized", "Authentication required", 401);
+      if (!env.GMAIL_CLIENT_ID || !env.GMAIL_CLIENT_SECRET) {
+        return jsonError("not_configured", "GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET are required", 400);
+      }
+      const { codeVerifier, codeChallenge } = await generatePKCE();
+      const state = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+      const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
+      await env.DB.prepare(
+        "INSERT OR REPLACE INTO gmail_oauth_states (state, code_verifier, expires_at, created_at) VALUES (?, ?, ?, ?)"
+      ).bind(state, codeVerifier, expiresAt, now.toISOString()).run();
+
+      const origin = new URL(request.url).origin;
+      const redirectUri = `${origin}/api/v1/auth/gmail/callback`;
+      const consentUrl = buildConsentUrl(env.GMAIL_CLIENT_ID, redirectUri, state, codeChallenge);
+
+      return jsonSuccess({ consent_url: consentUrl, state, expires_at: expiresAt });
+    }
+
+    // GET /api/v1/auth/gmail/callback (Public OAuth redirect handler)
+    if (method === "GET" && path === "/api/v1/auth/gmail/callback") {
+      const code = url.searchParams.get("code");
+      const state = url.searchParams.get("state");
+      if (!code || !state) {
+        return new Response("Missing code or state parameter", { status: 400 });
+      }
+
+      const stateRow = await env.DB.prepare(
+        "SELECT code_verifier, expires_at FROM gmail_oauth_states WHERE state = ?"
+      ).bind(state).first();
+
+      if (!stateRow || new Date((stateRow as any).expires_at).getTime() < now.getTime()) {
+        return new Response("Invalid or expired OAuth state. Please initiate connection again.", { status: 400 });
+      }
+
+      const origin = new URL(request.url).origin;
+      const redirectUri = `${origin}/api/v1/auth/gmail/callback`;
+      try {
+        const tokenData = await exchangeCodeForTokens(
+          code,
+          (stateRow as any).code_verifier,
+          env.GMAIL_CLIENT_ID,
+          env.GMAIL_CLIENT_SECRET,
+          redirectUri
+        );
+
+        if (!tokenData.refresh_token) {
+          return new Response("No refresh token returned by Google. Revoke app permissions at myaccount.google.com/permissions and retry with prompt=consent.", { status: 400 });
+        }
+
+        const encrypted = await encryptToken(tokenData.refresh_token, env.GMAIL_ENCRYPTION_KEY);
+        await env.DB.prepare(
+          "INSERT OR REPLACE INTO gmail_auth (id, status, encrypted_refresh_token, is_active, updated_at) VALUES ('primary', 'connected', ?, 1, ?)"
+        ).bind(encrypted, now.toISOString()).run();
+
+        await env.DB.prepare("DELETE FROM gmail_oauth_states WHERE state = ?").bind(state).run();
+
+        return Response.redirect(`${origin}/settings?tab=devices&gmail=connected`, 302);
+      } catch (err: any) {
+        return new Response(`OAuth connection failed: ${err.message}`, { status: 500 });
+      }
+    }
+
+    // POST /api/v1/auth/gmail/disconnect (Protected)
+    if (method === "POST" && path === "/api/v1/auth/gmail/disconnect") {
+      if (!session) return jsonError("unauthorized", "Authentication required", 401);
+      await revokeGmailAccess(env.DB, env.GMAIL_ENCRYPTION_KEY);
+      return jsonSuccess({ disconnected: true });
+    }
+
+    // GET /api/v1/gmail/status (Protected)
+    if (method === "GET" && path === "/api/v1/gmail/status") {
+      if (!session) return jsonError("unauthorized", "Authentication required", 401);
+      const authRow = await env.DB.prepare(
+        "SELECT status, is_active, last_polled_at, updated_at FROM gmail_auth WHERE id = 'primary'"
+      ).first();
+      return jsonSuccess({
+        connected: authRow?.status === 'connected',
+        status: authRow?.status || 'disconnected',
+        is_active: authRow?.is_active === 1,
+        last_polled_at: authRow?.last_polled_at || null,
+      });
+    }
+
 
     // =======================================================================
     // 2. FOCUS READ MODEL (Command Center Home Screen)

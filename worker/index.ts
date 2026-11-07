@@ -1,3 +1,4 @@
+import { runGmailIngestionCron } from "./gmailIngestion";
 import { routeCommand } from "./commands";
 import { handleNonSlashMessage } from "./telegramConversation";
 import { AIAdapter } from "./aiAdapter";
@@ -1822,6 +1823,9 @@ export default {
 
     // Phase 1 (Block 4): Periodic Deterministic Heartbeat (runs on minute % 15 == 0)
     await runDeterministicHeartbeat(env.DB, env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_OWNER_ID, scheduledTime).catch(() => {});
+
+    // Phase 4 (Block 5): Gmail Read-Only Ingress
+    await runGmailIngestionCron(env, scheduledTime).catch((err) => console.error('[GmailIngress] error:', err));
 
     await runScheduler(env.DB, scheduledTime, undefined, {
       botToken: env.TELEGRAM_BOT_TOKEN,

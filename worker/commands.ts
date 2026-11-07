@@ -1,3 +1,4 @@
+import { generatePKCE, buildConsentUrl, revokeGmailAccess } from "./gmailService";
 import { parseDateShorthand, ParsedDeadline, getISTDateParts, istToUtcDate, extractTimeAndTitle } from "./dateParser";
 import { planNotification, planCatchupDigest } from "./notificationPlanner";
 import {
@@ -1771,6 +1772,64 @@ export async function routeCommand(text: string, context?: CommandContext): Prom
   const commandName = rawCommand.slice(1).split("@")[0].toLowerCase();
 
   switch (commandName) {
+    case "connect": {
+      if (!context?.db) return { command: "connect", args, success: false, response: "No DB." };
+      if (args.toLowerCase().startsWith("gmail")) {
+        const clientId = context.env?.GMAIL_CLIENT_ID;
+        const clientSecret = context.env?.GMAIL_CLIENT_SECRET;
+        if (!clientId || !clientSecret) {
+          return {
+            command: "connect",
+            args,
+            success: false,
+            response: "Google OAuth credentials not configured. Set GMAIL_CLIENT_ID and GMAIL_CLIENT_SECRET in Cloudflare secrets.",
+          };
+        }
+        const { codeVerifier, codeChallenge } = await generatePKCE();
+        const state = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+        const expiresAt = new Date((context.now || new Date()).getTime() + 10 * 60 * 1000).toISOString();
+        await context.db.prepare(
+          "INSERT OR REPLACE INTO gmail_oauth_states (state, code_verifier, expires_at, created_at) VALUES (?, ?, ?, ?)"
+        ).bind(state, codeVerifier, expiresAt, (context.now || new Date()).toISOString()).run();
+
+        const origin = "https://personal-ai-os.jatin-personal-ai.workers.dev";
+        const redirectUri = `${origin}/api/v1/auth/gmail/callback`;
+        const consentUrl = buildConsentUrl(clientId, redirectUri, state, codeChallenge);
+        return {
+          command: "connect",
+          args,
+          success: true,
+          response: `🔗 Tap the link below to connect Gmail (read-only, valid for 10 min):\n${consentUrl}`,
+        };
+      }
+      return { command: "connect", args, success: false, response: "Usage: /connect gmail" };
+    }
+    case "disconnect": {
+      if (!context?.db) return { command: "disconnect", args, success: false, response: "No DB." };
+      if (args.toLowerCase().startsWith("gmail")) {
+        await revokeGmailAccess(context.db, context.env?.GMAIL_ENCRYPTION_KEY);
+        return {
+          command: "disconnect",
+          args,
+          success: true,
+          response: "Disconnected Gmail. OAuth tokens revoked and ciphertext purged from database.",
+        };
+      }
+      return { command: "disconnect", args, success: false, response: "Usage: /disconnect gmail" };
+    }
+    case "email": {
+      if (!context?.db) return { command: "email", args, success: false, response: "No DB." };
+      const sub = args.trim().toLowerCase();
+      const nowIso = (context.now || new Date()).toISOString();
+      if (sub === "on") {
+        await context.db.prepare("UPDATE gmail_auth SET is_active = 1, updated_at = ? WHERE id = 'primary'").bind(nowIso).run();
+        return { command: "email", args, success: true, response: "Gmail read-only ingestion enabled." };
+      } else if (sub === "off") {
+        await context.db.prepare("UPDATE gmail_auth SET is_active = 0, updated_at = ? WHERE id = 'primary'").bind(nowIso).run();
+        return { command: "email", args, success: true, response: "Gmail read-only ingestion paused." };
+      }
+      return { command: "email", args, success: false, response: "Usage: /email on | /email off" };
+    }
     case "start":
       return handleStart(args, context);
     case "help":
