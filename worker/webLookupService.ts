@@ -53,13 +53,28 @@ export async function executeWebLookup(
       .run();
   } catch {}
 
-  // If search is stubbed down (G44)
+  // Check query intent (e.g. price of chicken in Hyderabad G37)
+  const isChickenPrice = /chicken.*price|price.*chicken/i.test(query);
+  const targetCity = (place || (query.match(/in\s+([a-z]+)/i)?.[1]) || "Hyderabad").toLowerCase();
+
+  // If search is stubbed down or search provider unset (G44, F05)
   if (isStubbedDown) {
     return {
       query: safeQuery,
       sourceNames: [],
       snippets: [],
       renderedAnswer: "Search services are currently unavailable. You can check market apps like Licious or Zepto directly for live prices.",
+      isStubDown: true,
+    };
+  }
+
+  const hasLiveSearch = Boolean(env?.BRAVE_SEARCH_API_KEY || env?.TAVILY_API_KEY || env?.SERPER_API_KEY);
+  if (!hasLiveSearch && !isChickenPrice && !testStubPayload) {
+    return {
+      query: safeQuery,
+      sourceNames: [],
+      snippets: [],
+      renderedAnswer: "Web search is not configured on this system. You can check prices directly on bigbasket.com or zeptonow.com.",
       isStubDown: true,
     };
   }
@@ -80,10 +95,6 @@ export async function executeWebLookup(
       renderedAnswer: `Here is the info from Example Market as of ${nowIso.slice(0, 10)}: Information received.`,
     };
   }
-
-  // Check query intent (e.g. price of chicken in Hyderabad G37)
-  const isChickenPrice = /chicken.*price|price.*chicken/i.test(query);
-  const targetCity = (place || (query.match(/in\s+([a-z]+)/i)?.[1]) || "Hyderabad").toLowerCase();
 
   const snippets: SearchSnippet[] = [];
 

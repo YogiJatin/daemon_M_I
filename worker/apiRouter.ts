@@ -1732,6 +1732,30 @@ export async function handleApiRequest(
       return desktopResponse;
     }
 
+    // =======================================================================
+    // 14E. WEB PUSH NOTIFICATIONS (Block 4 / A10)
+    // =======================================================================
+    if (path === "/api/v1/push/config" && method === "GET") {
+      const hasVapid = Boolean(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY);
+      return jsonSuccess({
+        vapid_configured: hasVapid,
+        public_key: env.VAPID_PUBLIC_KEY || null,
+        message: hasVapid
+          ? "Web push notifications configured."
+          : "Web push notifications require VAPID keys configured by administrator. Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY secrets.",
+      });
+    }
+
+    if (path === "/api/v1/push/subscribe" && method === "POST") {
+      const body = ((await request.json().catch(() => ({}))) as any) || {};
+      if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
+        return jsonError("BAD_REQUEST", "Invalid push subscription object", 400);
+      }
+      const { savePushSubscription } = await import("./webPush");
+      await savePushSubscription(env.DB, body, session?.owner_user_id || "default");
+      return jsonSuccess({ subscribed: true });
+    }
+
     // GET /api/v1/assistant
     if (method === "GET" && path === "/api/v1/assistant") {
       const pendingProposals = await env.DB.prepare(

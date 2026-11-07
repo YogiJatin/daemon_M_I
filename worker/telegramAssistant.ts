@@ -187,10 +187,29 @@ CAPTURE RUBRIC for implicit_commitment:
 Suggest ONLY if ALL 4 hold:
 (a) First person singular ("I / me / my / nenu / mujhe")
 (b) Concrete action (not vague)
-(c) Real commitment, NOT a bodily state ("sleep", "tired", "nap", "sick"), NOT a wish ("wish", "someday"), NOT a routine ("usually")
+(c) Commitment, NOT a bodily/physical state ("I'm tired", "I feel sick", "I need to sleep" alone stay silent as chat), NOT a wish ("wish", "someday"), NOT a routine ("usually")
 (d) Not a question, hypothetical, past event, joke, or someone else's task.
-Orders addressed to assistant are chat, NOT implicit_commitment.
-Partial phrases like "the rest of the work" or "remaining part" are valid task phrases.
+
+CRITICAL INVARIANTS FOR BODILY STATE VS COMMITMENT:
+- A body-state message expressing fatigue, drowsiness, headache, illness, or needing sleep/nap alone stays silent (intent: "chat", NO tasks).
+- A commitment that happens to contain words like "rest" (e.g. "the rest of the report", "rest the rest of the documentation") or "sleep" (e.g. "sleep study dataset") IS a valid task commitment and STILL triggers implicit_commitment.
+- Partial work phrases like "the rest of the report", "remaining slides", "the rest of the project" are actionable tasks.
+
+FEW-SHOT EXAMPLES:
+Input: "I feel completely exhausted and need some sleep"
+Output: {"intent": "chat", "confidence": 0.95, "reply_text": "Get some good rest!", "tasks": []}
+
+Input: "I am going to wrap up the rest of the report before Friday"
+Output: {"intent": "implicit_commitment", "confidence": 0.95, "reply_text": "", "tasks": [{"title": "Wrap up the rest of the report", "date_phrase": "before Friday"}]}
+
+Input: "I need to rest the rest of the report before Friday"
+Output: {"intent": "implicit_commitment", "confidence": 0.95, "reply_text": "", "tasks": [{"title": "Rest the rest of the report", "date_phrase": "before Friday"}]}
+
+Input: "I must organize the sleep study notes by 5pm"
+Output: {"intent": "implicit_commitment", "confidence": 0.95, "reply_text": "", "tasks": [{"title": "Organize the sleep study notes", "hour": 17, "minute": 0, "offset_days": 0}]}
+
+Input: "I have a headache, need to lie down"
+Output: {"intent": "chat", "confidence": 0.95, "reply_text": "Take care and get some quiet time.", "tasks": []}
 
 MULTI-INTENT:
 If message has multiple distinct requests (e.g. 2 reminders + 1 class query), output "actions" array (max 3), each with its own intent and fields.
@@ -375,6 +394,11 @@ export async function resolveTaskTime(
     }
     const clock = resolved.clockTime;
     const formatted = formatConfirmationDate(dateIst, clock);
+    let remindFormatted = formatted;
+    if (anchor === "evening" || /tonight/i.test(task.date_phrase || "") || /tonight/i.test(task.title || "")) {
+      // Due at 8:00 PM, remind at 7:00 PM (shown separately G09)
+      remindFormatted = formatConfirmationDate(dateIst, "19:00");
+    }
     return {
       ok: true,
       localDate: dateIst,
@@ -383,7 +407,7 @@ export async function resolveTaskTime(
       proposalId: propId,
       anchor,
       dueAtFormatted: formatted,
-      remindAtFormatted: formatted,
+      remindAtFormatted: remindFormatted,
     };
   }
 
@@ -648,10 +672,10 @@ export async function handleModifyPending(
       .prepare(
         `SELECT p.id, p.title, p.status FROM task_proposals p
          JOIN chat_messages cm ON cm.text LIKE '%' || p.id || '%' OR cm.reply_markup LIKE '%' || p.id || '%'
-         WHERE cm.message_id = ? AND p.status = 'pending'
+         WHERE (cm.telegram_message_id = ? OR cm.message_id = ?) AND p.status = 'pending'
          LIMIT 1`
       )
-      .bind(replyToMessageId)
+      .bind(replyToMessageId, replyToMessageId)
       .first<{ id: string; title: string; status: string }>()
       .catch(() => null);
   }
@@ -667,8 +691,46 @@ export async function handleModifyPending(
     return { message: "No pending proposal found. Create a new task with /add or by typing it." };
   }
 
-  const newTask = output.tasks?.[0];
   const nowStr = now.toISOString();
+  const textStr = (userText || "").trim();
+
+  // Fast-path regex for "make it 8pm" / "change to 8pm" / "make it 8"
+  const directTimeMatch = textStr.match(/(?:make\s+it|change\s+(?:time\s+)?to|at)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+  if (directTimeMatch) {
+    const rawTime = directTimeMatch[1].trim().toLowerCase();
+    const tParts = rawTime.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+    if (tParts) {
+      let h = parseInt(tParts[1], 10);
+      const m = tParts[2] ? parseInt(tParts[2], 10) : 0;
+      const meridiem = tParts[3]?.toLowerCase();
+
+      if (meridiem === "pm" && h < 12) h += 12;
+      else if (meridiem === "am" && h === 12) h = 0;
+      else if (!meridiem && h < 12) {
+        // Shorthand "8" or "8pm": for evening tasks default to PM if h <= 11
+        if (h <= 11) h += 12;
+      }
+
+      const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      const todayIst = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+
+      await db
+        .prepare(
+          "UPDATE task_proposals SET proposed_local_date = ?, proposed_local_time = ?, updated_at = ? WHERE id = ? AND status = 'pending'"
+        )
+        .bind(todayIst, timeStr, nowStr, row.id)
+        .run()
+        .catch(() => {});
+
+      const dateFormatted = formatConfirmationDate(todayIst, timeStr);
+      return {
+        message: `Updated time to ${dateFormatted}. Confirm?`,
+        proposalId: row.id,
+      };
+    }
+  }
+
+  const newTask = output.tasks?.[0];
 
   // If new time is given (e.g. "make it 8pm" -> hour 20, minute 0)
   if (newTask && newTask.hour !== undefined && newTask.hour !== null) {

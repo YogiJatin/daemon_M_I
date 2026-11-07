@@ -30,10 +30,13 @@ dist-ssr
 .env*
 !.env.example
 
+# SQL dumps and backups
+*.sql
+!migrations/*.sql
+backups/
+backup_pre_block0.sql
+
 # Desktop agent — local settings contain vault path (personal, not committed)
 desktop-agent/settings.json
 # PowerShell sync script — local only (contains vault config reference)
 scripts/obsidian-vault.conf
-
-backup_pre_block0.sql
-

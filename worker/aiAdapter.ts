@@ -351,6 +351,16 @@ export class AIAdapter {
         continue;
       }
 
+      // Workers AI policy (A7): Workers AI may answer explicit reminders and chat, but never implicit capture
+      if (config.providerType === "workers_ai") {
+        const uText = ((input as any)?.userText || "").toLowerCase();
+        const isImplicit = (input as any)?.intent === "implicit_commitment" ||
+          (!/remind|add|buy|call|what|how|schedule|today|tomorrow|weather/i.test(uText) && /\b(i\s+will|i\s+need|i\s+must|i\s+should|i\s+have\s+to|nenu|mujhe)\b/i.test(uText));
+        if (isImplicit) {
+          continue;
+        }
+      }
+
       // Skip sibling slot if same model already gave a 503/model-wide error
       if (blockedModels.has(config.model)) {
         fallbackTriggered = true;
@@ -359,17 +369,16 @@ export class AIAdapter {
 
       const circuit = getCircuitState(config.id);
       const startTime = Date.now();
+      const req: AIRequest = {
+        capability: capability.id as any,
+        systemPrompt: capability.systemRules,
+        userPrompt: canonicalXml,
+        inputContext: input,
+        privacyClass,
+        simulatedFailure,
+      };
 
       try {
-        const req: AIRequest = {
-          capability: capability.id as any,
-          systemPrompt: capability.systemRules,
-          userPrompt: canonicalXml,
-          inputContext: input,
-          privacyClass,
-          simulatedFailure,
-        };
-
         let result = await this.callProvider<any>(config, req, now);
         let parsedData = result.data;
 
@@ -449,7 +458,30 @@ export class AIAdapter {
           cooldownMs = 15000;
         } else if (err.status === 429 || err.message?.includes("429")) {
           failureCode = "429";
-          cooldownMs = err.retryAfterMs || 10000;
+          const retryAfterMs = err.retryAfterMs || 2000;
+          cooldownMs = Math.max(retryAfterMs, 5000);
+          const remainingBudget = 6000 - (Date.now() - startTime);
+          if (retryAfterMs <= 2000 && remainingBudget > (retryAfterMs + 1000)) {
+            try {
+              await new Promise((r) => setTimeout(r, retryAfterMs));
+              const retryRes = await this.callProvider<any>(config, req, now);
+              if (retryRes && retryRes.data) {
+                circuit.consecutiveFailures = 0;
+                circuit.cooldownUntil = 0;
+                return {
+                  ok: true,
+                  data: retryRes.data,
+                  rawText: retryRes.rawText,
+                  provider: config.id,
+                  model: config.model,
+                  durationMs: Date.now() - startTime,
+                  fallbackTriggered: fallbackTriggered || i > 0,
+                };
+              }
+            } catch {
+              // Retry failed, move to next candidate slot
+            }
+          }
         } else if (err.status >= 500 || err.message?.includes("503")) {
           failureCode = "503";
           cooldownMs = 30000;
@@ -560,7 +592,30 @@ export class AIAdapter {
           cooldownMs = 15000;
         } else if (err.status === 429 || err.message?.includes("429")) {
           failureCode = "429";
-          cooldownMs = err.retryAfterMs || 10000;
+          const retryAfterMs = err.retryAfterMs || 2000;
+          cooldownMs = Math.max(retryAfterMs, 5000);
+          const remainingBudget = 6000 - (Date.now() - startTime);
+          if (retryAfterMs <= 2000 && remainingBudget > (retryAfterMs + 1000)) {
+            try {
+              await new Promise((r) => setTimeout(r, retryAfterMs));
+              const retryRes = await this.callProvider<TOutput>(config, request, now);
+              if (retryRes && retryRes.data) {
+                circuit.consecutiveFailures = 0;
+                circuit.cooldownUntil = 0;
+                return {
+                  ok: true,
+                  data: retryRes.data,
+                  rawText: retryRes.rawText,
+                  provider: config.id,
+                  model: config.model,
+                  durationMs: Date.now() - startTime,
+                  fallbackTriggered: fallbackTriggered || i > 0,
+                };
+              }
+            } catch {
+              // Retry failed, move to next candidate slot
+            }
+          }
         } else if (err.status >= 500 || err.message?.includes("503")) {
           failureCode = "503";
           cooldownMs = 30000;
@@ -807,6 +862,11 @@ export class AIAdapter {
         const err: any = new Error(`Groq API error: ${response.status}`);
         err.status = response.status;
         err.body = errorBody;
+        if (response.status === 429) {
+          const retryHeader = response.headers.get("retry-after");
+          const retrySec = retryHeader ? parseFloat(retryHeader) : NaN;
+          err.retryAfterMs = !isNaN(retrySec) ? Math.min(Math.round(retrySec * 1000), 10000) : 2000;
+        }
         if (response.status === 401 || response.status === 404 ||
             errorBody.includes("decommissioned") || errorBody.includes("model_not_found")) {
           err.permanent = true;
@@ -924,6 +984,11 @@ private extractJsonPayload<T = any>(rawText: any): T {
         const err: any = new Error(`Gemini API error: ${response.status}${shapeNote}`);
         err.status = response.status;
         err.body = errorBody + shapeNote;
+        if (response.status === 429) {
+          const retryHeader = response.headers.get("retry-after");
+          const retrySec = retryHeader ? parseFloat(retryHeader) : NaN;
+          err.retryAfterMs = !isNaN(retrySec) ? Math.min(Math.round(retrySec * 1000), 10000) : 2000;
+        }
         if (response.status === 401 || response.status === 404 ||
             errorBody.includes("decommissioned") || errorBody.includes("INVALID_ARGUMENT")) {
           err.permanent = true;

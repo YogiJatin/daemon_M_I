@@ -26,8 +26,30 @@ async function main() {
     if (args[i] === "--server" && args[i + 1]) serverUrl = args[++i];
   }
 
-  if (!code) {
-    console.log("Usage: npm run agent:pair -- --code <8-char-code> [--name <device-name>]");
+  if (!code || args.includes("--help") || args.includes("-h")) {
+    console.log(`
+===================================================================
+       Personal AI OS - Desktop Agent Pairing Instructions
+===================================================================
+
+Step 1: Generate a pairing code in Telegram
+  - Open your Telegram bot.
+  - Send the command: /pair
+  - You will receive an 8-character pairing code valid for 10 minutes.
+
+Step 2: Run the pairing command in terminal
+  - Command: npm run agent:pair -- --code <8-CHAR-CODE>
+  - Example: npm run agent:pair -- --code ABCD1234
+
+Step 3: Verify or configure your local Obsidian Vault
+  - Configure your vault path in scripts/obsidian-vault.conf
+  - Run the agent manually to test: npm run agent
+
+Step 4: (Optional) Enable auto-start at Windows logon
+  - Run in PowerShell:
+    powershell -ExecutionPolicy Bypass -File desktop_agent/install-service.ps1
+===================================================================
+`);
     process.exit(1);
   }
 

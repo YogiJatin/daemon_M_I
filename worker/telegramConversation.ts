@@ -38,6 +38,7 @@ import {
   handleMemoriesCommand,
 } from "./memoryService";
 import { parseRegionalDateWords } from "./dateLexicon";
+import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
 
 // ---------------------------------------------------------------------------
 // Budget & timing constants
@@ -346,6 +347,150 @@ async function processSingleMessage(
     return;
   }
 
+  // 3.5 Fast-path Proposal Modification via reply_to_message_id (A8, G20)
+  if (replyToMessageId && /(?:make\s+it|change\s+(?:time\s+)?to|at)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i.test(text)) {
+    const modResult = await handleModifyPending(db, { intent: "modify_pending", confidence: 1.0, reply_text: "" } as any, replyToMessageId, now, text);
+    if (modResult.proposalId) {
+      const markup = makeInlineKeyboard([
+        { text: "Confirm", callback_data: `confirm_proposal:${modResult.proposalId}` },
+        { text: "Cancel", callback_data: `reject_proposal:${modResult.proposalId}` },
+      ]);
+      const sendRes = await sendTg(modResult.message, markup).catch(() => null);
+      await logChatMessage(db, {
+        updateId,
+        chatId,
+        messageId,
+        role: "assistant",
+        text: modResult.message,
+        intent: "modify_pending",
+        confidence: 1.0,
+        outcome: "proposal_modified",
+        status: "sent",
+        replyMarkup: markup,
+        provider: "deterministic",
+        latencyMs: Date.now() - startProcessing,
+        telegramMessageId: sendRes?.telegramMessageId,
+      });
+      await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+      return;
+    }
+  }
+
+  // 3.6 Multi-Intent Splitting (A4, G41, F04)
+  const clauses = splitMessageClauses(text);
+  if (clauses.length > 1) {
+    let handledCount = 0;
+    for (const clause of clauses) {
+      // Clause schedule check
+      const isClauseSched = /what\s+classes.*tomorrow|classes\s+tomorrow|what\s+do\s+i\s+have\s+today|today'?s?\s*classes/i.test(clause);
+      if (isClauseSched) {
+        const schedReply = await renderD1ScheduleQuery(db, { type: "classes" }, clause, now);
+        await sendTg(schedReply).catch(() => null);
+        handledCount++;
+        continue;
+      }
+
+      // Clause deterministic reminder check
+      const parsedDet = parseExplicitReminderDeterministic(clause, now);
+      if (parsedDet) {
+        const propId = "prop_" + ulid();
+        await db.prepare(
+          `INSERT INTO task_proposals (id, title, priority, date_role, proposed_local_date, proposed_local_time, status, created_at, updated_at)
+           VALUES (?, ?, 'normal', 'reminder_time', ?, ?, 'pending', ?, ?)`
+        ).bind(propId, parsedDet.title, parsedDet.localDate, parsedDet.localTime, nowIso(), nowIso()).run().catch(() => {});
+
+        const timeLines = parsedDet.dueDifferentFromRemind
+          ? `\n📅 Due: ${parsedDet.dueAtFormatted}\n⏰ Remind: ${parsedDet.remindAtFormatted}`
+          : `\n⏰ Remind: ${parsedDet.remindAtFormatted}`;
+        const bubbleText = `Proposal:\n• ${parsedDet.title}${timeLines}\n\nConfirm?`;
+        const bubbleMarkup = makeInlineKeyboard([
+          { text: "Confirm", callback_data: `confirm_proposal:${propId}` },
+          { text: "Change time", callback_data: `change_time:${propId}` },
+          { text: "Cancel", callback_data: `reject_proposal:${propId}` },
+        ]);
+        await sendTg(bubbleText, bubbleMarkup).catch(() => null);
+        handledCount++;
+        continue;
+      }
+
+      // Clause anchor task check (e.g. "buy milk after college")
+      if (/buy|pick\s+up|submit|call|meet/i.test(clause) && /after\s+college|after\s+class|leaving\s+college|on\s+the\s+way\s+home/i.test(clause)) {
+        const cleanTitle = clause.replace(/^(?:i\s+need\s+to\s+|i\s+must\s+|i\s+have\s+to\s+)/i, "").trim();
+        const anchorType = /on\s+the\s+way\s+home|leaving\s+college/i.test(clause) ? "leaving_college" : "after_last_class";
+        const taskObj = { title: cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1), anchor: anchorType as any, offset_days: 0 };
+        const resolved = await resolveAnchorTime(db, taskObj, now, env);
+        const propId = await createProposalFromTask(db, taskObj, resolved, "explicit_reminder", now);
+        const dateStr = formatConfirmationDate(resolved.localDate, resolved.localTime);
+        const bubbleText = `Proposal:\n• ${taskObj.title}\n⏰ Remind: ${dateStr}\n\nConfirm?`;
+        const bubbleMarkup = makeInlineKeyboard([
+          { text: "Confirm", callback_data: `confirm_proposal:${propId}` },
+          { text: "Change time", callback_data: `change_time:${propId}` },
+          { text: "Cancel", callback_data: `reject_proposal:${propId}` },
+        ]);
+        await sendTg(bubbleText, bubbleMarkup).catch(() => null);
+        handledCount++;
+        continue;
+      }
+    }
+
+    if (handledCount > 0) {
+      await logChatMessage(db, {
+        updateId,
+        chatId,
+        messageId,
+        role: "assistant",
+        text: `Processed ${handledCount} requests from multi-intent message.`,
+        intent: "multi_intent",
+        confidence: 1.0,
+        outcome: "multi_intent_processed",
+        status: "sent",
+        provider: "deterministic",
+        latencyMs: Date.now() - startProcessing,
+      });
+      await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+      return;
+    }
+  }
+
+  // 3.7 Deterministic-First Reminders (A2, F01) - 0 LLM calls, works with AI down
+  const profile = await getProfile(db);
+  const detReminder = parseExplicitReminderDeterministic(text, now, profile);
+  if (detReminder) {
+    const propId = "prop_" + ulid();
+    await db.prepare(
+      `INSERT INTO task_proposals (id, title, priority, date_role, proposed_local_date, proposed_local_time, status, created_at, updated_at)
+       VALUES (?, ?, 'normal', 'reminder_time', ?, ?, 'pending', ?, ?)`
+    ).bind(propId, detReminder.title, detReminder.localDate, detReminder.localTime, nowIso(), nowIso()).run().catch(() => {});
+
+    const timeLines = detReminder.dueDifferentFromRemind
+      ? `\n📅 Due: ${detReminder.dueAtFormatted}\n⏰ Remind: ${detReminder.remindAtFormatted}`
+      : `\n⏰ Remind: ${detReminder.remindAtFormatted}`;
+    const replyText = `Proposal:\n• ${detReminder.title}${timeLines}\n\nConfirm?`;
+    const markup = makeInlineKeyboard([
+      { text: "Confirm", callback_data: `confirm_proposal:${propId}` },
+      { text: "Change time", callback_data: `change_time:${propId}` },
+      { text: "Cancel", callback_data: `reject_proposal:${propId}` },
+    ]);
+    const sendRes = await sendTg(replyText, markup).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: replyText,
+      intent: "explicit_reminder",
+      confidence: 1.0,
+      outcome: "proposal_created",
+      status: "sent",
+      replyMarkup: markup,
+      provider: "deterministic",
+      latencyMs: Date.now() - startProcessing,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+    return;
+  }
+
   // 4. Daily AI budget check
   const dailyBudget = parseInt(env.DAILY_AI_BUDGET || String(DEFAULT_DAILY_AI_BUDGET), 10);
   const withinBudget = await checkDailyAiBudget(db, dailyBudget, now);
@@ -455,7 +600,7 @@ async function processSingleMessage(
     }
   }
 
-  const profile = await getProfile(db);
+  // profile already fetched above
   const settingsObj: Record<string, any> = {
     morning_anchor_time: profile.morning_anchor_time || "08:00",
     evening_anchor_time: profile.evening_anchor_time || "20:00",
@@ -983,9 +1128,9 @@ async function processSingleMessage(
         const dueStr = formatConfirmationDate(resolved.localDate, resolved.localTime);
         const remindStr = resolved.remindAtFormatted || dueStr;
         const timeLines = (resolved.dueAtFormatted && resolved.remindAtFormatted && resolved.dueAtFormatted !== resolved.remindAtFormatted)
-          ? `\n- Due: ${resolved.dueAtFormatted}\n- Remind: ${resolved.remindAtFormatted}`
-          : `\n- Due: ${dueStr}\n- Remind: ${remindStr}`;
-        replyText = `Got it! Here's what I'll save:\n- ${singleTask.title}${timeLines}\n\nConfirm?`;
+          ? `\n📅 Due: ${resolved.dueAtFormatted}\n⏰ Remind: ${resolved.remindAtFormatted}`
+          : `\n⏰ Remind: ${remindStr}`;
+        replyText = `Proposal:\n• ${singleTask.title}${timeLines}\n\nConfirm?`;
         replyMarkup = makeInlineKeyboard([
           { text: "Confirm", callback_data: `confirm_proposal:${propId}` },
           { text: "Change time", callback_data: `change_time:${propId}` },

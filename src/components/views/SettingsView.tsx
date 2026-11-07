@@ -5,6 +5,44 @@ import { api } from '../../api/client';
 export const SettingsView: React.FC = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [session, setSession] = useState<any>(null);
+  const [pushStatus, setPushStatus] = useState<string | null>(null);
+  const [isPushLoading, setIsPushLoading] = useState(false);
+
+  const handleEnableNotifications = async () => {
+    setIsPushLoading(true);
+    setPushStatus(null);
+    try {
+      const res = await fetch('/api/v1/push/config');
+      const data = ((await res.json().catch(() => ({}))) as any) || {};
+      if (!data.ok || !data.data?.vapid_configured || !data.data?.public_key) {
+        setPushStatus(
+          data.data?.message ||
+            'Web push notifications require VAPID keys configured by administrator. Set VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY secrets.'
+        );
+        setIsPushLoading(false);
+        return;
+      }
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: data.data.public_key,
+        });
+        await fetch('/api/v1/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sub.toJSON()),
+        });
+        setPushStatus('Web push notifications enabled successfully.');
+      } else {
+        setPushStatus('Push notifications not supported in this browser.');
+      }
+    } catch (err: any) {
+      setPushStatus(err.message || 'Failed to enable notifications.');
+    } finally {
+      setIsPushLoading(false);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -63,6 +101,32 @@ export const SettingsView: React.FC = () => {
           >
             {isPaused ? 'Resume Reminders' : 'Pause Reminders'}
           </button>
+        </div>
+      </Card>
+
+      {/* Web Push Fallback (Block 4, A10) */}
+      <Card title="Web Push Notifications Fallback">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-sans text-sm font-medium text-on-surface">Browser Push Notifications</h4>
+              <p className="font-mono text-xs text-outline mt-0.5">
+                Fallback alert channel when Telegram delivery is unavailable or paused.
+              </p>
+            </div>
+            <button
+              onClick={handleEnableNotifications}
+              disabled={isPushLoading}
+              className="min-h-[44px] px-4 rounded-lg font-mono text-xs font-semibold bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors disabled:opacity-50"
+            >
+              {isPushLoading ? 'Checking...' : 'Enable notifications'}
+            </button>
+          </div>
+          {pushStatus && (
+            <div className="p-3 bg-surface-container rounded-lg font-mono text-xs text-outline border border-surface-container-high">
+              {pushStatus}
+            </div>
+          )}
         </div>
       </Card>
 
