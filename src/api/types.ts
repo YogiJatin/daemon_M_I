@@ -134,15 +134,16 @@ export interface AuditEventItem {
 
 export type OSMode =
   | 'focus'       // / (Today / Briefing)
+  | 'tasks'       // /tasks (Tasks List & Detail)
   | 'inbox'       // /inbox (Proposals Review)
-  | 'memory'      // /tasks (Tasks List & Detail)
+  | 'memory'      // /memory (Memory & Knowledge Objects)
+  | 'settings'    // /settings (Preferences, Status, Devices)
   | 'academy'     // /timetable (Classes & Grid)
   | 'timeline'    // /history (Audit Events)
   | 'teach'       // /teach (Teach Mode)
   | 'safebrowser' // /safebrowser (Safe Browser)
   | 'execution'   // /execution (Execution Queue & Approvals)
   | 'system'      // /health (Subsystems & QoS)
-  | 'settings'    // /settings (Preferences)
   | 'pairing'     // /pair (Device Link)
   | 'panel';      // /panel (Compact Floating Bar)
 

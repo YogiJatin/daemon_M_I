@@ -40,9 +40,17 @@ export const AppShell: React.FC<AppShellProps> = ({
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
+  const mobileNavItems: Array<{ mode: OSMode; label: string; icon: string }> = [
+    { mode: 'focus', label: 'Today', icon: '◎' },
+    { mode: 'tasks', label: 'Tasks', icon: '✓' },
+    { mode: 'inbox', label: 'Inbox', icon: '📥' },
+    { mode: 'memory', label: 'Memory', icon: '🧠' },
+    { mode: 'settings', label: 'Settings', icon: '⚙' },
+  ];
+
   return (
-    <div className={`min-h-screen bg-floor text-on-surface antialiased flex flex-col font-sans ${theme}`}>
-      {/* 1. Sidebar (Operating Modes Navigation) */}
+    <div className={`min-h-screen bg-floor text-on-surface antialiased flex flex-col font-sans overflow-x-hidden ${theme}`}>
+      {/* 1. Sidebar (Desktop Navigation) */}
       <Sidebar
         currentMode={currentMode}
         onSelectMode={onSelectMode}
@@ -69,11 +77,30 @@ export const AppShell: React.FC<AppShellProps> = ({
       />
 
       {/* 4. Content Region (Primary OS Workspace) */}
-      <main className="flex-1 pt-14 sm:pl-[240px] flex flex-col min-h-screen">
-        <div className="w-full max-w-[1360px] mx-auto px-4 sm:px-8 py-4 sm:py-6 flex-1 flex flex-col">
+      <main className="flex-1 pt-14 pb-20 sm:pb-6 sm:pl-[240px] flex flex-col min-h-screen">
+        <div className="w-full max-w-[1360px] mx-auto px-3 sm:px-8 py-3 sm:py-6 flex-1 flex flex-col">
           {children}
         </div>
       </main>
+
+      {/* 5. Mobile Bottom Navigation Bar (390px Mobile First) */}
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-surface-container-lowest/95 backdrop-blur-md border-t border-surface-container z-30 flex items-center justify-around sm:hidden px-2">
+        {mobileNavItems.map((item) => {
+          const isActive = currentMode === item.mode;
+          return (
+            <button
+              key={item.mode}
+              onClick={() => onSelectMode(item.mode)}
+              className={`flex flex-col items-center justify-center flex-1 min-h-[48px] py-1 transition-colors ${
+                isActive ? 'text-primary font-bold' : 'text-outline hover:text-on-surface'
+              }`}
+            >
+              <span className="text-base leading-none mb-1">{item.icon}</span>
+              <span className="text-[10px] font-mono tracking-tight">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 };

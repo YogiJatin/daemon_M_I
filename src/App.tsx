@@ -1,51 +1,33 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { OSMode, SystemPresence, TodayData, FocusData, Task, ClassOccurrence, AuditEventItem } from './api/types';
+import type { OSMode, SystemPresence, TodayData, FocusData, Task } from './api/types';
 import { api } from './api/client';
 import { AppShell } from './components/shell/AppShell';
 import { TodayView } from './components/views/TodayView';
-import { QuickPanelView } from './components/views/QuickPanelView';
 import { TaskListView } from './components/views/TaskListView';
-import { TimetableGrid } from './components/views/TimetableGrid';
-import { AuditTimeline } from './components/views/AuditTimeline';
-import { HealthDashboard } from './components/views/HealthDashboard';
+import { InboxView } from './components/views/InboxView';
+import { MemoryView } from './components/views/MemoryView';
 import { SettingsView } from './components/views/SettingsView';
 import { PairView } from './components/views/PairView';
 import { ShareTargetView } from './components/views/ShareTargetView';
 import { Inspector } from './components/primitives/Inspector';
 import { TaskInspectorContent } from './components/views/TaskInspectorContent';
-import { InboxView } from './components/views/InboxView';
-import { TeachModePanel } from './components/views/TeachModePanel';
-import { SafeBrowserPanel } from './components/views/SafeBrowserPanel';
-import { ExecutionQueuePanel } from './components/views/ExecutionQueuePanel';
 
 function getModeFromPath(pathname: string): OSMode {
+  if (pathname === '/tasks') return 'tasks';
   if (pathname === '/inbox') return 'inbox';
-  if (pathname === '/tasks') return 'memory';
-  if (pathname === '/timetable') return 'academy';
-  if (pathname === '/history') return 'timeline';
-  if (pathname === '/teach') return 'teach';
-  if (pathname === '/safebrowser') return 'safebrowser';
-  if (pathname === '/execution') return 'execution';
-  if (pathname === '/health') return 'system';
-  if (pathname === '/settings') return 'settings';
+  if (pathname === '/memory') return 'memory';
+  if (pathname === '/settings' || pathname === '/health') return 'settings';
   if (pathname === '/pair') return 'pairing';
-  if (pathname === '/panel') return 'panel';
   return 'focus';
 }
 
 function getPathFromMode(mode: OSMode): string {
   switch (mode) {
+    case 'tasks': return '/tasks';
     case 'inbox': return '/inbox';
-    case 'memory': return '/tasks';
-    case 'academy': return '/timetable';
-    case 'timeline': return '/history';
-    case 'teach': return '/teach';
-    case 'safebrowser': return '/safebrowser';
-    case 'execution': return '/execution';
-    case 'system': return '/health';
+    case 'memory': return '/memory';
     case 'settings': return '/settings';
     case 'pairing': return '/pair';
-    case 'panel': return '/panel';
     case 'focus':
     default:
       return '/';
@@ -62,8 +44,6 @@ export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [inspectedTask, setInspectedTask] = useState<Task | null>(null);
-  const [inspectedClass, setInspectedClass] = useState<ClassOccurrence | null>(null);
-  const [inspectedEvent, setInspectedEvent] = useState<AuditEventItem | null>(null);
 
   // Sync mode with browser history
   const handleSelectMode = (mode: OSMode) => {
@@ -97,7 +77,7 @@ export function App() {
     });
   };
 
-  // Primary data polling (TEST-4.2: ~30s polling while visible)
+  // Primary data polling (~30s polling while visible)
   const refreshCoreData = useCallback(async () => {
     try {
       // 1. Verify cryptographic session first via /api/v1/auth/me
@@ -199,7 +179,7 @@ export function App() {
         <ShareTargetView
           onSaved={() => {
             refreshCoreData();
-            handleSelectMode('memory');
+            handleSelectMode('tasks');
           }}
           onCancel={() => handleSelectMode('focus')}
         />
@@ -215,64 +195,36 @@ export function App() {
             />
           )}
 
+          {currentMode === 'tasks' && (
+            <TaskListView
+              onInspectTask={(task) => setInspectedTask(task)}
+            />
+          )}
+
           {currentMode === 'inbox' && (
             <InboxView
               onTaskCreated={refreshCoreData}
             />
           )}
 
-          {currentMode === 'panel' && (
-            <QuickPanelView
-              todayData={todayData}
-              focusData={focusData}
-              onRefresh={refreshCoreData}
-              onOpenFullApp={() => handleSelectMode('focus')}
-              onInspectTask={(task) => setInspectedTask(task)}
-            />
-          )}
-
           {currentMode === 'memory' && (
-            <TaskListView
-              onInspectTask={(task) => setInspectedTask(task)}
-            />
+            <MemoryView />
           )}
 
-          {currentMode === 'academy' && (
-            <TimetableGrid
-              onInspectClass={(cls) => setInspectedClass(cls)}
-            />
+          {currentMode === 'settings' && (
+            <SettingsView />
           )}
-
-          {currentMode === 'timeline' && (
-            <AuditTimeline
-              onInspectEvent={(ev) => setInspectedEvent(ev)}
-            />
-          )}
-
-          {currentMode === 'teach' && (
-            <TeachModePanel />
-          )}
-
-          {currentMode === 'safebrowser' && (
-            <SafeBrowserPanel />
-          )}
-
-          {currentMode === 'execution' && (
-            <ExecutionQueuePanel />
-          )}
-
-          {currentMode === 'system' && <HealthDashboard />}
-
-          {currentMode === 'settings' && <SettingsView />}
 
           {currentMode === 'pairing' && (
-            <PairView
-              isAuthenticated={isAuthenticated}
-              onPairedSuccess={() => {
-                refreshCoreData();
-                handleSelectMode('focus');
-              }}
-            />
+            <div className="max-w-md mx-auto w-full py-6">
+              <PairView
+                isAuthenticated={isAuthenticated}
+                onPairedSuccess={() => {
+                  refreshCoreData();
+                  handleSelectMode('focus');
+                }}
+              />
+            </div>
           )}
         </>
       )}
@@ -290,100 +242,6 @@ export function App() {
             onRefresh={refreshCoreData}
             onClose={() => setInspectedTask(null)}
           />
-        )}
-      </Inspector>
-
-      {/* Universal Inspector for Classes */}
-      <Inspector
-        isOpen={!!inspectedClass}
-        onClose={() => setInspectedClass(null)}
-        title={inspectedClass?.subject_name || 'Class Details'}
-        subtitle={`Slot: ${inspectedClass?.start_time} – ${inspectedClass?.end_time}`}
-      >
-        {inspectedClass && (
-          <div className="space-y-4 font-mono text-xs">
-            <div className="p-3 rounded-lg bg-surface-container-low space-y-2 border border-surface-container">
-              <div className="flex justify-between">
-                <span className="text-outline">Subject Code:</span>
-                <span className="text-on-surface">{inspectedClass.subject_code || '—'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Room:</span>
-                <span className="text-on-surface">{inspectedClass.room || 'Default Hall'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Faculty:</span>
-                <span className="text-on-surface">{inspectedClass.faculty || '—'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Status:</span>
-                <span className="text-primary uppercase">{inspectedClass.status}</span>
-              </div>
-            </div>
-
-            {inspectedClass.materials && inspectedClass.materials.length > 0 && (
-              <div>
-                <div className="uppercase text-outline text-[10px] mb-2">Preparation Checklist</div>
-                <div className="space-y-1.5">
-                  {inspectedClass.materials.map((m, i) => (
-                    <div key={i} className="p-2 rounded bg-surface-container-low border border-surface-container flex items-center justify-between">
-                      <span className="text-on-surface">{m.title}</span>
-                      {m.required && <span className="text-error text-[10px] uppercase">[Required]</span>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Inspector>
-
-      {/* Universal Inspector for Audit Events */}
-      <Inspector
-        isOpen={!!inspectedEvent}
-        onClose={() => setInspectedEvent(null)}
-        title={inspectedEvent?.event_type || 'Audit Event'}
-        subtitle={`Sequence #${inspectedEvent?.sequence ?? '—'}`}
-      >
-        {inspectedEvent && (
-          <div className="space-y-3 font-mono text-xs">
-            <div className="p-3 rounded-lg bg-surface-container-low space-y-2 border border-surface-container">
-              <div className="flex justify-between">
-                <span className="text-outline">Actor:</span>
-                <span className="text-on-surface">{inspectedEvent.actor}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Entity:</span>
-                <span className="text-on-surface">{inspectedEvent.entity_type} ({inspectedEvent.entity_id})</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Timestamp:</span>
-                <span className="text-on-surface">{inspectedEvent.created_at}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Integrity:</span>
-                <span className="text-ok">CRYPTOGRAPHICALLY VERIFIED</span>
-              </div>
-            </div>
-
-            {inspectedEvent.payload_hash && (
-              <div>
-                <div className="uppercase text-outline text-[10px] mb-1">Payload SHA-256</div>
-                <div className="p-2 rounded bg-surface-container-lowest border border-surface-container text-[10px] break-all text-on-surface-variant">
-                  {inspectedEvent.payload_hash}
-                </div>
-              </div>
-            )}
-
-            {inspectedEvent.record_hash && (
-              <div>
-                <div className="uppercase text-outline text-[10px] mb-1">Chained Record Hash</div>
-                <div className="p-2 rounded bg-surface-container-lowest border border-surface-container text-[10px] break-all text-primary">
-                  {inspectedEvent.record_hash}
-                </div>
-              </div>
-            )}
-          </div>
         )}
       </Inspector>
     </AppShell>

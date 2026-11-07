@@ -14,9 +14,9 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ onInspectTask }) => 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'open' | 'completed' | 'all'>('open');
-  const [priorityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const fetchTasks = async () => {
     try {
@@ -24,7 +24,6 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ onInspectTask }) => 
       setError(null);
       const res = await api.getTasks({
         status: statusFilter === 'all' ? undefined : statusFilter,
-        priority: priorityFilter === 'all' ? undefined : priorityFilter,
       });
       setTasks(res.tasks);
     } catch (err: any) {
@@ -36,17 +35,20 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ onInspectTask }) => 
 
   useEffect(() => {
     fetchTasks();
-  }, [statusFilter, priorityFilter]);
+  }, [statusFilter]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTaskTitle.trim()) return;
+    if (!newTaskTitle.trim() || creating) return;
     try {
+      setCreating(true);
       await api.createTask({ title: newTaskTitle.trim(), priority: 'normal' });
       setNewTaskTitle('');
       fetchTasks();
     } catch (err: any) {
       alert(`Failed to create task: ${err.message}`);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -68,27 +70,28 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ onInspectTask }) => 
     : tasks;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full">
       {/* Header & Quick Add */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-surface-container">
         <div>
-          <h2 className="font-sans text-xl font-semibold text-on-surface">Memory (Tasks & Directives)</h2>
-          <p className="font-mono text-xs text-outline mt-0.5">Authoritative state owned exclusively by D1</p>
+          <h1 className="font-sans text-xl font-bold text-on-surface">Tasks & Directives</h1>
+          <p className="font-mono text-xs text-outline mt-0.5">Authoritative task state owned exclusively by Cloudflare D1</p>
         </div>
 
-        <form onSubmit={handleCreate} className="flex gap-2">
+        <form onSubmit={handleCreate} className="flex gap-2 w-full sm:w-auto">
           <input
             type="text"
             value={newTaskTitle}
             onChange={(e) => setNewTaskTitle(e.target.value)}
             placeholder="Add new directive..."
-            className="bg-surface-container-low border border-surface-container rounded-lg px-3 py-1.5 text-xs font-sans text-on-surface focus:outline-none focus:border-primary w-48 sm:w-64"
+            className="min-h-[44px] bg-surface-container-low border border-surface-container rounded-lg px-3 text-xs font-sans text-on-surface focus:outline-none focus:border-primary flex-1 sm:w-64"
           />
           <button
             type="submit"
-            className="min-h-[44px] sm:min-h-[32px] px-3 bg-primary text-on-primary rounded-lg font-mono text-xs font-medium"
+            disabled={creating}
+            className="min-h-[44px] px-4 bg-primary text-on-primary rounded-lg font-mono text-xs font-semibold shrink-0 disabled:opacity-50"
           >
-            Create
+            {creating ? 'Saving...' : 'Create'}
           </button>
         </form>
       </div>
@@ -98,9 +101,9 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ onInspectTask }) => 
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setStatusFilter('open')}
-            className={`min-h-[44px] sm:min-h-[28px] px-3 py-1 rounded text-xs font-mono transition-colors ${
+            className={`min-h-[44px] px-3.5 py-1.5 rounded-md text-xs font-mono transition-colors ${
               statusFilter === 'open'
-                ? 'bg-surface-container text-primary font-semibold'
+                ? 'bg-surface-container text-primary font-bold shadow-sm'
                 : 'text-outline hover:text-on-surface'
             }`}
           >
@@ -108,9 +111,9 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ onInspectTask }) => 
           </button>
           <button
             onClick={() => setStatusFilter('completed')}
-            className={`min-h-[44px] sm:min-h-[28px] px-3 py-1 rounded text-xs font-mono transition-colors ${
+            className={`min-h-[44px] px-3.5 py-1.5 rounded-md text-xs font-mono transition-colors ${
               statusFilter === 'completed'
-                ? 'bg-surface-container text-primary font-semibold'
+                ? 'bg-surface-container text-primary font-bold shadow-sm'
                 : 'text-outline hover:text-on-surface'
             }`}
           >
@@ -118,9 +121,9 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ onInspectTask }) => 
           </button>
           <button
             onClick={() => setStatusFilter('all')}
-            className={`min-h-[44px] sm:min-h-[28px] px-3 py-1 rounded text-xs font-mono transition-colors ${
+            className={`min-h-[44px] px-3.5 py-1.5 rounded-md text-xs font-mono transition-colors ${
               statusFilter === 'all'
-                ? 'bg-surface-container text-primary font-semibold'
+                ? 'bg-surface-container text-primary font-bold shadow-sm'
                 : 'text-outline hover:text-on-surface'
             }`}
           >
@@ -128,22 +131,20 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ onInspectTask }) => 
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter Memory..."
-            className="bg-surface-container-low border border-surface-container rounded px-2.5 py-1 text-xs font-sans text-on-surface focus:outline-none w-36 sm:w-44"
-          />
-        </div>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Filter tasks..."
+          className="min-h-[44px] bg-surface-container-low border border-surface-container rounded-lg px-3 text-xs font-sans text-on-surface focus:outline-none focus:border-primary w-full sm:w-48"
+        />
       </div>
 
       {/* Tasks List */}
-      <Card title={`Active Directives (${filteredTasks.length})`}>
+      <Card title={`Directives (${filteredTasks.length})`}>
         {loading ? (
-          <div className="text-center py-10 font-mono text-xs text-primary animate-pulse">
-            Syncing memory from D1...
+          <div className="text-center py-12 font-mono text-xs text-primary animate-pulse">
+            Syncing tasks from D1...
           </div>
         ) : error ? (
           <div className="text-center py-8 font-mono text-xs text-error">
@@ -152,7 +153,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ onInspectTask }) => 
         ) : filteredTasks.length === 0 ? (
           <EmptyState
             title="No tasks match criteria"
-            description="Adjust your filters or add a new task."
+            description="Adjust your filters or add a new directive above."
           />
         ) : (
           <div className="flex flex-col gap-2">
