@@ -35,6 +35,8 @@ import {
   handleListDevicesCommand,
   handleRevokeDeviceCommand,
 } from "./desktopMirrorService";
+import { renderAttentionReport } from "./attention";
+import { buildMorningBriefingText, buildEveningBriefingText } from "./briefings";
 
 interface SnoozePresetResult {
   success: boolean;
@@ -792,6 +794,109 @@ export async function handleHealth(args: string, context?: CommandContext): Prom
     .run();
 
   return { command: "health", args, success: true, response: lines.join("\n") };
+}
+
+export async function handleStatus(args: string, context?: CommandContext): Promise<CommandResult> {
+  if (!context?.db) {
+    return { command: "status", args, success: false, response: "No database connection." };
+  }
+
+  const [tasksCount, propCount, memCount, devices, outbox, health] = await Promise.all([
+    context.db.prepare(`SELECT 
+      SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_cnt,
+      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as done_cnt
+      FROM tasks`).first<{ open_cnt: number; done_cnt: number }>().catch(() => ({ open_cnt: 0, done_cnt: 0 })),
+    context.db.prepare(`SELECT COUNT(*) as cnt FROM task_proposals WHERE status = 'pending'`).first<{ cnt: number }>().catch(() => ({ cnt: 0 })),
+    context.db.prepare(`SELECT COUNT(*) as cnt FROM memory_objects WHERE is_active = 1`).first<{ cnt: number }>().catch(() => ({ cnt: 0 })),
+    context.db.prepare(`SELECT COUNT(*) as cnt, MAX(last_seen_at) as last_seen FROM desktop_devices WHERE revoked_at IS NULL`).first<{ cnt: number; last_seen: string | null }>().catch(() => ({ cnt: 0, last_seen: null })),
+    context.db.prepare(`SELECT 
+      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_cnt,
+      SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as deliv_cnt
+      FROM desktop_mirror_outbox`).first<{ pending_cnt: number; deliv_cnt: number }>().catch(() => ({ pending_cnt: 0, deliv_cnt: 0 })),
+    context.db.prepare(`SELECT consecutive_failures, last_scheduler_success_at FROM system_health WHERE id = 1`).first<{ consecutive_failures: number; last_scheduler_success_at: string }>().catch(() => null),
+  ]);
+
+  const lines = [
+    "🖥️ *System Operational Status*",
+    "",
+    "📦 *Database State:*",
+    `• Tasks: ${tasksCount?.open_cnt ?? 0} open, ${tasksCount?.done_cnt ?? 0} completed`,
+    `• Proposals: ${propCount?.cnt ?? 0} pending review`,
+    `• Memories: ${memCount?.cnt ?? 0} active records`,
+    "",
+    "💻 *Desktop Mirror:*",
+    `• Devices: ${devices?.cnt ?? 0} paired (${devices?.last_seen ? "Last seen " + devices.last_seen : "Never"})`,
+    `• Outbox Queue: ${outbox?.pending_cnt ?? 0} pending, ${outbox?.deliv_cnt ?? 0} delivered`,
+    "",
+    "⚡ *Worker & Scheduler:*",
+    `• Scheduler: ${health?.consecutive_failures === 0 ? "🟢 Healthy" : "🔴 Failing"}`,
+    `• Last Tick: ${health?.last_scheduler_success_at || "N/A"}`,
+    `• AI Providers: Groq primary, Workers AI secondary (Gemini: parked)`,
+  ];
+
+  await context.db
+    .prepare(`UPDATE telegram_updates SET status = 'processed', processed_at = ?, outcome = 'status_queried' WHERE update_id = ?`)
+    .bind((context.now || new Date()).toISOString(), context.updateId)
+    .run()
+    .catch(() => {});
+
+  return { command: "status", args, success: true, response: lines.join("\n") };
+}
+
+export async function handleBriefing(args: string, context?: CommandContext): Promise<CommandResult> {
+  if (!context?.db) {
+    return { command: "briefing", args, success: false, response: "No database connection." };
+  }
+  const now = context.now || new Date();
+  const ist = getISTDateParts(now);
+  const hour = parseInt(ist.hours, 10);
+  const isEvening = args.toLowerCase().includes("evening") || hour >= 17;
+  const text = isEvening
+    ? await buildEveningBriefingText(context.db, ist.localDate, ist.dayOfWeek, now)
+    : await buildMorningBriefingText(context.db, ist.localDate, ist.dayOfWeek, now);
+
+  await context.db
+    .prepare(`UPDATE telegram_updates SET status = 'processed', processed_at = ?, outcome = 'briefing_queried' WHERE update_id = ?`)
+    .bind(now.toISOString(), context.updateId)
+    .run()
+    .catch(() => {});
+
+  return { command: "briefing", args, success: true, response: text };
+}
+
+export async function handleHeartbeat(args: string, context?: CommandContext): Promise<CommandResult> {
+  if (!context?.db) {
+    return { command: "heartbeat", args, success: false, response: "No database connection." };
+  }
+  const now = context.now || new Date();
+  const oneDayAgo = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+
+  const [overdue, staleProps, dev] = await Promise.all([
+    context.db.prepare(`SELECT count(*) as cnt FROM tasks WHERE status = 'open' AND due_date_time_local < ?`).bind(oneDayAgo.slice(0, 16)).first<{ cnt: number }>().catch(() => ({ cnt: 0 })),
+    context.db.prepare(`SELECT count(*) as cnt FROM task_proposals WHERE status = 'pending' AND created_at < ?`).bind(oneDayAgo).first<{ cnt: number }>().catch(() => ({ cnt: 0 })),
+    context.db.prepare(`SELECT MAX(last_seen_at) as last_seen FROM desktop_devices WHERE revoked_at IS NULL`).first<{ last_seen: string | null }>().catch(() => null),
+  ]);
+
+  const findings: string[] = [];
+  if (overdue && overdue.cnt > 0) findings.push(`• ${overdue.cnt} task(s) overdue > 24h`);
+  if (staleProps && staleProps.cnt > 0) findings.push(`• ${staleProps.cnt} proposal(s) pending > 24h`);
+  if (findings.length === 0) findings.push("• All invariants green. Zero stale items.");
+
+  const lines = [
+    "💓 *Heartbeat Findings (Deterministic)*",
+    "",
+    ...findings,
+    "",
+    `Desktop Mirror: ${dev?.last_seen ? "Last seen " + dev.last_seen : "Never connected"}`,
+  ];
+
+  await context.db
+    .prepare(`UPDATE telegram_updates SET status = 'processed', processed_at = ?, outcome = 'heartbeat_queried' WHERE update_id = ?`)
+    .bind(now.toISOString(), context.updateId)
+    .run()
+    .catch(() => {});
+
+  return { command: "heartbeat", args, success: true, response: lines.join("\n") };
 }
 
 export async function handlePause(args: string, context?: CommandContext): Promise<CommandResult> {
@@ -1680,6 +1785,17 @@ export async function routeCommand(text: string, context?: CommandContext): Prom
       return await handleSnooze(args, context);
     case "health":
       return await handleHealth(args, context);
+    case "status":
+      return await handleStatus(args, context);
+    case "briefing":
+      return await handleBriefing(args, context);
+    case "heartbeat":
+      return await handleHeartbeat(args, context);
+    case "attention": {
+      if (!context?.db) return { command: "attention", args, success: false, response: "No DB." };
+      const rep = await renderAttentionReport(context.db, context.now);
+      return { command: "attention", args, success: true, response: rep };
+    }
     case "pause":
       return await handlePause(args, context);
     case "resume":

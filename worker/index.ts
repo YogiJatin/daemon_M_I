@@ -5,6 +5,8 @@ import { handleTelegramMediaIngress } from "./telegramMedia";
 import { sendTelegramMessage, answerCallbackQuery } from "./telegram";
 import { runScheduler } from "./scheduler";
 import { sweepStaleChatMessages } from "./chatSweeper";
+import { checkAndDispatchBriefings } from "./briefings";
+import { runDeterministicHeartbeat } from "./heartbeat";
 import {
   updateTaskTitle,
   updateTaskDeadline,
@@ -1808,9 +1810,18 @@ export default {
     // Cron sweeper for stale chat messages (Part A1 + Fix Brief 0 F4)
     await sweepStaleChatMessages(env.DB, env.TELEGRAM_BOT_TOKEN, scheduledTime, env.TELEGRAM_OWNER_ID);
 
-    // P0-11: 30-day retention cleanup for chat_messages
+    // Phase 0.5: Retention cleanups: chat_messages 30d, telegram_updates 7d, delivered mirror_outbox 30d
     const thirtyDaysAgo = new Date(scheduledTime.getTime() - 30 * 24 * 3600 * 1000).toISOString();
+    const sevenDaysAgo = new Date(scheduledTime.getTime() - 7 * 24 * 3600 * 1000).toISOString();
     await env.DB.prepare("DELETE FROM chat_messages WHERE created_at < ?").bind(thirtyDaysAgo).run().catch(() => {});
+    await env.DB.prepare("DELETE FROM telegram_updates WHERE created_at < ?").bind(sevenDaysAgo).run().catch(() => {});
+    await env.DB.prepare("DELETE FROM desktop_mirror_outbox WHERE status = 'delivered' AND created_at < ?").bind(thirtyDaysAgo).run().catch(() => {});
+
+    // Phase 1 (Block 4): Autonomous Morning & Evening Briefings
+    await checkAndDispatchBriefings(env.DB, env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_OWNER_ID, scheduledTime).catch(() => {});
+
+    // Phase 1 (Block 4): Periodic Deterministic Heartbeat (runs on minute % 15 == 0)
+    await runDeterministicHeartbeat(env.DB, env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_OWNER_ID, scheduledTime).catch(() => {});
 
     await runScheduler(env.DB, scheduledTime, undefined, {
       botToken: env.TELEGRAM_BOT_TOKEN,
