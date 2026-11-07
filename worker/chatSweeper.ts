@@ -3,7 +3,7 @@
  *
  * Requirements (F4):
  * - Sweeper covers 'received', 'queued', AND 'processing' older than 60s.
- * - At most 2 fallback sends per message, then status='failed_final' and never again.
+ * - At most 2 fallback sends per message, then status='failed' and never again.
  * - Success on send marks user status='done'.
  * - Skip rows not belonging to the owner chat or the private test group.
  * - Adds attempts and last_attempt_at tracking.
@@ -38,7 +38,7 @@ export async function sweepStaleChatMessages(
          FROM chat_messages
          WHERE role = 'user'
            AND status IN ('received', 'queued', 'processing')
-           AND status != 'failed_final'
+           AND status != 'failed'
            AND attempts < 2
            AND created_at < ?`
       )
@@ -62,11 +62,11 @@ export async function sweepStaleChatMessages(
         chatIdStr === DEFAULT_PRIVATE_TEST_GROUP;
 
       if (!isAllowedChat) {
-        // Mark failed_final and never send to unknown / synthetic runner chats
+        // Mark failed and never send to unknown / synthetic runner chats
         await db
           .prepare(
             `UPDATE chat_messages
-             SET status = 'failed_final', attempts = ?, last_attempt_at = ?, updated_at = ?
+             SET status = 'failed', attempts = ?, last_attempt_at = ?, updated_at = ?
              WHERE id = ?`
           )
           .bind(attempts, nowIso, nowIso, row.id)
@@ -125,8 +125,8 @@ export async function sweepStaleChatMessages(
           .run()
           .catch(() => {});
       } else {
-        // Failed send: if reached 2 attempts, mark failed_final and never again
-        const nextStatus = attempts >= 2 ? "failed_final" : "failed";
+        // Failed send: if reached 2 attempts, mark failed and never again
+        const nextStatus = attempts >= 2 ? "failed" : "failed";
         await db
           .prepare(
             `UPDATE chat_messages

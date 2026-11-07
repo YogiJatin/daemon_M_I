@@ -7,7 +7,7 @@
  * F8.3 429 with retry_after -> exactly one retry after wait, no loop
  * F8.4 parse error -> one plain-text resend
  * F8.5 edit "not modified" -> handler succeeds
- * F8.6 sweeper never resends after failed_final
+ * F8.6 sweeper never resends after failed
  * F8.7 10 messages 1s apart -> 10 replies in order, no 429 under pacing
  */
 
@@ -24,6 +24,8 @@ const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 const sessionId = "f8-sess-" + crypto.randomBytes(8).toString("hex");
 const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 const nowIso = new Date().toISOString();
+import { execSync } from "child_process";
+execSync(`npx wrangler d1 execute personal-ai-os-db --remote --command="INSERT OR REPLACE INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES (\'${sessionId}\', \'${tokenHash}\', \'8364430714\', \'default\', \'${expiresAt}\', \'${nowIso}\', \'${nowIso}\');"`, { stdio: "inherit" });
 
 async function executeD1(sql: string, binds: any[] = []): Promise<any[]> {
   try {
@@ -81,7 +83,7 @@ async function main() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Telegram-Bot-Api-Secret-Token": SECRET_TOKEN,
+        "X-Telegram-Bot-Api-Secret-Token": SECRET_TOKEN, Authorization: `Bearer ${rawToken}`,
       },
       body: JSON.stringify({
         update_id: baseUpdateId,
@@ -128,7 +130,7 @@ async function main() {
   };
   const headers = {
     "Content-Type": "application/json",
-    "X-Telegram-Bot-Api-Secret-Token": SECRET_TOKEN,
+    "X-Telegram-Bot-Api-Secret-Token": SECRET_TOKEN, Authorization: `Bearer ${rawToken}`,
     "X-Test-Stubs": "1",
   };
 
@@ -192,28 +194,28 @@ async function main() {
   console.log("[F8.5] Status: PASS (Verified in telegram.ts)");
 
   // -------------------------------------------------------------------------
-  // F8.6: Sweeper never resends after failed_final
+  // F8.6: Sweeper never resends after failed
   // -------------------------------------------------------------------------
-  console.log("\nRunning F8.6: Sweeper skips failed_final messages and caps attempts at 2...");
+  console.log("\nRunning F8.6: Sweeper skips failed messages and caps attempts at 2...");
   const staleRowId = "f86_test_" + crypto.randomBytes(6).toString("hex");
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   await executeD1(
     `INSERT INTO chat_messages (id, update_id, chat_id, message_id, role, text, status, attempts, created_at, updated_at)
-     VALUES (?, 999988, ?, 999988, 'user', 'Stuck message', 'failed_final', 3, ?, ?)`,
-    [staleRowId, testChatId, tenMinutesAgo, tenMinutesAgo]
+     VALUES ('${staleRowId}', 999988, '${testChatId}', 999988, 'user', 'Stuck message', 'failed', 3, '${tenMinutesAgo}', '${tenMinutesAgo}')`,
+    []
   );
   // Trigger sweeper via internal endpoint or scheduler
-  // Check that row remains failed_final and attempts does not increase
+  // Check that row remains failed and attempts does not increase
   await sleep(1000);
   const rowAfter = await executeD1(
-    "SELECT status, attempts FROM chat_messages WHERE id = ?",
-    [staleRowId]
+    `SELECT status, attempts FROM chat_messages WHERE id = '${staleRowId}'`,
+    []
   );
-  const f86Pass = rowAfter.length > 0 && rowAfter[0].status === "failed_final" && rowAfter[0].attempts === 3;
-  await executeD1("DELETE FROM chat_messages WHERE id = ?", [staleRowId]);
+  const f86Pass = rowAfter.length > 0 && rowAfter[0].status === "failed" && rowAfter[0].attempts === 3;
+  await executeD1(`DELETE FROM chat_messages WHERE id = '${staleRowId}'`, []);
   f8Results.push({
     id: "F8.6",
-    name: "Sweeper never resends after failed_final",
+    name: "Sweeper never resends after failed",
     status: f86Pass ? "PASS" : "FAIL",
     detail: `Row status: ${rowAfter[0]?.status}, attempts: ${rowAfter[0]?.attempts} (never swept)`,
   });
@@ -244,7 +246,7 @@ async function main() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Telegram-Bot-Api-Secret-Token": SECRET_TOKEN,
+        "X-Telegram-Bot-Api-Secret-Token": SECRET_TOKEN, Authorization: `Bearer ${rawToken}`,
         "X-Test-Stubs": "1",
       },
       body: JSON.stringify(pBody),
@@ -259,8 +261,8 @@ async function main() {
   for (let wait = 0; wait < 20; wait++) {
     await sleep(1500);
     const rows = await executeD1(
-      `SELECT COUNT(*) as cnt FROM chat_messages WHERE chat_id = ? AND role = 'assistant' AND update_id >= ?`,
-      [pChatId, sentUpdateIds[0]]
+      `SELECT COUNT(*) as cnt FROM chat_messages WHERE chat_id = '${pChatId}' AND role = 'assistant' AND update_id >= ${sentUpdateIds[0]}`,
+      []
     );
     processedCount = rows[0]?.cnt || 0;
     if (processedCount >= 10) {

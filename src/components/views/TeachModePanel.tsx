@@ -199,7 +199,7 @@ export const TeachModePanel: React.FC = () => {
     const health = await checkAgentHealth();
     if (!health?.ok) {
       setAgentAvailable(false);
-      setStatusMessage('Desktop agent not running. Start it with: npx tsx desktop-agent/obsidian-writer.ts');
+      setStatusMessage('Desktop agent not paired or running. Start it with: npx tsx desktop_agent/mirror_agent.ts');
       return;
     }
 
@@ -261,7 +261,7 @@ export const TeachModePanel: React.FC = () => {
           <span className="font-semibold">Desktop Agent offline.</span>{' '}
           Start it to enable direct Obsidian export:
           <code className="ml-2 font-mono bg-yellow-100 dark:bg-yellow-900/40 px-1 rounded">
-            npx tsx desktop-agent/obsidian-writer.ts
+            npx tsx desktop_agent/mirror_agent.ts
           </code>
         </div>
       )}
@@ -406,7 +406,7 @@ export const TeachModePanel: React.FC = () => {
                                 )}
                                 <span className="opacity-70">
                                   Start agent:{' '}
-                                  <code className="font-mono">npx tsx desktop-agent/obsidian-writer.ts</code>
+                                  <code className="font-mono">npx tsx desktop_agent/mirror_agent.ts</code>
                                 </span>
                               </span>
                             )}

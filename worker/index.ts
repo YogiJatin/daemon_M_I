@@ -130,7 +130,7 @@ export default {
     }
 
     // B3-02: Owner token on a desktop route -> 403 Forbidden
-    if (isDesktopRoute && url.pathname !== "/api/v1/desktop/pair" && url.pathname !== "/api/v1/desktop/export-obsidian" && !isDesktopToken) {
+    if (isDesktopRoute && url.pathname !== "/api/v1/desktop/pair" && url.pathname !== "/api/v1/desktop/export-obsidian" && !url.pathname.includes("/revoke") && !isDesktopToken) {
       return jsonError("forbidden", "Owner token not permitted on desktop routes", 403);
     }
 

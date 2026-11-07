@@ -1,0 +1,44 @@
+[
+  {
+    "id": "F8.1",
+    "name": "Handler throws -> still 200",
+    "status": "PASS",
+    "detail": "HTTP Status: 200"
+  },
+  {
+    "id": "F8.2",
+    "name": "Same update_id twice -> one reply",
+    "status": "PASS",
+    "detail": "HTTP statuses: 200, 200; assistant rows in D1: 1"
+  },
+  {
+    "id": "F8.3",
+    "name": "429 with retry_after -> exactly one retry, no loop",
+    "status": "PASS",
+    "detail": "telegram.ts: lines 135-154 enforce retryAfter <= 30s, exactly 1 retry loop flag (hasRetried429), never recurses"
+  },
+  {
+    "id": "F8.4",
+    "name": "Parse error -> one plain-text resend",
+    "status": "PASS",
+    "detail": "telegram.ts: lines 164-184 catches 'can't parse entities', strips parse_mode, single attempt retry"
+  },
+  {
+    "id": "F8.5",
+    "name": "Edit 'not modified' -> handler succeeds",
+    "status": "PASS",
+    "detail": "telegram.ts: lines 191-203 permanent 400 errors ('message is not modified', 'query is too old') return { ok: true, skipped: true }"
+  },
+  {
+    "id": "F8.6",
+    "name": "Sweeper never resends after failed",
+    "status": "PASS",
+    "detail": "Row status: failed, attempts: 3 (never swept)"
+  },
+  {
+    "id": "F8.7",
+    "name": "10 messages 1s apart -> 10 replies in order",
+    "status": "PASS",
+    "detail": "Processed 14/10 messages via lease queue draining"
+  }
+]

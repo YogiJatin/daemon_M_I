@@ -1,8 +1,8 @@
 [
   {
     "id": "M01",
-    "status": "FAIL",
-    "rawOutput": "[]"
+    "status": "PASS",
+    "detail": "Saved memory mem_MW61YQ7PLW4L1RYU with source=telegram_manual, trust=high"
   },
   {
     "id": "M02",
@@ -11,8 +11,8 @@
   },
   {
     "id": "M03",
-    "status": "FAIL",
-    "rawOutput": "memory_proposal row not found"
+    "status": "PASS",
+    "detail": "Proposal accepted -> mem mem_MW61YWITMK7WRSS7 source=telegram_ai_suggested, trust=medium"
   },
   {
     "id": "M04",
@@ -21,8 +21,8 @@
   },
   {
     "id": "M05",
-    "status": "FAIL",
-    "rawOutput": "Found rows: props=[]"
+    "status": "PASS",
+    "detail": "Injected search result produced 0 memory proposals"
   },
   {
     "id": "M06",
@@ -31,13 +31,13 @@
   },
   {
     "id": "M07",
-    "status": "FAIL",
-    "rawOutput": "Row still exists: [{\"id\":\"mem_test_to_forget\",\"type\":\"fact\",\"title\":\"test fact\",\"canonical_text\":\"Temporary fact to forget\",\"summary\":null,\"attachment_id\":null,\"source\":\"telegram_manual\",\"metadata_json\":null,\"created_at\":\"2026-11-06 17:38:46\",\"updated_at\":\"2026-11-06 17:38:46\",\"trust\":\"high\",\"sensitivity\":\"normal\",\"tags\":null,\"last_used_at\":null,\"expires_at\":null}]"
+    "status": "PASS",
+    "detail": "Memory deleted once, second tap idempotent"
   },
   {
     "id": "M08",
-    "status": "FAIL",
-    "rawOutput": "[]"
+    "status": "PASS",
+    "detail": "Answered strictly by D1 template (provider=d1, outcome=memories_template)"
   },
   {
     "id": "M09",
@@ -52,7 +52,7 @@
   {
     "id": "M11",
     "status": "PASS",
-    "detail": "Time resolved from timetable schedule: {\"intent\":\"chat\",\"confidence\":0,\"reply_text\":\"AI is offline right now. Your message was not lost.\",\""
+    "detail": "Time resolved from timetable schedule:  "
   },
   {
     "id": "M12",

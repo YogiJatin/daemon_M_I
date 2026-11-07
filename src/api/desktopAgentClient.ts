@@ -1,134 +1,111 @@
 /**
- * src/api/desktopAgentClient.ts — Browser Client for the Local Desktop Agent
+ * src/api/desktopAgentClient.ts - Browser Client for Desktop Outbox Mirror
  *
- * Handles all communication with the Obsidian writer agent running at
- * http://127.0.0.1:27124. Never touches the cloud for filesystem writes.
+ * Enqueues Markdown notes to the Cloudflare D1 mirror_outbox via
+ * POST /api/v1/desktop/export-obsidian. The local desktop agent (mirror_agent.ts)
+ * polls these jobs via /api/v1/desktop/mirror-jobs and writes them atomically
+ * to the Obsidian vault with path validation and conflict detection.
  *
- * Security flow for writes:
- *   1. GET /desktop/nonce  → receive single-use token (30s TTL)
- *   2. POST /desktop/obsidian/write + X-Agent-Nonce header → write file
- *
- * The agent only accepts requests from origins listed in its settings.json.
- * Random sites cannot obtain a nonce because the /nonce endpoint also
- * enforces the origin allowlist.
- *
- * This module never reads vault contents back to the cloud.
- * D1 remains the source of truth.
+ * Zero inbound listening ports on desktop.
  */
 
-const AGENT_BASE   = 'http://127.0.0.1:27124';
-const HEALTH_TIMEOUT_MS = 1_500;
-const WRITE_TIMEOUT_MS  = 10_000;
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { getSessionToken } from './client';
 
 export interface AgentHealth {
-  ok:            boolean;
-  vault:         string;
+  ok: boolean;
+  vault: string;
   defaultFolder: string;
 }
 
 export interface ObsidianWriteRequest {
-  /** Optional override; defaults to the agent's configured vault. */
-  vault?:     string;
-  /** Relative subfolder inside the vault. Created if missing. */
-  folder?:    string;
-  /** Markdown filename, e.g. "My Recipe.md". Sanitized server-side. */
-  filename:   string;
-  /** Full Markdown content, including YAML frontmatter. Not modified. */
-  content:    string;
-  /** Overwrite an existing file. Defaults to the agent's setting. */
+  vault?: string;
+  folder?: string;
+  filename: string;
+  content: string;
   overwrite?: boolean;
 }
 
 export interface ObsidianWriteResult {
-  success:       boolean;
-  /** Absolute path of the written file on the local machine. */
-  path?:         string;
-  /** Path relative to the vault root, e.g. "Workflows/My Recipe.md". */
+  success: boolean;
+  path?: string;
   relativePath?: string;
-  /** Human-readable error when success === false. */
-  error?:        string;
+  error?: string;
 }
 
-// ─── Health Check ─────────────────────────────────────────────────────────────
-
 /**
- * Checks whether the desktop agent is reachable.
- * Returns null if the agent is not running or the request times out.
- * Use this before showing the "Export to Obsidian" button state.
+ * Checks whether the desktop agent is paired and active by querying /api/v1/health.
  */
 export async function checkAgentHealth(): Promise<AgentHealth | null> {
   try {
-    const res = await fetch(`${AGENT_BASE}/desktop/health`, {
-      signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+    const token = getSessionToken();
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch('/api/v1/health', {
+      headers,
+      signal: AbortSignal.timeout(2000),
     });
     if (!res.ok) return null;
-    return (await res.json()) as AgentHealth;
+    const data = (await res.json()) as any;
+    const agent = data?.data?.desktop_agent || data?.desktop_agent;
+    if (agent && agent.paired) {
+      return {
+        ok: true,
+        vault: "Knowledge/Mirror",
+        defaultFolder: "Recipes",
+      };
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-// ─── Nonce Fetch ──────────────────────────────────────────────────────────────
-
-async function fetchNonce(): Promise<string> {
-  const res = await fetch(`${AGENT_BASE}/desktop/nonce`, {
-    signal: AbortSignal.timeout(3_000),
-  });
-  if (res.status === 403) {
-    throw new Error('Desktop agent rejected this origin. Check allowedOrigins in desktop-agent/settings.json.');
-  }
-  if (!res.ok) {
-    throw new Error(`Nonce request failed: HTTP ${res.status}`);
-  }
-  const data = (await res.json()) as { nonce: string };
-  return data.nonce;
-}
-
-// ─── Write ────────────────────────────────────────────────────────────────────
-
 /**
- * Writes a Markdown note to the local Obsidian vault via the desktop agent.
- *
- * Flow:
- *   GET /desktop/nonce         → single-use token
- *   POST /desktop/obsidian/write + X-Agent-Nonce → file written to vault
- *
- * Returns a structured result. Never throws — errors are returned in result.error.
+ * Enqueues a note into mirror_outbox via the Cloudflare Worker outbox.
  */
 export async function writeToObsidian(
   req: ObsidianWriteRequest
 ): Promise<ObsidianWriteResult> {
-  // Step 1: Acquire nonce
-  let nonce: string;
   try {
-    nonce = await fetchNonce();
-  } catch (err: any) {
-    return {
-      success: false,
-      error:   `Desktop agent unreachable or rejected: ${err.message}`,
+    const token = getSessionToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
     };
-  }
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  // Step 2: Write with nonce
-  try {
-    const res = await fetch(`${AGENT_BASE}/desktop/obsidian/write`, {
-      method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'X-Agent-Nonce': nonce,
-      },
-      body:   JSON.stringify(req),
-      signal: AbortSignal.timeout(WRITE_TIMEOUT_MS),
+    const targetFolder = req.folder || 'Recipes';
+    const res = await fetch('/api/v1/desktop/export-obsidian', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        targetFolder,
+        filename: req.filename,
+        content: req.content,
+        isUntrusted: false,
+      }),
+      signal: AbortSignal.timeout(10_000),
     });
 
-    const data = (await res.json()) as ObsidianWriteResult;
-    return data;
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      return {
+        success: false,
+        error: errData?.error?.message || `Outbox export failed (HTTP ${res.status})`,
+      };
+    }
+
+    await res.json().catch(() => ({}));
+    return {
+      success: true,
+      relativePath: `${targetFolder}/${req.filename}`,
+      path: `Knowledge/Mirror/${targetFolder}/${req.filename}`,
+    };
   } catch (err: any) {
     return {
       success: false,
-      error:   `Write request failed: ${err.message}`,
+      error: `Failed to enqueue note to desktop outbox: ${err.message}`,
     };
   }
 }

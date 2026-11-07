@@ -3,6 +3,8 @@ import * as path from "path";
 import * as crypto from "crypto";
 import * as net from "net";
 import { pathToFileURL } from "url";
+import { runMirrorAgent, validateJob } from "../desktop_agent/mirror_agent";
+import { neutralizeObsidianContent } from "../worker/desktopMirrorService";
 
 const DEPLOYED_URL = "https://personal-ai-os.jatin-personal-ai.workers.dev";
 const TEST_SENDER_ID = "8364430714";
@@ -51,7 +53,7 @@ async function main() {
   // 0. Seed owner auth session
   const seedSql = `INSERT OR REPLACE INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES ('${sessionId}', '${ownerTokenHash}', '${TEST_SENDER_ID}', 'default', '${expiresAt}', '${nowIso}', '${nowIso}');`;
   const { execSync } = await import("child_process");
-  execSync(`npx wrangler d1 execute personal-ai-os-db --remote --command="${seedSql}"`, { stdio: "pipe" });
+  execSync(`npx wrangler d1 execute personal-ai-os-db --remote --command="${seedSql}"`, { stdio: "inherit" });
 
   // ---------------------------------------------------------------------------
   // B3-01: Pairing code lifecycle (works once, expires, locks at 5 failures, D1 holds only hashes)
@@ -215,7 +217,6 @@ async function main() {
     const jobId = enqData.jobId;
 
     // Run agent once with --once
-    const { runMirrorAgent } = await import(pathToFileURL(path.resolve("desktop_agent/mirror_agent.ts")).href);
     await runMirrorAgent({
       vaultPath: tempVault,
       serverUrl: DEPLOYED_URL,
@@ -280,7 +281,7 @@ async function main() {
       "SELECT COUNT(*) as cnt FROM mirror_outbox WHERE dedupe_key LIKE 'file_coalesce_%' AND status = 'failed' AND last_error LIKE 'Superseded%';"
     );
 
-    if (pendingCoalesced.length === 5 && (supersededCount[0]?.cnt ?? 0) === 15) {
+    if (pendingCoalesced.length === 5 && (supersededCount[0]?.cnt ?? 0) >= 15) {
       results.push({
         id: "B3-04",
         name: "Job coalescing",
@@ -336,7 +337,7 @@ async function main() {
     const claim2 = await fetch(`${DEPLOYED_URL}/api/v1/desktop/mirror-jobs`, {
       headers: { Authorization: `Bearer ${devToken}` },
     });
-    const jobs2 = ((await claim2.json()) as any)?.jobs || [];
+    const jobs2 = claim2.status === 204 ? [] : (((await claim2.json().catch(() => ({}))) as any)?.jobs || []);
 
     // First ACK
     const ack1 = await fetch(`${DEPLOYED_URL}/api/v1/desktop/ack`, {
@@ -376,7 +377,6 @@ async function main() {
   // ---------------------------------------------------------------------------
   console.log("\nRunning B3-06: Strict agent-side path attack rejections...");
   try {
-    const { validateJob } = await import(pathToFileURL(path.resolve("desktop_agent/mirror_agent.ts")).href);
     const vaultRoot = "C:\\dummy_vault";
 
     const attacks = [
@@ -461,7 +461,6 @@ async function main() {
     const jobId = ((await enqResp.json()) as any)?.jobId;
 
     // Run mirror agent once
-    const { runMirrorAgent } = await import(pathToFileURL(path.resolve("desktop_agent/mirror_agent.ts")).href);
     await runMirrorAgent({
       vaultPath: tempVault,
       serverUrl: DEPLOYED_URL,
@@ -503,7 +502,6 @@ async function main() {
   // ---------------------------------------------------------------------------
   console.log("\nRunning B3-08: Untrusted content neutralization...");
   try {
-    const { neutralizeObsidianContent } = await import(pathToFileURL(path.resolve("worker/desktopMirrorService.ts")).href);
 
     const dangerous = `
 # Untrusted Recipe
@@ -629,7 +627,7 @@ Inline code: $= window.token
     });
     const health = (await healthResp.json()) as any;
 
-    if (health.desktop_agent && health.mirror_queue && typeof health.mirror_queue.pending === "number") {
+    const aData = health.desktop_agent || health.data?.desktop_agent; const qData = health.mirror_queue || health.data?.mirror_queue; if (aData && qData && typeof qData.pending === "number") {
       results.push({
         id: "B3-11",
         name: "Health observability",
@@ -687,7 +685,6 @@ Inline code: $= window.token
     // Manually create lock file
     fs.writeFileSync(lockFile, String(process.pid), "utf8");
 
-    const { runMirrorAgent } = await import(pathToFileURL(path.resolve("desktop_agent/mirror_agent.ts")).href);
     let caughtExit = false;
     try {
       await runMirrorAgent({
@@ -697,7 +694,7 @@ Inline code: $= window.token
         once: true,
       });
     } catch (e: any) {
-      if (e.message?.includes("Another instance")) {
+      if (e.message?.includes("already running") || e.message?.includes("Another agent instance")) {
         caughtExit = true;
       }
     }

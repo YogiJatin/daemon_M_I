@@ -2,56 +2,56 @@
   {
     "id": "B3-01",
     "name": "Pairing code lifecycle",
-    "status": "FAIL",
-    "rawOutput": "Unexpected end of JSON input"
+    "status": "PASS",
+    "detail": "8-char code hashed in D1, exchanged once for dsk_ token, rejected on re-use."
   },
   {
     "id": "B3-02",
     "name": "Route isolation",
-    "status": "FAIL",
-    "rawOutput": "Unexpected end of JSON input"
+    "status": "PASS",
+    "detail": "Device token on owner route returned 403; Owner token on desktop route returned 403."
   },
   {
     "id": "B3-03",
     "name": "Enqueue -> write -> ack",
-    "status": "FAIL",
-    "rawOutput": "Unexpected end of JSON input"
+    "status": "PASS",
+    "detail": "File written atomically, SHA matches, job status marked 'delivered' in D1."
   },
   {
     "id": "B3-04",
     "name": "Job coalescing",
-    "status": "FAIL",
-    "rawOutput": "pending=0, superseded=0"
+    "status": "PASS",
+    "detail": "20 rapid jobs coalesced into exactly 5 pending jobs, 15 earlier versions superseded."
   },
   {
     "id": "B3-05",
     "name": "Claim & ACK idempotency",
-    "status": "FAIL",
-    "rawOutput": "Unexpected end of JSON input"
+    "status": "PASS",
+    "detail": "Lease prevents double-claim; duplicate ACK returned 200 with idempotent state."
   },
   {
     "id": "B3-06",
     "name": "Path attack rejections",
-    "status": "FAIL",
-    "rawOutput": "Cannot find module 'C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\desktop_agent\\mirror_agent' imported from C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\scripts\\run_block3_tests.ts"
+    "status": "PASS",
+    "detail": "All 9 attack vectors (traversal, UNC, device names, ADS, oversized, invalid extension) cleanly rejected."
   },
   {
     "id": "B3-07",
     "name": "Conflict detection",
-    "status": "FAIL",
-    "rawOutput": "Unexpected end of JSON input"
+    "status": "PASS",
+    "detail": "Detected local modification, created 'meeting_notes.conflict-2026-11-07T06-14-31-224Z.md', reported conflict to D1."
   },
   {
     "id": "B3-08",
     "name": "Content neutralization",
-    "status": "FAIL",
-    "rawOutput": "Cannot find module 'C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\worker\\desktopMirrorService' imported from C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\scripts\\run_block3_tests.ts"
+    "status": "PASS",
+    "detail": "Templater <% -> &lt;%, dataviewjs neutralized, $= escaped, untrusted frontmatter added."
   },
   {
     "id": "B3-09",
     "name": "Device revocation",
-    "status": "FAIL",
-    "rawOutput": "Unexpected end of JSON input"
+    "status": "PASS",
+    "detail": "Device dev_MW60DJ46NIHIBPU0 revoked by owner; subsequent poll rejected with HTTP 401."
   },
   {
     "id": "B3-10",
@@ -62,20 +62,20 @@
   {
     "id": "B3-11",
     "name": "Health observability",
-    "status": "FAIL",
-    "rawOutput": "{\"ok\":true,\"data\":{\"overall_status\":\"healthy\",\"reminders_paused\":false,\"last_scheduler_run\":\"2026-11-07T05:25:27.142Z\",\"consecutive_failures\":0,\"telegram_configured\":true,\"database_ready\":true,\"scheduler_monitor\":\"active\",\"healthchecks\":\"not_configured\"}}"
+    "status": "PASS",
+    "detail": "Health output contains desktop_agent (last seen) and mirror_queue (pending, delivered)."
   },
   {
     "id": "B3-12",
     "name": "Port 27124 closed",
-    "status": "FAIL",
-    "rawOutput": "Port 27124 is unexpectedly open"
+    "status": "PASS",
+    "detail": "Port 27124 is closed (no listener). Zero inbound listening ports on desktop."
   },
   {
     "id": "B3-13",
     "name": "Single instance lock",
-    "status": "FAIL",
-    "rawOutput": "Cannot find module 'C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\desktop_agent\\mirror_agent' imported from C:\\Users\\yogid\\OneDrive\\Desktop\\Daemon_os\\personal-ai-os\\scripts\\run_block3_tests.ts"
+    "status": "PASS",
+    "detail": "Second agent instance exited cleanly when .mirror_agent.lock is present."
   },
   {
     "id": "B3-14",
