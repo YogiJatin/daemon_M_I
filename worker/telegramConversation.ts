@@ -48,6 +48,9 @@ import {
 } from "./memoryService";
 import { parseRegionalDateWords } from "./dateLexicon";
 import { DAEMON_PLAIN_ANSWER_PROMPT } from "./prompts";
+import { preRouteIntent } from "./intentPreRouter";
+import { handleForgetMemory, restoreLatestMemory } from "./memoryActions";
+import { normalizeActions } from "./intentSchema";
 import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
 
 // ---------------------------------------------------------------------------
@@ -341,6 +344,13 @@ async function processSingleMessage(
       .catch(() => null);
 
     if (!batch) {
+      const restore = await restoreLatestMemory(db, oneDayAgo, now);
+      if (restore.restoredId) {
+        await sendTg(restore.reply).catch(() => null);
+        await logChatMessage(db, { updateId, chatId, messageId, role: "assistant", text: restore.reply, intent: "command", confidence: 1.0, outcome: "undo_memory", status: "sent", provider: "system", latencyMs: 12 });
+        await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+        return;
+      }
       const resp = "No bulk actions found within the last 24h to undo.";
       await sendTg(resp).catch(() => null);
       await logChatMessage(db, { updateId, chatId, messageId, role: "assistant", text: resp, intent: "command", confidence: 1.0, outcome: "undo_none", status: "sent", provider: "system", latencyMs: 5 });
@@ -744,6 +754,60 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     return;
   }
 
+  // 3.95 Deterministic pre-router: forget/remember never wait for an LLM.
+  const preRouted = preRouteIntent(text);
+  if (preRouted?.kind === "forget_memory") {
+    const outcome = await handleForgetMemory(db, preRouted.query, now);
+    if (outcome.status !== "none") turnActionResults.push(outcome.reply);
+    const sendRes = await sendTg(outcome.reply).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: outcome.reply,
+      intent: "forget_memory",
+      confidence: 1.0,
+      outcome: outcome.status,
+      status: "sent",
+      provider: "deterministic",
+      latencyMs: Date.now() - startProcessing,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db
+      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+      .bind(nowIso(), userMsgRowId)
+      .run()
+      .catch(() => {});
+    return;
+  }
+
+  if (preRouted?.kind === "remember_memory") {
+    const propRes = await createMemoryProposal(db, preRouted.query, now);
+    const replyText = propRes ? propRes.replyText : "Already remembered or not stored.";
+    const sendRes = await sendTg(replyText, propRes?.replyMarkup).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: replyText,
+      intent: "remember",
+      confidence: 1.0,
+      outcome: "memory_proposal",
+      status: "sent",
+      provider: "deterministic",
+      latencyMs: Date.now() - startProcessing,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db
+      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+      .bind(nowIso(), userMsgRowId)
+      .run()
+      .catch(() => {});
+    return;
+  }
+
   // 4. Daily AI budget check
   const dailyBudget = parseInt(env.DAILY_AI_BUDGET || String(DEFAULT_DAILY_AI_BUDGET), 10);
   const withinBudget = await checkDailyAiBudget(db, dailyBudget, now);
@@ -1098,6 +1162,47 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     return;
   }
 
+  // 7.0 Structured actions: forget outranks remember before legacy fields apply.
+  const routedActions = normalizeActions(result);
+  const forgetAction = routedActions.find((action) => action.type === "forget_memory") as
+    | { type: "forget_memory"; query: string }
+    | undefined;
+  if (forgetAction) {
+    const outcome = await handleForgetMemory(db, forgetAction.query || text, now);
+    if (outcome.status !== "none") turnActionResults.push(outcome.reply);
+    const sendRes = await sendTg(outcome.reply).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: outcome.reply,
+      intent: "forget_memory",
+      confidence: result.confidence,
+      outcome: outcome.status,
+      status: "sent",
+      provider: providerUsed,
+      latencyMs,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db
+      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+      .bind(nowIso(), userMsgRowId)
+      .run()
+      .catch(() => {});
+    return;
+  }
+
+  const rememberAction = routedActions.find((action) => action.type === "remember_memory") as
+    | { type: "remember_memory"; text: string }
+    | undefined;
+  if (rememberAction && !result.memory?.text) {
+    result.memory = { text: rememberAction.text };
+    if (result.intent === "chat" || result.intent === "general_question") {
+      result.intent = "remember";
+    }
+  }
+
   const intent = result.intent;
   let replyText = result.reply_text || "";
   let replyMarkup: any = undefined;
@@ -1261,7 +1366,7 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
       const memText = result.memory?.text || text.replace(/^remember\s+/i, "");
       const propRes = await createMemoryProposal(db, memText, now);
       if (propRes) {
-        replyText = propRes.replyText;
+        replyText = result.reply_text?.trim() ? `${result.reply_text.trim()}\n\n${propRes.replyText}` : propRes.replyText;
         replyMarkup = propRes.replyMarkup;
       } else {
         replyText = "I don't store secrets or duplicate memories.";

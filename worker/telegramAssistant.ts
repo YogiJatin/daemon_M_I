@@ -117,8 +117,7 @@ export { formatConfirmationDate } from "./dateParser";
 export function buildAssistantSystemPrompt(ownerName: string, manifest: string): string {
   // Single source of truth: worker/prompts.ts (DAEMON_SYSTEM_PROMPT).
   // ownerName is retained so existing call sites and tests keep their signature.
-  void ownerName;
-  return renderDaemonSystemPrompt(manifest);
+  return renderDaemonSystemPrompt(manifest, ownerName);
 }
 
 // ---------------------------------------------------------------------------
@@ -424,6 +423,19 @@ export async function resolveTaskTime(
 // ---------------------------------------------------------------------------
 // Schedule Query Renderer from D1 (B1, G17, G18, G48)
 // ---------------------------------------------------------------------------
+/**
+ * Backwards-compatible schedule renderer used by the Block 1 test suite.
+ * Delegates to renderD1ScheduleQuery so D1 remains the only fact source.
+ */
+export async function renderQueryAnswer(
+  db: D1Database,
+  query: any,
+  now: Date,
+  _settings: Record<string, any> = {}
+): Promise<string> {
+  return renderD1ScheduleQuery(db, query, "", now);
+}
+
 export async function renderD1ScheduleQuery(
   db: D1Database,
   query: AssistantQuery | undefined,

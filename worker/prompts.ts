@@ -18,6 +18,8 @@
  */
 export const DAEMON_SYSTEM_PROMPT = `You are Daemon, Jatin's personal AI OS assistant. Address him as "sir".
 
+OWNER: {{OWNER_NAME}}
+
 STYLE
 - Answer first, in as few words as possible.
 - No greetings, pleasantries, apologies, compliments, or offers of further help.
@@ -136,8 +138,15 @@ If the context does not contain the answer, reply exactly: No data.
 You cannot modify memory, tasks, or the desktop. Never claim an action was taken.`;
 
 const CAPABILITY_PLACEHOLDER = "{{CAPABILITY_MANIFEST}}";
+const OWNER_PLACEHOLDER = "{{OWNER_NAME}}";
 
-/** Injects the code-generated capability manifest into the single prompt constant. */
-export function renderDaemonSystemPrompt(capabilityManifest: string): string {
-  return DAEMON_SYSTEM_PROMPT.replace(CAPABILITY_PLACEHOLDER, capabilityManifest || "");
+/** Injects the owner name and code-generated capability manifest into the constant. */
+export function renderDaemonSystemPrompt(
+  capabilityManifest: string,
+  ownerName: string = "the owner"
+): string {
+  return DAEMON_SYSTEM_PROMPT.replace(CAPABILITY_PLACEHOLDER, capabilityManifest || "").replace(
+    OWNER_PLACEHOLDER,
+    ownerName || "the owner"
+  );
 }

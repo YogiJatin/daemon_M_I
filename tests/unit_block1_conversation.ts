@@ -201,7 +201,8 @@ async function runTests() {
       }),
     };
     const answer = await renderQueryAnswer(mockDb, { type: "today" }, new Date(), {});
-    assert.strictEqual(answer, "Nothing due today!");
+    assert.ok(answer.includes("Tasks Due: None"), `unexpected empty render: ${answer}`);
+    assert.ok(!answer.includes("•"), `empty D1 must not invent rows: ${answer}`);
   });
 
   it("renderQueryAnswer formats real D1 rows accurately without hallucination", async () => {
@@ -210,16 +211,16 @@ async function runTests() {
         bind: () => ({
           all: async () => ({
             results: [
-              { title: "Physics Lab Manual", deadline_local_time: "14:00", priority: "high", status: "open" },
-              { title: "Math Assignment 4", deadline_local_time: "18:00", priority: "normal", status: "open" },
+              { title: "Physics Lab Manual", deadline_time_local: "14:00", priority: "high", status: "open" },
+              { title: "Math Assignment 4", deadline_time_local: "18:00", priority: "normal", status: "open" },
             ],
           }),
         }),
       }),
     };
     const answer = await renderQueryAnswer(mockDb, { type: "today" }, new Date(), {});
-    assert.ok(answer.includes("Physics Lab Manual at 14:00"));
-    assert.ok(answer.includes("Math Assignment 4 at 18:00"));
+    assert.ok(answer.includes("Physics Lab Manual at 14:00"), `missing first row: ${answer}`);
+    assert.ok(answer.includes("Math Assignment 4 at 18:00"), `missing second row: ${answer}`);
   });
 
   // -------------------------------------------------------------------------

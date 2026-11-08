@@ -11,6 +11,8 @@
  */
 
 import { checkAndRedactSecrets } from "./secretsGuard";
+import { findContradictingMemory } from "./memoryActions";
+import { isMemoryMutation } from "./intentSchema";
 
 export interface MemoryObject {
   id: string;
@@ -79,7 +81,8 @@ export async function handleRememberCommand(
   const existing = await db
     .prepare(
       `SELECT id FROM memory_objects
-       WHERE lower(trim(canonical_text)) = lower(trim(?))
+       WHERE deleted_at IS NULL
+         AND lower(trim(canonical_text)) = lower(trim(?))
          AND (expires_at IS NULL OR expires_at > ?)
        LIMIT 1`
     )
@@ -125,7 +128,8 @@ export async function handleMemoriesCommand(
     .prepare(
       `SELECT id, source, trust, sensitivity, canonical_text, created_at
        FROM memory_objects
-       WHERE (expires_at IS NULL OR expires_at > ?)
+       WHERE deleted_at IS NULL
+         AND (expires_at IS NULL OR expires_at > ?)
        ORDER BY created_at DESC
        LIMIT 15`
     )
@@ -176,7 +180,7 @@ export async function handleForgetCommand(
   }
 
   const existing = await db
-    .prepare("SELECT id, canonical_text FROM memory_objects WHERE id = ?")
+    .prepare("SELECT id, canonical_text FROM memory_objects WHERE id = ? AND deleted_at IS NULL")
     .bind(targetId)
     .first<{ id: string; canonical_text: string }>()
     .catch(() => null);
@@ -205,18 +209,21 @@ export async function handleForgetCommand(
 // ---------------------------------------------------------------------------
 export async function handleDeleteMemoryCallback(
   db: D1Database,
-  memoryId: string
+  memoryId: string,
+  now: Date = new Date()
 ): Promise<string> {
+  const nowIso = now.toISOString();
   const res = await db
-    .prepare("DELETE FROM memory_objects WHERE id = ?")
-    .bind(memoryId)
+    .prepare("UPDATE memory_objects SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+    .bind(nowIso, nowIso, memoryId)
     .run()
     .catch(() => null);
 
-  if (!res || res.meta?.changes === 0) {
+  const changes = Number((res as any)?.meta?.changes ?? 0);
+  if (changes === 0) {
     return `Memory [${memoryId}] already removed.`;
   }
-  return `Memory [${memoryId}] deleted.`;
+  return "Deleted 1 memory.";
 }
 
 // ---------------------------------------------------------------------------
@@ -227,30 +234,66 @@ export async function createMemoryProposal(
   text: string,
   now: Date = new Date()
 ): Promise<{ proposalId: string; replyText: string; replyMarkup: any } | null> {
+  // Forget/delete/remove is a mutation intent, never a remember proposal.
+  if (isMemoryMutation(text)) {
+    return null;
+  }
+
   const secretCheck = checkAndRedactSecrets(text);
   if (secretCheck.isSecret) {
     return null;
   }
 
+  const trimmedText = text.trim();
+  if (!trimmedText) return null;
+
   const nowIso = now.toISOString();
 
-  // Dedupe against existing memories
+  // Exact duplicate: code-owned reply, no card.
   const existingMem = await db
     .prepare(
-      `SELECT id FROM memory_objects
-       WHERE lower(trim(canonical_text)) = lower(trim(?))
+      `SELECT id, canonical_text FROM memory_objects
+       WHERE deleted_at IS NULL
+         AND lower(trim(canonical_text)) = lower(trim(?))
          AND (expires_at IS NULL OR expires_at > ?)
        LIMIT 1`
     )
-    .bind(text, nowIso)
-    .first<{ id: string }>()
+    .bind(trimmedText, nowIso)
+    .first<{ id: string; canonical_text: string }>()
     .catch(() => null);
 
   if (existingMem) {
-    return null; // Already remembered
+    return {
+      proposalId: existingMem.id,
+      replyText: `Already remembered [${existingMem.id}]: "${existingMem.canonical_text}"`,
+      replyMarkup: undefined,
+    };
   }
 
-  // Dedupe against pending proposals
+  // Contradiction: same topic, different wording -> offer Replace.
+  const contradiction = await findContradictingMemory(db, trimmedText, now);
+  if (contradiction) {
+    const proposalId = "mprop_" + ulid();
+    await db
+      .prepare(
+        `INSERT INTO memory_proposals
+           (id, canonical_text, source, trust, sensitivity, status, replaces_id, created_at, updated_at)
+         VALUES (?, ?, 'telegram_ai_suggested', 'medium', 'normal', 'pending', ?, ?, ?)`
+      )
+      .bind(proposalId, trimmedText, contradiction.id, nowIso, nowIso)
+      .run()
+      .catch(() => {});
+
+    return {
+      proposalId,
+      replyText: `Replace this memory?\nOld: "${contradiction.canonical_text}"\nNew: "${trimmedText}"`,
+      replyMarkup: makeInlineKeyboard([
+        { text: "Replace", callback_data: `replace_memory:${proposalId}` },
+        { text: "Cancel", callback_data: `reject_memory:${proposalId}` },
+      ]),
+    };
+  }
+
   const existingProp = await db
     .prepare(
       `SELECT id FROM memory_proposals
@@ -258,7 +301,7 @@ export async function createMemoryProposal(
          AND status = 'pending'
        LIMIT 1`
     )
-    .bind(text)
+    .bind(trimmedText)
     .first<{ id: string }>()
     .catch(() => null);
 
@@ -268,15 +311,15 @@ export async function createMemoryProposal(
     await db
       .prepare(
         `INSERT INTO memory_proposals
-           (id, canonical_text, source, trust, sensitivity, status, created_at, updated_at)
-         VALUES (?, ?, 'telegram_ai_suggested', 'medium', 'normal', 'pending', ?, ?)`
+           (id, canonical_text, source, trust, sensitivity, status, replaces_id, created_at, updated_at)
+         VALUES (?, ?, 'telegram_ai_suggested', 'medium', 'normal', 'pending', NULL, ?, ?)`
       )
-      .bind(proposalId, text, nowIso, nowIso)
+      .bind(proposalId, trimmedText, nowIso, nowIso)
       .run()
       .catch(() => {});
   }
 
-  const replyText = `Remember this?\n"${text}"`;
+  const replyText = `Remember this?\n"${trimmedText}"`;
   const replyMarkup = makeInlineKeyboard([
     { text: "Confirm", callback_data: `save_memory:${proposalId}` },
     { text: "Cancel", callback_data: `reject_memory:${proposalId}` },
@@ -306,6 +349,15 @@ export async function handleSaveMemoryProposalCallback(
   const nowIso = now.toISOString();
   const memId = "mem_" + ulid();
 
+  // Replace flow: soft-delete the contradicted memory only after the owner taps.
+  if (prop.replaces_id) {
+    await db
+      .prepare("UPDATE memory_objects SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+      .bind(nowIso, nowIso, prop.replaces_id)
+      .run()
+      .catch(() => {});
+  }
+
   await db
     .prepare(
       `INSERT INTO memory_objects
@@ -321,6 +373,14 @@ export async function handleSaveMemoryProposalCallback(
     .run();
 
   return `Saved memory [${memId}]: "${prop.canonical_text}"`;
+}
+
+export async function handleReplaceMemoryProposalCallback(
+  db: D1Database,
+  proposalId: string,
+  now: Date = new Date()
+): Promise<string> {
+  return handleSaveMemoryProposalCallback(db, proposalId, now);
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +399,8 @@ export async function retrieveMemoriesForPrompt(
     .prepare(
       `SELECT id, canonical_text, source, trust, created_at
        FROM memory_objects
-       WHERE sensitivity != 'private'
+       WHERE deleted_at IS NULL
+         AND sensitivity != 'private'
          AND (expires_at IS NULL OR expires_at > ?)
        ORDER BY created_at DESC
        LIMIT 25`

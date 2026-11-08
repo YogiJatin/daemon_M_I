@@ -19,7 +19,7 @@ import { recordRejectionFeedback } from "./captureEngine";
 import { setProfileKey } from "./dailyRhythm";
 import { applyReminderShifts, findRemindersToShift } from "./dailyRhythm";
 import { sendTelegramMessage } from "./telegram";
-import { handleSaveMemoryProposalCallback, handleDeleteMemoryCallback } from "./memoryService";
+import { handleSaveMemoryProposalCallback, handleDeleteMemoryCallback, handleReplaceMemoryProposalCallback } from "./memoryService";
 
 export interface CallbackResult {
   success: boolean;
@@ -357,6 +357,15 @@ export async function handleCallbackQuery(
   // ---------------------------------------------------------------------------
   // Memory callbacks: save_memory, reject_memory, delete_memory, cancel_forget
   // ---------------------------------------------------------------------------
+  if (action === "replace_memory") {
+    const propId = payload;
+    const msg = await handleReplaceMemoryProposalCallback(env.DB, propId, now);
+    await clearKeyboard(botToken, chatId, messageId);
+    await env.DB.prepare("UPDATE telegram_updates SET status = 'processed', processed_at = ? WHERE update_id = ?")
+      .bind(nowIso, updateId).run().catch(() => {});
+    return { success: true, action, message: msg };
+  }
+
   if (action === "save_memory") {
     const propId = payload;
     const msg = await handleSaveMemoryProposalCallback(env.DB, propId, now);

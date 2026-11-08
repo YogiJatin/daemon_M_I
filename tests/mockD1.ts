@@ -70,11 +70,11 @@ export function createMockD1(): any {
         });
       },
 
-      async run(): Promise<{ success: boolean }> {
+      async run(): Promise<{ success: boolean; meta: { changes: number; last_row_id: number } }> {
         return serialWrite(() => {
           const stmt = sqlite.prepare(query);
-          stmt.run(...boundParams);
-          return { success: true };
+          const info = stmt.run(...boundParams) as any;
+          return { success: true, meta: { changes: Number(info.changes), last_row_id: Number(info.lastInsertRowid) } };
         });
       },
     };
