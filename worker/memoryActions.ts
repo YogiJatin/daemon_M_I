@@ -9,6 +9,8 @@
  * - Deletes are soft (deleted_at) so /undo can restore within 24h.
  */
 
+import { enqueueMemoryMirror } from "./desktopMirrorService";
+
 const STOPWORDS = new Set([
   "the", "that", "this", "with", "from", "your", "memory", "memories", "forget", "delete",
   "remove", "about", "have", "has", "had", "was", "were", "are", "and", "but", "not", "you",
@@ -32,6 +34,7 @@ export function tokenizeMemoryQuery(text: string): string[] {
 export interface MemoryMatch {
   id: string;
   canonical_text: string;
+  sensitivity?: string | null;
   score: number;
 }
 
@@ -51,19 +54,24 @@ export async function findMemoryMatches(
   const where = tokens.map(() => "lower(canonical_text) LIKE ?").join(" OR ");
   const rows = await db
     .prepare(
-      `SELECT id, canonical_text
+      `SELECT id, canonical_text, sensitivity
        FROM memory_objects
        WHERE deleted_at IS NULL AND (${where})
        LIMIT ?`
     )
     .bind(...tokens.map(likeToken), limit)
-    .all<{ id: string; canonical_text: string }>()
+    .all<{ id: string; canonical_text: string; sensitivity: string | null }>()
     .catch(() => ({ results: [] }));
 
   const scored = (rows.results || []).map((row) => {
     const lower = row.canonical_text.toLowerCase();
     const score = tokens.reduce((count, token) => (lower.includes(token) ? count + 1 : count), 0);
-    return { id: row.id, canonical_text: row.canonical_text, score };
+    return {
+      id: row.id,
+      canonical_text: row.canonical_text,
+      sensitivity: row.sensitivity,
+      score,
+    };
   });
 
   return scored
@@ -203,6 +211,22 @@ export async function handleForgetMemory(
     if (changes === 0) {
       return { status: "none", reply: "No matching memory.", deletedIds: [], matches };
     }
+
+    // Mirror delete only after the D1 delete committed.
+    await enqueueMemoryMirror(
+      db,
+      {
+        id: matches[0].id,
+        type: "fact",
+        title: "",
+        canonical_text: matches[0].canonical_text,
+        sensitivity: matches[0].sensitivity ?? "normal",
+        created_at: nowIso,
+      },
+      "delete",
+      now
+    ).catch(() => {});
+
     return {
       status: "deleted",
       reply: `Deleted ${changes} ${changes === 1 ? "memory" : "memories"}.`,
@@ -225,13 +249,24 @@ export async function restoreLatestMemory(
 ): Promise<{ restoredId: string | null; reply: string }> {
   const row = await db
     .prepare(
-      `SELECT id FROM memory_objects
+      `SELECT id, type, title, canonical_text, summary, sensitivity, trust, created_at, updated_at
+       FROM memory_objects
        WHERE deleted_at IS NOT NULL AND deleted_at >= ?
        ORDER BY deleted_at DESC
        LIMIT 1`
     )
     .bind(sinceIso)
-    .first<{ id: string }>()
+    .first<{
+      id: string;
+      type: string;
+      title: string;
+      canonical_text: string;
+      summary: string | null;
+      sensitivity: string | null;
+      trust: string | null;
+      created_at: string;
+      updated_at: string | null;
+    }>()
     .catch(() => null);
 
   if (!row) {
@@ -248,5 +283,8 @@ export async function restoreLatestMemory(
   if (changes === 0) {
     return { restoredId: null, reply: "Nothing to restore." };
   }
+
+  await enqueueMemoryMirror(db, row as any, "upsert", now).catch(() => {});
+
   return { restoredId: row.id, reply: `Restored 1 memory [${row.id}].` };
 }

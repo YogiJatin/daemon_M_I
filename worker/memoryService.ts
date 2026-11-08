@@ -13,6 +13,7 @@
 import { checkAndRedactSecrets } from "./secretsGuard";
 import { findContradictingMemory } from "./memoryActions";
 import { isMemoryMutation } from "./intentSchema";
+import { enqueueMemoryMirror } from "./desktopMirrorService";
 
 export interface MemoryObject {
   id: string;
@@ -213,6 +214,15 @@ export async function handleDeleteMemoryCallback(
   now: Date = new Date()
 ): Promise<string> {
   const nowIso = now.toISOString();
+  const existing = await db
+    .prepare(
+      `SELECT id, type, title, canonical_text, summary, sensitivity, trust, created_at, updated_at
+       FROM memory_objects WHERE id = ?`
+    )
+    .bind(memoryId)
+    .first<any>()
+    .catch(() => null);
+
   const res = await db
     .prepare("UPDATE memory_objects SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
     .bind(nowIso, nowIso, memoryId)
@@ -223,6 +233,12 @@ export async function handleDeleteMemoryCallback(
   if (changes === 0) {
     return `Memory [${memoryId}] already removed.`;
   }
+
+  // Mirror delete fires only on a committed D1 delete.
+  if (existing) {
+    await enqueueMemoryMirror(db, existing as any, "delete", now).catch(() => {});
+  }
+
   return "Deleted 1 memory.";
 }
 
@@ -351,11 +367,27 @@ export async function handleSaveMemoryProposalCallback(
 
   // Replace flow: soft-delete the contradicted memory only after the owner taps.
   if (prop.replaces_id) {
-    await db
+    const replaced = await db
       .prepare("UPDATE memory_objects SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
       .bind(nowIso, nowIso, prop.replaces_id)
       .run()
-      .catch(() => {});
+      .catch(() => null);
+
+    if (Number((replaced as any)?.meta?.changes ?? 0) > 0) {
+      await enqueueMemoryMirror(
+        db,
+        {
+          id: prop.replaces_id,
+          type: "fact",
+          title: "",
+          canonical_text: "",
+          sensitivity: "normal",
+          created_at: nowIso,
+        },
+        "delete",
+        now
+      ).catch(() => {});
+    }
   }
 
   await db
@@ -371,6 +403,21 @@ export async function handleSaveMemoryProposalCallback(
     .prepare("UPDATE memory_proposals SET status = 'accepted', updated_at = ? WHERE id = ?")
     .bind(nowIso, proposalId)
     .run();
+
+  await enqueueMemoryMirror(
+    db,
+    {
+      id: memId,
+      type: "fact",
+      title: prop.canonical_text.slice(0, 50),
+      canonical_text: prop.canonical_text,
+      sensitivity: "normal",
+      trust: "medium",
+      created_at: nowIso,
+    },
+    "upsert",
+    now
+  ).catch(() => {});
 
   return `Saved memory [${memId}]: "${prop.canonical_text}"`;
 }

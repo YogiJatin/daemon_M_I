@@ -49,6 +49,7 @@ import {
   claimPendingMirrorJobs,
   acknowledgeMirrorJob,
   enqueueMirrorJob,
+  reconcileMemoryMirror,
   handleRevokeDeviceCommand,
 } from "./desktopMirrorService";
 
@@ -1818,6 +1819,9 @@ export default {
 
     // Phase 1 (Block 4): Autonomous Morning & Evening Briefings
     await checkAndDispatchBriefings(env.DB, env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_OWNER_ID, scheduledTime).catch(() => {});
+
+    // Block 9: one-way D1 -> Obsidian memory mirror reconcile (max once per 24h)
+    await reconcileMemoryMirror(env.DB, scheduledTime).catch(() => {});
 
     // Phase 1 (Block 4): Periodic Deterministic Heartbeat (runs on minute % 15 == 0)
     await runDeterministicHeartbeat(env.DB, env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_OWNER_ID, scheduledTime).catch(() => {});

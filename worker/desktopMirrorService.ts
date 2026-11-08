@@ -10,6 +10,7 @@
  */
 
 import { checkAndRedactSecrets } from "./secretsGuard";
+import { formatMemoryNote, isMirrorableMemory, MemoryNoteInput } from "./obsidianMirror";
 
 export interface MirrorJobRecord {
   id: string;
@@ -25,6 +26,7 @@ export interface MirrorJobRecord {
   written_path: string | null;
   last_error: string | null;
   conflict_path: string | null;
+  action: "upsert" | "delete";
   created_at: string;
   updated_at: string;
 }
@@ -240,6 +242,7 @@ export async function enqueueMirrorJob(
     filename: string;
     content: string;
     isUntrusted?: boolean;
+    action?: "upsert" | "delete";
   }
 ): Promise<string> {
   const jobId = "job_" + ulid();
@@ -265,8 +268,8 @@ export async function enqueueMirrorJob(
   await db
     .prepare(
       `INSERT INTO mirror_outbox
-         (id, dedupe_key, target_folder, filename, content, content_sha256, status, attempts, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`
+         (id, dedupe_key, target_folder, filename, content, content_sha256, status, attempts, action, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?)`
     )
     .bind(
       jobId,
@@ -275,6 +278,7 @@ export async function enqueueMirrorJob(
       params.filename,
       cleanContent,
       contentSha,
+      params.action || "upsert",
       nowIso,
       nowIso
     )
@@ -420,6 +424,108 @@ export async function handleListDevicesCommand(db: D1Database): Promise<string> 
   }
   lines.push("\nTo revoke a device: /revoke <id>");
   return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// Block 9: One-Way D1 -> Obsidian Memory Mirror
+// ---------------------------------------------------------------------------
+
+/**
+ * Enqueues a memory mirror job. Private memories are never enqueued.
+ * Delete jobs are only created by callers after a committed D1 delete.
+ */
+export async function enqueueMemoryMirror(
+  db: D1Database,
+  memory: MemoryNoteInput,
+  action: "upsert" | "delete",
+  now: Date = new Date()
+): Promise<string | null> {
+  if (!isMirrorableMemory(memory)) return null;
+  const note = action === "upsert" ? formatMemoryNote(memory) : null;
+  return enqueueMirrorJob(db, {
+    dedupeKey: `memory:${memory.id}`,
+    targetFolder: "Memories",
+    filename: `${memory.id}.md`,
+    content: note ? note.markdown : "",
+    action,
+  });
+}
+
+/**
+ * Reconcile pass: re-enqueues missing upserts for live memories and deletes
+ * for soft-deleted ones. Runs at most once per 24h using a settings marker.
+ */
+export async function reconcileMemoryMirror(
+  db: D1Database,
+  now: Date = new Date(),
+  limit: number = 50
+): Promise<{ upserts: number; deletes: number; skipped: boolean }> {
+  const marker = await db
+    .prepare("SELECT value FROM settings WHERE key = 'memory_mirror_reconciled_at'")
+    .first<{ value: string }>()
+    .catch(() => null);
+
+  if (marker?.value) {
+    const last = Date.parse(marker.value);
+    if (!Number.isNaN(last) && now.getTime() - last < 24 * 3600 * 1000) {
+      return { upserts: 0, deletes: 0, skipped: true };
+    }
+  }
+
+  const live = await db
+    .prepare(
+      `SELECT m.id, m.type, m.title, m.canonical_text, m.summary, m.sensitivity, m.trust, m.created_at, m.updated_at
+       FROM memory_objects m
+       WHERE m.deleted_at IS NULL
+         AND m.sensitivity != 'private'
+         AND NOT EXISTS (
+           SELECT 1 FROM mirror_outbox o
+           WHERE o.dedupe_key = 'memory:' || m.id AND o.action = 'upsert' AND o.status IN ('pending', 'claimed', 'delivered')
+         )
+       ORDER BY m.created_at ASC
+       LIMIT ?`
+    )
+    .bind(limit)
+    .all<any>()
+    .catch(() => ({ results: [] }));
+
+  const removed = await db
+    .prepare(
+      `SELECT m.id, m.type, m.title, m.canonical_text, m.sensitivity, m.created_at
+       FROM memory_objects m
+       WHERE m.deleted_at IS NOT NULL
+         AND m.sensitivity != 'private'
+         AND NOT EXISTS (
+           SELECT 1 FROM mirror_outbox o
+           WHERE o.dedupe_key = 'memory:' || m.id AND o.action = 'delete' AND o.status IN ('pending', 'claimed', 'delivered')
+         )
+       ORDER BY m.deleted_at ASC
+       LIMIT ?`
+    )
+    .bind(limit)
+    .all<any>()
+    .catch(() => ({ results: [] }));
+
+  let upserts = 0;
+  for (const memory of live.results || []) {
+    const jobId = await enqueueMemoryMirror(db, memory, "upsert", now).catch(() => null);
+    if (jobId) upserts++;
+  }
+
+  let deletes = 0;
+  for (const memory of removed.results || []) {
+    const jobId = await enqueueMemoryMirror(db, memory, "delete", now).catch(() => null);
+    if (jobId) deletes++;
+  }
+
+  const nowIso = now.toISOString();
+  await db
+    .prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('memory_mirror_reconciled_at', ?, ?)")
+    .bind(nowIso, nowIso)
+    .run()
+    .catch(() => {});
+
+  return { upserts, deletes, skipped: false };
 }
 
 export async function handleRevokeDeviceCommand(db: D1Database, deviceId: string): Promise<string> {

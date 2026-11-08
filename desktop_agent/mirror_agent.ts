@@ -177,6 +177,21 @@ export async function processJob(
   const relPath = path.relative(config.vaultPath, targetFilePath).replace(/\\/g, "/");
   const jobSha = sha256File(job.content);
 
+  // Delete jobs are created only by the cloud after a committed D1 delete.
+  if (job.action === "delete") {
+    let removed = false;
+    if (fs.existsSync(targetFilePath)) {
+      if (!config.dryRun) {
+        fs.unlinkSync(targetFilePath);
+        delete state.writtenHashes[relPath];
+        saveState(config.vaultPath, state);
+      }
+      removed = true;
+    }
+    logMessage(logFile, `[DELETE] ${removed ? "Removed" : "No file at"} '${relPath}'.`);
+    return { status: "delivered", writtenPath: targetFilePath };
+  }
+
   // Conflict Guard: check if file already exists on disk
   if (fs.existsSync(targetFilePath)) {
     const existingContent = fs.readFileSync(targetFilePath, "utf8");

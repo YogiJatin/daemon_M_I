@@ -18,6 +18,52 @@ export interface ObsidianNote {
   title: string;
 }
 
+export interface MemoryNoteInput {
+  id: string;
+  type: string;
+  title: string;
+  canonical_text: string;
+  summary?: string | null;
+  sensitivity?: string | null;
+  trust?: string | null;
+  created_at: string;
+  updated_at?: string | null;
+}
+
+/** Private memories never leave D1 and are never mirrored to the vault. */
+export function isMirrorableMemory(memory: Partial<MemoryNoteInput> | null | undefined): boolean {
+  return !!memory && typeof memory.id === "string" && memory.sensitivity !== "private";
+}
+
+/** One-way D1 -> Obsidian note. D1 stays canonical; the note is read-only output. */
+export function formatMemoryNote(memory: MemoryNoteInput): ObsidianNote {
+  const safeTitle = (memory.title || memory.canonical_text.slice(0, 60))
+    .replace(/[/\\?%*:|"<>]/g, "-")
+    .trim();
+  const filename = `${memory.id}.md`;
+  const vaultPath = `Memories/${filename}`;
+  const body = memory.summary ? `${memory.canonical_text}\n\n${memory.summary}` : memory.canonical_text;
+
+  const markdown = `---
+title: "${safeTitle}"
+memory_id: "${memory.id}"
+memory_type: "${memory.type}"
+trust: "${memory.trust || "unknown"}"
+sensitivity: "${memory.sensitivity || "normal"}"
+created_at: "${memory.created_at}"
+updated_at: "${memory.updated_at || memory.created_at}"
+---
+
+# ${safeTitle}
+
+> **Personal AI OS Memory** — D1 is canonical. This note is a one-way mirror and edits here are not written back.
+
+${body}
+`;
+
+  return { filename, vaultPath, markdown, recipeId: memory.id, title: safeTitle };
+}
+
 export class ObsidianMirror {
   /**
    * Generates a formatted Markdown note for an approved recipe.
