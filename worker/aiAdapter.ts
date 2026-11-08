@@ -146,7 +146,7 @@ export class AIAdapter {
         providerType: "groq",
         keySlot: 1,
         apiKey: this.resolveApiKey("groq", 1) || undefined,
-        model: this.env?.GROQ_MODEL || "llama-3.3-70b-versatile",
+        model: this.env?.GROQ_MODEL || "openai/gpt-oss-120b",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 6000,
       };
@@ -157,7 +157,7 @@ export class AIAdapter {
         providerType: "groq",
         keySlot: 2,
         apiKey: this.resolveApiKey("groq", 2) || undefined,
-        model: this.env?.GROQ_MODEL_SECONDARY || this.env?.GROQ_MODEL || "llama-3.1-8b-instant",
+        model: this.env?.GROQ_MODEL_SECONDARY || this.env?.GROQ_MODEL || "openai/gpt-oss-20b",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 6000,
       };
@@ -192,7 +192,7 @@ export class AIAdapter {
       return {
         id: "workers_ai",
         providerType: "workers_ai",
-        model: this.env?.WORKERS_AI_MODEL || "@cf/meta/llama-3.1-8b-instruct-fast",
+        model: this.env?.WORKERS_AI_MODEL || "@cf/meta/llama-3.2-3b-instruct",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 8000,
       };
@@ -494,7 +494,7 @@ export class AIAdapter {
           failureCode = err.status === 401 ? "auth_failed" : "model_decommissioned";
           cooldownMs = 24 * 60 * 60 * 1000;
           circuit.consecutiveFailures = 99;
-          this.sendPermanentAlert(config.id, failureCode).catch(() => {});
+          this.sendPermanentAlert(config.id, config.model, failureCode).catch(() => {});
         } else if (circuit.consecutiveFailures >= 3) {
           cooldownMs = Math.max(cooldownMs, 300000);
         }
@@ -626,7 +626,7 @@ export class AIAdapter {
           failureCode = err.status === 401 ? "auth_failed" : "model_decommissioned";
           cooldownMs = 24 * 60 * 60 * 1000;
           circuit.consecutiveFailures = 99;
-          this.sendPermanentAlert(config.id, failureCode).catch(() => {});
+          this.sendPermanentAlert(config.id, config.model, failureCode).catch(() => {});
         } else if (circuit.consecutiveFailures >= 3) {
           cooldownMs = Math.max(cooldownMs, 300000);
         }
@@ -1102,7 +1102,7 @@ private extractJsonPayload<T = any>(rawText: any): T {
    * Sends a Telegram alert when a provider is permanently disabled.
    * Best-effort: never throws.
    */
-  private async sendPermanentAlert(providerId: string, reason: string): Promise<void> {
+  private async sendPermanentAlert(providerId: string, modelId: string, reason: string): Promise<void> {
     try {
       // F5: No alerts for test runs
       if (this.env?.ALLOW_TEST_STUBS === "1") return;
@@ -1137,7 +1137,7 @@ private extractJsonPayload<T = any>(rawText: any): T {
           .catch(() => {});
       }
 
-      const msg = `[AI] Provider state change: ${providerId} (${reason}).`;
+      const msg = `[AI Alert] Provider ${providerId} (model: ${modelId}) state changed to: ${reason}.`;
       await sendTelegramMessage(token, chatId, msg);
     } catch {
       // best-effort
@@ -1184,7 +1184,7 @@ private extractJsonPayload<T = any>(rawText: any): T {
           ? (err.status === 401 ? "auth_failed" : "model_decommissioned")
           : (err.status === 429 ? "429" : (err.status?.toString() || "error"));
         await this.recordProviderHealth(config.id, config.model, isPermanent ? "cooldown" : "degraded", 99, latencyMs, now, failCode);
-        if (isPermanent) await this.sendPermanentAlert(config.id, failCode);
+        if (isPermanent) await this.sendPermanentAlert(config.id, config.model, failCode);
       }
     }
     return results;
