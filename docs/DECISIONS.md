@@ -401,3 +401,15 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 **Context**: Execution requests could be swapped or replayed maliciously if approvals were generic boolean flags.
 **Decision**: Tier 2 execution plans require owner approval cryptographically bound to the SHA-256 hash of the canonical step payload. Approval hashes are single-use and expire. Execution router verifies the exact hash before dispatching steps through typed adapters.
 **Consequences**: Prevents approval-swap attacks (approving A and executing B). Guarantees that only what the owner reviewed can execute.
+
+## ADR-049 - Daemon Persona with Code-Owned Memory Mutations
+**Date**: 2026-11-08
+**Context**: The assistant claimed actions ("I deleted that") that D1 never committed, and memory deletes were sometimes answered as remember-proposals. Chat replies also leaked politeness and offers that the owner does not want.
+**Decision**: One exported daemon prompt (`worker/prompts.ts`) with a terse persona, no politeness, and a no-action-claims contract; temperature ceiling 0.2 on every provider. Memory mutations are code-owned: forget/delete/remove is rejected as a remember proposal, pre-routed before remember, soft-deleted through `memory_objects.deleted_at`, and the reply is generated from the D1 change count. Ambiguous matches list rows instead of guessing. An opt-in egress guard checks chat turns only, so scheduler reminders and digests are unaffected.
+**Consequences**: The model cannot narrate side effects it did not cause. Deletes stay recoverable via `/undo` for 24h. Reminder delivery keeps its existing behavior.
+
+## ADR-050 - One-Way Obsidian Memory Mirror
+**Date**: 2026-11-08
+**Context**: The owner wants memories readable in the vault, but vault edits must never become a second source of truth, and private memories must not leave D1.
+**Decision**: D1 enqueues `mirror_outbox` jobs (`action` upsert/delete) keyed by `memory:<id>` after a committed write or delete; private memories and rows without a committed change never enqueue. The desktop agent deletes only the note matching a delete job, inside the vault allowlist. A reconcile pass with a 24h settings marker re-enqueues missing upserts and soft-delete tombstones.
+**Consequences**: The vault stays a read-only projection. A lost or offline agent self-heals within a day; vault edits are preserved as conflict copies, never written back.
