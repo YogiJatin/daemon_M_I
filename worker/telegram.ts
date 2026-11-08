@@ -241,6 +241,18 @@ export async function sendTelegramMessage(
     return { sent: false, error: "Circuit breaker open: outbound Telegram paused for 60s" };
   }
 
+  // M5 Guard: Any row/message with a test_run_id or test clock is NEVER sent to owner chat
+  const isTestIsolated = Boolean(options?.testStubs || (options as any)?.test_run_id || (options as any)?.testClock);
+  const ownerEnvId = ((globalThis as any).process?.env?.TELEGRAM_OWNER_ID) || (options as any)?.ownerChatId;
+  if (isTestIsolated && ownerEnvId && String(chatId).trim() === String(ownerEnvId).trim()) {
+    console.warn("[TEST GUARD] Blocked attempt to send test-isolated message to owner chat id:", chatId);
+    return {
+      sent: false,
+      error: "test_run_id_blocked_for_owner",
+      isPermanent: true,
+    };
+  }
+
   // F6 Test isolation: stub synthetic runner chats (chatId starts with -100223300)
   // Only allowed cases in the real private group reach Telegram API
   const isSyntheticTestChat = chatIdStr.startsWith("-100223300");

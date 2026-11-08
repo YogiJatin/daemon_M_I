@@ -348,6 +348,39 @@ export async function runScheduler(
 
       if (row.dedup_key.startsWith("prep-digest:")) {
         const targetDate = row.dedup_key.split(":")[1];
+        // D4 fix: Never send past or stale prep digests to owner chat
+        if (targetDate && targetDate < istDate) {
+          await db
+            .prepare(
+              `UPDATE notification_log
+               SET status = 'missed',
+                   cap_reservation_state = 'released',
+                   error_code = 'past_prep_digest',
+                   lease_expires_at = NULL,
+                   updated_at = ?
+               WHERE id = ? AND status = 'claimed'`
+            )
+            .bind(nowIso, row.id)
+            .run();
+          continue;
+        }
+        const scheduledTimeMs = new Date(row.scheduled_at).getTime();
+        const delayMin = (now.getTime() - scheduledTimeMs) / (60 * 1000);
+        if (delayMin > 120) {
+          await db
+            .prepare(
+              `UPDATE notification_log
+               SET status = 'missed',
+                   cap_reservation_state = 'released',
+                   error_code = 'stale_prep_digest',
+                   lease_expires_at = NULL,
+                   updated_at = ?
+               WHERE id = ? AND status = 'claimed'`
+            )
+            .bind(nowIso, row.id)
+            .run();
+          continue;
+        }
         reminderText = await renderPrepDigestMessage(db, targetDate);
       } else if (row.dedup_key.startsWith("catchup:")) {
         reminderText = `🔄 Catch-up Digest:\nSystem resumed from pause episode. All pending schedules caught up.`;

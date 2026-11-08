@@ -14,7 +14,7 @@
  * - Audit events for all state changes
  */
 
-import { getISTDateParts, istToUtcDate } from "./dateParser";
+import { getISTDateParts, istToUtcDate, formatConfirmationDate } from "./dateParser";
 import { planNotification, planPrepDigest } from "./notificationPlanner";
 import {
   getIsoWeekday,
@@ -486,15 +486,17 @@ export async function getPrepDigestData(
  */
 export async function renderPrepDigestMessage(db: D1Database, targetYmd: string): Promise<string> {
   const data = await getPrepDigestData(db, targetYmd);
+  const formattedDate = formatConfirmationDate(targetYmd);
 
   if (data.classes.length === 0) {
-    return `Tomorrow (${targetYmd}): No classes scheduled. Enjoy your day!`;
+    return `Tomorrow (${formattedDate}): No classes scheduled. Enjoy your day!`;
   }
 
-  let msg = `📚 Schedule for Tomorrow (${targetYmd}):\n\n`;
+  let msg = `📚 Schedule for Tomorrow (${formattedDate}):\n\n`;
 
   for (const c of data.classes) {
-    const roomStr = c.room ? ` | Room ${c.room}` : "";
+    const cleanRoom = c.room ? c.room.replace(/^Room\s+/i, "").trim() : "";
+    const roomStr = cleanRoom ? ` | Room ${cleanRoom}` : "";
     const facultyStr = c.faculty ? ` (${c.faculty})` : "";
     msg += `⏰ ${c.startTime} – ${c.endTime}: ${c.subjectName}${roomStr}${facultyStr}\n`;
 
