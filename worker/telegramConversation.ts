@@ -47,6 +47,7 @@ import {
   handleMemoriesCommand,
 } from "./memoryService";
 import { parseRegionalDateWords } from "./dateLexicon";
+import { DAEMON_PLAIN_ANSWER_PROMPT } from "./prompts";
 import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
 
 // ---------------------------------------------------------------------------
@@ -220,8 +221,9 @@ async function processSingleMessage(
 ): Promise<void> {
   const startProcessing = Date.now();
   const botToken: string = env.TELEGRAM_BOT_TOKEN;
+  const turnActionResults: string[] = [];
   const sendTg = (txt: string, markup?: any) =>
-    sendTelegramMessage(botToken, chatId, txt, markup, { testStubs: Boolean(testStubs), db });
+    sendTelegramMessage(botToken, chatId, txt, markup, { testStubs: Boolean(testStubs), db, egress: { actionResults: turnActionResults } });
 
   // 0. Forwarded Data-Only Check (G21, Non-negotiable Rule 11)
   if (isForwarded) {
@@ -716,6 +718,32 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     return;
   }
 
+  // 3.9 Terse greeting short-circuit: Daemon never greets or offers help.
+  if (/^\s*(?:hey+|hi+|hello+|yo|sup|namaste|good\s+(?:morning|afternoon|evening))\s*[!.?]*\s*$/i.test(text)) {
+    const greetingReply = "Ready, sir.";
+    const sendRes = await sendTg(greetingReply).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: greetingReply,
+      intent: "chat",
+      confidence: 1.0,
+      outcome: "terse_greeting",
+      status: "sent",
+      provider: "deterministic",
+      latencyMs: Date.now() - startProcessing,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db
+      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+      .bind(nowIso(), userMsgRowId)
+      .run()
+      .catch(() => {});
+    return;
+  }
+
   // 4. Daily AI budget check
   const dailyBudget = parseInt(env.DAILY_AI_BUDGET || String(DEFAULT_DAILY_AI_BUDGET), 10);
   const withinBudget = await checkDailyAiBudget(db, dailyBudget, now);
@@ -856,6 +884,9 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     db,
     env,
   };
+
+  // Classification runs deterministically at temperature 0 on every provider.
+  (input as any).temperature = 0;
 
   const adapter = new AIAdapter(env, db);
   let result: TelegramAssistantOutput | null = null;
@@ -1128,13 +1159,14 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
           memRes.xmlBlock,
           aboutContext,
           `<DATA type="user_message">\n${text}\n</DATA>`,
-          "Answer the user concisely and helpfully using the context above if relevant. Reflect their preferences and facts naturally. Do not invent facts."
+          "Answer using only the DATA above. If it does not contain the answer, reply exactly: No data."
         ].filter(Boolean).join("\n\n");
 
         try {
           const answerAi = await adapter.execute({
             capability: "telegram_assistant",
-            systemPrompt: "You are the Personal AI OS conversational assistant. Answer the user's question concisely using the provided context. If context says the user studies best at night or has other preferences, reflect that naturally. Return plain text only.",
+            systemPrompt: DAEMON_PLAIN_ANSWER_PROMPT,
+            temperature: 0.1,
             userPrompt: answerPrompt,
             inputContext: { userText: text },
             privacyClass: "personal",
@@ -1392,13 +1424,14 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
           memRes.xmlBlock,
           aboutContext,
           `<DATA type="user_message">\n${text}\n</DATA>`,
-          "Answer the user concisely and helpfully using the context above if relevant. Reflect their preferences and facts naturally. Do not invent facts."
+          "Answer using only the DATA above. If it does not contain the answer, reply exactly: No data."
         ].filter(Boolean).join("\n\n");
 
         try {
           const answerAi = await adapter.execute({
             capability: "telegram_assistant",
-            systemPrompt: "You are the Personal AI OS conversational assistant. Answer the user's question concisely using the provided context. If context says the user studies best at night or has other preferences, reflect that naturally. Return plain text only.",
+            systemPrompt: DAEMON_PLAIN_ANSWER_PROMPT,
+            temperature: 0.1,
             userPrompt: answerPrompt,
             inputContext: { userText: text },
             privacyClass: "personal",
@@ -1413,18 +1446,17 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
         }
       }
 
-      // Post-check: ensure chat replies NEVER state facts about tasks, schedule, or progress
-      // and do not list/offer abilities except via the manifest (P0-7, G02)
+      // Post-check: facts about tasks/schedule/progress must come from D1, and the
+      // reply must not offer help. Action claims are handled separately by the
+      // opt-in egress guard at send time (worker/egressGuard.ts).
       if (
         /on track|tasks are|pending tasks|your schedule shows|progress looks/i.test(replyText) ||
-        /I'?ll remind|All confirmed|\bsaved\b|\badded\b|\bcreated\b/i.test(replyText) ||
-        /completed|marked as|marked them|tasks have been|have marked|have completed|closed all|closing all/i.test(replyText) ||
-        /closing.*windows|open windows|closed.*windows/i.test(replyText) ||
         /I can help you|I can assist with|I can set reminders|I can manage|feel free to ask/i.test(replyText)
       ) {
-        replyText = "I haven't changed anything.";
+        replyText = "No data.";
       }
-      if (!replyText) replyText = "I haven't changed anything.";
+      if (!replyText) replyText = "No data.";
+      if (!replyText) replyText = "No data.";
       break;
     }
   }

@@ -32,6 +32,7 @@ export interface AIRequest<TInput = any> {
   timeoutMs?: number; // default: 6000ms
   correlationId?: string;
   simulatedFailure?: "429" | "503" | "timeout" | "malformed_json" | "privacy_blocked"; // for test suites
+  temperature?: number; // optional per-request override, clamped to MAX_CHAT_TEMPERATURE
 }
 
 export interface AIResponse<TOutput = any> {
@@ -79,6 +80,19 @@ function getCircuitState(providerId: string): CircuitState {
     circuitStates.set(providerId, state);
   }
   return state;
+}
+
+/** Hard ceiling for chat/reply generation across every provider. */
+export const MAX_CHAT_TEMPERATURE = 0.2;
+
+/**
+ * Clamps a requested temperature to [0, 0.2]. Defaults to 0.1 (deterministic).
+ * Used by Groq, Gemini and Workers AI so no provider can run hotter than the cap.
+ */
+export function resolveTemperature(requested?: number): number {
+  const value =
+    typeof requested === "number" && Number.isFinite(requested) ? requested : 0.1;
+  return Math.max(0, Math.min(value, MAX_CHAT_TEMPERATURE));
 }
 
 export class AIAdapter {
@@ -375,6 +389,7 @@ export class AIAdapter {
         inputContext: input,
         privacyClass,
         simulatedFailure,
+        temperature: typeof (input as any)?.temperature === "number" ? (input as any).temperature : undefined,
       };
 
       try {
@@ -860,7 +875,7 @@ export class AIAdapter {
             { role: "user", content: request.userPrompt },
           ],
           ...(isPlainText ? {} : { response_format: { type: "json_object" } }),
-          temperature: 0.1,
+          temperature: resolveTemperature(request.temperature),
           max_tokens: 1024,
         }),
         signal: controller.signal,
@@ -891,9 +906,15 @@ export class AIAdapter {
     } finally {
       clearTimeout(timeout);
     }
+  }  /**
+   * Returns plain text as-is for plain-text prompts; otherwise strict JSON.
+   * Providers share this so plain-text answers never get JSON-ified.
+   */
+  private parseProviderOutput<T>(rawText: string, isPlainText: boolean): T {
+    return (isPlainText ? (rawText as any) : this.extractJsonPayload<T>(rawText)) as T;
   }
 
-private extractJsonPayload<T = any>(rawText: any): T {
+  private extractJsonPayload<T = any>(rawText: any): T {
   const textStr = typeof rawText === "string" ? rawText : JSON.stringify(rawText || "{}");
   const trimmed = textStr.trim();
   try {
@@ -933,17 +954,18 @@ private extractJsonPayload<T = any>(rawText: any): T {
     const aiBinding = this.env?.AI;
     if (!aiBinding) throw new Error("Cloudflare Workers AI binding (env.AI) not configured");
 
+    const isPlainTextWai = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
+
     const response: any = await aiBinding.run(config.model, {
       messages: [
-        { role: "system", content: `${request.systemPrompt}\n\nIMPORTANT: Return valid JSON only.` },
+        { role: "system", content: isPlainTextWai ? request.systemPrompt : `${request.systemPrompt}\n\nIMPORTANT: Return valid JSON only.` },
         { role: "user", content: request.userPrompt },
       ],
       max_tokens: 1024,
-      temperature: 0.1,
+      temperature: resolveTemperature(request.temperature),
     });
 
     const rawText = typeof response === "string" ? response : typeof response?.response === "string" ? response.response : JSON.stringify(response);
-    const isPlainTextWai = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
     let waiData: TOutput;
     if (isPlainTextWai) {
       waiData = (rawText as any) as TOutput;
@@ -990,10 +1012,13 @@ private extractJsonPayload<T = any>(rawText: any): T {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 15000);
 
+    const isPlainText = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
+
     const payload: any = {
       contents: [{ parts: [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }] }],
       generationConfig: {
-        responseMimeType: "application/json",
+        temperature: resolveTemperature(request.temperature),
+        ...(isPlainText ? {} : { responseMimeType: "application/json" }),
         thinkingConfig: { thinkingBudget: 0 },
       },
     };
@@ -1040,8 +1065,8 @@ private extractJsonPayload<T = any>(rawText: any): T {
       }
 
       const resJson = (await response.json()) as any;
-      const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-      const data = this.extractJsonPayload<TOutput>(rawText);
+      const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || (isPlainText ? "" : "{}");
+      const data = this.parseProviderOutput<TOutput>(rawText, Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt)));
       return { data, rawText };
     } finally {
       clearTimeout(timeout);
@@ -1082,7 +1107,7 @@ private extractJsonPayload<T = any>(rawText: any): T {
 
       const resJson = (await response.json()) as any;
       const rawText = resJson.response || "{}";
-      const data = this.extractJsonPayload<TOutput>(rawText);
+      const data = this.parseProviderOutput<TOutput>(rawText, Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt)));
       return { data, rawText };
     } finally {
       clearTimeout(timeout);

@@ -16,6 +16,7 @@ import { formatConfirmationDate } from "./dateParser";
 
 import { AICapabilityRegistry } from "./aiCapabilityRegistry";
 import { getCapabilityManifest, renderHelpResponse } from "./capabilityManifest";
+import { renderDaemonSystemPrompt } from "./prompts";
 import { resolveExtendedAnchor, ExtendedAnchor } from "./dailyRhythm";
 
 export type AssistantIntent =
@@ -114,94 +115,10 @@ export { formatConfirmationDate } from "./dateParser";
 // System Prompt Builder with Persona & Rubric
 // ---------------------------------------------------------------------------
 export function buildAssistantSystemPrompt(ownerName: string, manifest: string): string {
-  return `You are Antigravity OS, the personal AI assistant for ${ownerName}. You understand English, Hinglish, and Telugu-mixed messages.
-
-PERSONA:
-- Replies are 1-3 sentences unless asked for more.
-- Friendly, dry humor. Match user's language mix (English / Hinglish / Telugu-mixed).
-- Treat sarcasm, exaggeration, and jokes as jokes and play along lightly.
-- Never answer with only "I can't". Say what is missing in one clause, then give nearest useful thing.
-- Only claim abilities listed in the capability manifest below.
-- Never state facts about user's tasks, schedule, or progress (code renders them).
-- Never use the words "task", "schedule", "track", "progress", or "todo" in chat replies unless the user explicitly asked about them.
-- Never invent live facts; use the lookup path.
-
-CAPABILITIES:
-${manifest}
-
-INTENTS:
-- chat: greetings, banter, insults, sarcasm, complaints.
-- explicit_task: user explicitly commands adding a task ("add task...", "order groceries at 5pm").
-- explicit_reminder: user explicitly commands a reminder ("remind me at 6pm about dentist appointment").
-- implicit_commitment: first-person future obligation passing ALL rubric points below.
-- query_schedule: asking about classes, timetable, or day's commitments.
-- query_tasks: asking about pending tasks, progress.
-- modify_pending: replying to an existing proposal to change title or time.
-- remember: user wants to save a durable note, fact, or preference.
-- schedule_exception: user reporting a change to today's schedule ("leaving early today", "class cancelled").
-- general_question: question answerable from general knowledge.
-- lookup: questions needing live data (weather or web prices/facts).
-- unclear: ambiguous input.
-
-ANCHOR MAPPINGS (use anchor property in tasks[]):
-- "after college" / "after class" -> "after_last_class"
-- "on the way home" / "leaving college" -> "leaving_college"
-- "when I get home" / "reaching home" -> "reaching_home"
-- "before college" / "leaving home" -> "leaving_home"
-- "tonight" / "by tonight" -> "evening"
-- "tomorrow morning" / "kal subah" -> "morning"
-- other / specific clock time -> "none"
-
-SPECIAL INSTRUCTIONS:
-- If user says "remind me at <time>" without specifying what (e.g. "remind me at 4"), set intent: "explicit_reminder", tasks: [{ "title": "Reminder", "hour": 4, "offset_days": 0 }].
-- For schedule questions, set intent: "query_schedule" with query.type: "today" or "tomorrow".
-- For task progress/summary questions, set intent: "query_tasks" with query.type: "summary".
-- "remember <fact>" -> intent: "remember", memory: { "text": "<fact>" }.
-- Hindi/Telugu task commitments (e.g. "kal subah office jaana hai" / "repu project ivvali") -> intent: "implicit_commitment" with appropriate anchor or offset_days.
-- When an input specifies a relative anchor like evening or morning, map to the corresponding anchor ("morning", "evening", "leaving_college", "reaching_home", "after_last_class").
-
-CAPTURE RUBRIC for implicit_commitment:
-Suggest ONLY if ALL 4 hold:
-(a) First person singular ("I / me / my / nenu / mujhe")
-(b) Concrete action (not vague)
-(c) Commitment, NOT a bodily/physical state ("I'm tired", "I feel sick", "I need to sleep" alone stay silent as chat), NOT a wish ("wish", "someday"), NOT a routine ("usually")
-(d) Not a question, hypothetical, past event, joke, or someone else's task.
-
-CRITICAL INVARIANTS FOR BODILY STATE VS COMMITMENT:
-- A body-state message expressing fatigue, drowsiness, headache, illness, or needing sleep/nap alone stays silent (intent: "chat", NO tasks).
-- A commitment that happens to contain words like "rest" (e.g. "the rest of the report", "rest the rest of the documentation") or "sleep" (e.g. "sleep study dataset") IS a valid task commitment and STILL triggers implicit_commitment.
-- Partial work phrases like "the rest of the report", "remaining slides", "the rest of the project" are actionable tasks.
-
-FEW-SHOT EXAMPLES:
-Input: "I feel completely exhausted and need some sleep"
-Output: {"intent": "chat", "confidence": 0.95, "reply_text": "Get some good rest!", "tasks": []}
-
-Input: "I am going to wrap up the rest of the report before Friday"
-Output: {"intent": "implicit_commitment", "confidence": 0.95, "reply_text": "", "tasks": [{"title": "Wrap up the rest of the report", "date_phrase": "before Friday"}]}
-
-Input: "I need to rest the rest of the report before Friday"
-Output: {"intent": "implicit_commitment", "confidence": 0.95, "reply_text": "", "tasks": [{"title": "Rest the rest of the report", "date_phrase": "before Friday"}]}
-
-Input: "I must organize the sleep study notes by 5pm"
-Output: {"intent": "implicit_commitment", "confidence": 0.95, "reply_text": "", "tasks": [{"title": "Organize the sleep study notes", "hour": 17, "minute": 0, "offset_days": 0}]}
-
-Input: "I have a headache, need to lie down"
-Output: {"intent": "chat", "confidence": 0.95, "reply_text": "Take care and get some quiet time.", "tasks": []}
-
-MULTI-INTENT:
-If message has multiple distinct requests (e.g. 2 reminders + 1 class query), output "actions" array (max 3), each with its own intent and fields.
-
-OUTPUT FORMAT (JSON only):
-{
-  "intent": "<primary_intent>",
-  "confidence": <0..1>,
-  "reply_text": "<conversational reply>",
-  "tasks": [{ "title": "", "date_phrase": "", "offset_days": 0, "hour": null, "minute": null, "anchor": "none", "priority": "normal" }],
-  "query": { "type": "today|tomorrow|week|summary|classes", "date": "" },
-  "lookup": { "kind": "weather|web", "query": "", "place": "", "when": "now|today|tomorrow" },
-  "memory": { "text": "" },
-  "actions": []
-}`;
+  // Single source of truth: worker/prompts.ts (DAEMON_SYSTEM_PROMPT).
+  // ownerName is retained so existing call sites and tests keep their signature.
+  void ownerName;
+  return renderDaemonSystemPrompt(manifest);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +204,33 @@ export function validateAssistantOutput(data: any): { valid: boolean; errors: st
 
   if (typeof data.confidence !== "number" || data.confidence < 0 || data.confidence > 1) {
     return { valid: false, errors: ["confidence must be 0..1"] };
+  }
+
+  if (data.actions !== undefined) {
+    if (!Array.isArray(data.actions)) {
+      return { valid: false, errors: ["actions must be an array"] };
+    }
+    if (data.actions.length > 3) {
+      return { valid: false, errors: ["actions must contain at most 3 items"] };
+    }
+    const allowedActions = new Set([
+      "forget_memory",
+      "remember_memory",
+      "create_task",
+      "query_schedule",
+      "query_tasks",
+      "lookup",
+      "chat",
+    ]);
+    for (const action of data.actions) {
+      if (!action || typeof action !== "object" || !allowedActions.has(action.type)) {
+        return { valid: false, errors: [`Invalid action: ${JSON.stringify(action)}`] };
+      }
+    }
+  }
+
+  if (data.reply_needed !== undefined && typeof data.reply_needed !== "boolean") {
+    return { valid: false, errors: ["reply_needed must be boolean"] };
   }
 
   return { valid: true, errors: [] };
@@ -766,8 +710,8 @@ export function registerTelegramAssistantCapability(): void {
   AICapabilityRegistry.register<TelegramAssistantInput, TelegramAssistantOutput>({
     id: "telegram_assistant",
     promptId: "telegram_assistant_v2",
-    promptVersion: "2.0.0",
-    checksum: "block2-intelligence-assistant",
+    promptVersion: "3.0.0",
+    checksum: "daemon-prompt-v3",
     dependencies: ["tasks", "timetable"],
     supportedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
     maxContextTokens: 2500,

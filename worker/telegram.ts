@@ -13,6 +13,8 @@
  * - Test isolation (ALLOW_TEST_STUBS): synthetic runner chats stubbed, never hitting real API.
  */
 
+import { guardReply, type EgressContext } from "./egressGuard";
+
 export interface SendResult {
   sent: boolean;
   statusCode?: number;
@@ -28,6 +30,8 @@ export interface TelegramOptions {
   testStubs?: boolean;
   db?: D1Database;
   parseMode?: "HTML" | "Markdown" | "MarkdownV2";
+  /** Chat-turn egress context. Omit for reminders/digests so they are never rewritten. */
+  egress?: EgressContext;
 }
 
 // Global in-memory state across requests within isolate
@@ -182,7 +186,7 @@ export async function editMessageReplyMarkup(
  * A string that parses as a JSON object, or contains "_mock", "reply_text"
  * or "\"intent\"", is dropped, logged, and replaced by the code template.
  */
-export function sanitizeOutboundMessage(text: string): string {
+export function sanitizeOutboundMessage(text: string, ctx?: EgressContext): string {
   if (typeof text !== "string") return "";
   const trimmed = text.trim();
   let leaked = false;
@@ -210,7 +214,7 @@ export function sanitizeOutboundMessage(text: string): string {
     console.warn("[EGRESS GUARD] Dropped leaked raw provider payload / JSON from outbound message:", trimmed.slice(0, 100));
     return "AI is temporarily offline. Reminders, /tasks, and /today remain operational.";
   }
-  return text;
+  return guardReply(text, ctx).text;
 }
 
 export async function sendTelegramMessage(
@@ -220,7 +224,7 @@ export async function sendTelegramMessage(
   replyMarkup?: any,
   options?: TelegramOptions
 ): Promise<SendResult> {
-  text = sanitizeOutboundMessage(text);
+  text = sanitizeOutboundMessage(text, options?.egress);
   if (!token) {
     return { sent: true };
   }
