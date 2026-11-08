@@ -1,3 +1,4 @@
+import { formatConfirmationDate } from "./dateParser";
 /**
  * worker/telegramAssistant.ts - telegram_assistant AI Capability
  *
@@ -107,31 +108,7 @@ export interface TelegramAssistantInput {
 // ---------------------------------------------------------------------------
 // Confirmation Date Formatter: "Fri 6 Nov, 3:00 PM"
 // ---------------------------------------------------------------------------
-export function formatConfirmationDate(dateIst: string, timeIst?: string | null): string {
-  try {
-    const [y, m, d] = dateIst.split("-").map(Number);
-    // Construct local midday to extract day of week and month
-    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const dayStr = dayNames[dt.getUTCDay()];
-    const monStr = monthNames[m - 1];
-
-    let timeStr = "";
-    if (timeIst) {
-      const [hStr, minStr] = timeIst.split(":");
-      let h = parseInt(hStr, 10);
-      const ampm = h >= 12 ? "PM" : "AM";
-      h = h % 12;
-      if (h === 0) h = 12;
-      timeStr = `, ${h}:${minStr.padStart(2, "0")} ${ampm}`;
-    }
-
-    return `${dayStr} ${d} ${monStr}${timeStr}`;
-  } catch {
-    return dateIst + (timeIst ? ` ${timeIst}` : "");
-  }
-}
+export { formatConfirmationDate } from "./dateParser";
 
 // ---------------------------------------------------------------------------
 // System Prompt Builder with Persona & Rubric

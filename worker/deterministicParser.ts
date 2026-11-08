@@ -296,8 +296,9 @@ export function parseExplicitReminderDeterministic(
   }
 
   // 5. Explicit "remind me to <title> at <time>" or "remind me at <time> to <title>"
-  const atTimeRegex1 = /remind\s+(?:me\s+)?(?:to\s+|about\s+)?(.+?)\s+at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(today|tomorrow)?/i;
-  const atTimeRegex2 = /remind\s+(?:me\s+)?at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(today|tomorrow)?\s+(?:to\s+|about\s+)?(.+)/i;
+  // Also handles "that" connector: "remind me that submit X tomorrow at 5pm"
+  const atTimeRegex1 = /remind\s+(?:me\s+)?(?:to\s+|about\s+|that\s+)?(.+?)\s+at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(today|tomorrow)?/i;
+  const atTimeRegex2 = /remind\s+(?:me\s+)?at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(today|tomorrow)?\s+(?:to\s+|about\s+|that\s+)?(.+)/i;
   const directActionRegex = /^(buy|call|meet|pick\s+up|submit|send)\s+(.+?)\s+at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(today|tomorrow)?/i;
 
   let matchAt = lower.match(atTimeRegex1);
@@ -325,9 +326,23 @@ export function parseExplicitReminderDeterministic(
   }
 
   if (matchAt && title && timeStr) {
+    // If tomorrow/today appears in the captured title (before "at"), detect it and strip it
+    const titleHasTomorrow = /\btomorrow\b/i.test(title);
+    const titleHasToday = /\btoday\b/i.test(title);
+    if (!dayWord && titleHasTomorrow) dayWord = "tomorrow";
+    else if (!dayWord && titleHasToday) dayWord = "today";
+
+    // Strip leading connectors and inline day/time words from title
+    let cleanTitle = title
+      .replace(/^(?:to|that|about)\s+/i, "")           // leading connector word
+      .replace(/\b(tomorrow|today|tonight|morning|afternoon|evening)\b/gi, "") // day/time words
+      .replace(/^(?:to|that|about)\s+/i, "")           // second pass after day removal
+      .replace(/\s{2,}/g, " ")                          // collapse extra spaces
+      .trim();
+    cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
+
     const offsetDays = dayWord === "tomorrow" ? 1 : 0;
     const resolved = resolveNearestFutureTime(timeStr, now, offsetDays);
-    const cleanTitle = title.charAt(0).toUpperCase() + title.slice(1);
     const formatted = formatConfirmationDate(resolved.localDate, resolved.localTime);
     return {
       title: cleanTitle,

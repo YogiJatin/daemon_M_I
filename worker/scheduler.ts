@@ -19,8 +19,7 @@
  */
 
 import { sendTelegramMessage, buildReminderInlineKeyboard } from "./telegram";
-import { formatConfirmationDate } from "./telegramAssistant";
-import { getISTDateParts } from "./dateParser";
+import { getISTDateParts, formatConfirmationDate } from "./dateParser";
 import { materializeRecurringOccurrences } from "./recurrenceEngine";
 import { materializeTimetableOccurrences, renderPrepDigestMessage } from "./timetableEngine";
 
