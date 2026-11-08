@@ -755,11 +755,13 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
       .bind(String(chatId), tenMinAgo)
       .first<{ id: string }>()
       .catch(() => null);
-    const markup: ReturnType<typeof makeInlineKeyboard> | undefined = undefined; // set below
     // Brief C3: calm code-template, no raw two-word error; 1-word msgs get no Save button
     const wordCount = text.trim().split(/\s+/).length;
+    const markup = wordCount > 1
+      ? makeInlineKeyboard([{ text: "Save as untimed task", callback_data: `save_untimed:${encodeURIComponent(text.slice(0, 200))}` }])
+      : undefined;
     const replyText = prevOffline
-      ? "AI is currently unavailable. Your message was saved."
+      ? "AI is temporarily offline. Your message was saved."
       : "AI is temporarily offline. Core reminders, tasks, and schedule still work.";
     const sendRes = await sendTg(replyText, markup ?? null).catch(() => null);
     await logChatMessage(db, {
@@ -1025,11 +1027,13 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
       .bind(String(chatId), tenMinAgo)
       .first<{ id: string }>()
       .catch(() => null);
-    const markup: ReturnType<typeof makeInlineKeyboard> | undefined = undefined; // set below
     // Brief C3: calm code-template, no raw two-word error; 1-word msgs get no Save button
     const wordCount = text.trim().split(/\s+/).length;
+    const markup = wordCount > 1
+      ? makeInlineKeyboard([{ text: "Save as untimed task", callback_data: `save_untimed:${encodeURIComponent(text.slice(0, 200))}` }])
+      : undefined;
     const replyText = prevOffline
-      ? "AI is currently unavailable. Your message was saved."
+      ? "AI is temporarily offline. Your message was saved."
       : "AI is temporarily offline. Core reminders, tasks, and schedule still work.";
     const sendRes = await sendTg(replyText, markup ?? null).catch(() => null);
     await logChatMessage(db, {

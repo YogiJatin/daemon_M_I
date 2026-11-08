@@ -948,16 +948,33 @@ private extractJsonPayload<T = any>(rawText: any): T {
     if (isPlainTextWai) {
       waiData = (rawText as any) as TOutput;
     } else {
+      let parsed: any = null;
       try {
-        waiData = this.extractJsonPayload<TOutput>(rawText);
+        parsed = this.extractJsonPayload<any>(rawText);
       } catch {
-        // Workers AI small models return plain text. Wrap in minimal valid telegram_assistant schema.
-        if (request.capability === "telegram_assistant") {
-          const synth: any = { intent: "chat", confidence: 0.85, reply_text: rawText.trim().slice(0, 500) };
-          waiData = synth as TOutput;
+        // non-JSON
+      }
+
+      if (request.capability === "telegram_assistant") {
+        if (parsed && typeof parsed === "object" && parsed.intent && typeof parsed.confidence === "number") {
+          waiData = parsed as TOutput;
         } else {
+          // Normalize Workers AI output (which may be {response: "..."}, plain text, or partial JSON)
+          const textCandidate = (parsed && typeof parsed === "object")
+            ? (parsed.reply_text || parsed.response || parsed.message || parsed.text || JSON.stringify(parsed))
+            : rawText;
+          const cleanText = String(textCandidate || "Hey! How can I help you today?").trim().replace(/^[\s{"}]+/, "").slice(0, 500);
+          waiData = {
+            intent: "chat",
+            confidence: 0.85,
+            reply_text: cleanText || "Hey! How can I help you today?",
+          } as TOutput;
+        }
+      } else {
+        if (!parsed) {
           throw new Error(`Workers AI response is not valid JSON: ${rawText.slice(0, 150)}`);
         }
+        waiData = parsed as TOutput;
       }
     }
     return { data: waiData, rawText };
