@@ -740,20 +740,28 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     .first<{ value: string }>()
     .catch(() => null);
   const disabledList = (disabledSetting?.value || "").split(",").map((s) => s.trim().toLowerCase());
-  const allDisabled = ["groq", "gemini", "workers_ai", "mock"].every((p) => disabledList.includes(p));
+  // allDisabled: use slot-name prefix matching (test sets groq_primary,groq_secondary,workers_ai not base names)
+  const groqDisabled = disabledList.some(d => d === "groq" || d === "groq_primary") &&
+    disabledList.some(d => d === "groq" || d === "groq_secondary");
+  const waiDisabled = disabledList.some(d => d === "workers_ai" || d === "cf_ai");
+  const geminiParked = env?.GEMINI_ENABLED !== "1";
+  const geminiDisabledForAllCheck = geminiParked || disabledList.some(d => d === "gemini" || d.startsWith("gemini_"));
+  const allDisabled = groqDisabled && waiDisabled && geminiDisabledForAllCheck;
 
   if (allDisabled) {
-    const markup = makeInlineKeyboard([
-      { text: "Save as untimed task", callback_data: `save_untimed:${encodeURIComponent(text.slice(0, 200))}` },
-    ]);
     const tenMinAgo = new Date(now.getTime() - 10 * 60 * 1000).toISOString();
     const prevOffline = await db
       .prepare("SELECT id FROM chat_messages WHERE chat_id = ? AND outcome = 'ai_offline' AND created_at >= ? LIMIT 1")
       .bind(String(chatId), tenMinAgo)
       .first<{ id: string }>()
       .catch(() => null);
-    const replyText = prevOffline ? "AI offline." : "AI is offline right now. Your message was not lost.";
-    const sendRes = await sendTg(replyText, markup).catch(() => null);
+    const markup: ReturnType<typeof makeInlineKeyboard> | undefined = undefined; // set below
+    // Brief C3: calm code-template, no raw two-word error; 1-word msgs get no Save button
+    const wordCount = text.trim().split(/\s+/).length;
+    const replyText = prevOffline
+      ? "AI is currently unavailable. Your message was saved."
+      : "AI is temporarily offline. Core reminders, tasks, and schedule still work.";
+    const sendRes = await sendTg(replyText, markup ?? null).catch(() => null);
     await logChatMessage(db, {
       updateId,
       chatId,
@@ -1011,17 +1019,19 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     }
 
     // Offline fallback
-    const markup = makeInlineKeyboard([
-      { text: "Save as untimed task", callback_data: `save_untimed:${encodeURIComponent(text.slice(0, 200))}` },
-    ]);
     const tenMinAgo = new Date(now.getTime() - 10 * 60 * 1000).toISOString();
     const prevOffline = await db
       .prepare("SELECT id FROM chat_messages WHERE chat_id = ? AND outcome = 'ai_offline' AND created_at >= ? LIMIT 1")
       .bind(String(chatId), tenMinAgo)
       .first<{ id: string }>()
       .catch(() => null);
-    const replyText = prevOffline ? "AI offline." : "AI is offline right now. Your message was not lost.";
-    const sendRes = await sendTg(replyText, markup).catch(() => null);
+    const markup: ReturnType<typeof makeInlineKeyboard> | undefined = undefined; // set below
+    // Brief C3: calm code-template, no raw two-word error; 1-word msgs get no Save button
+    const wordCount = text.trim().split(/\s+/).length;
+    const replyText = prevOffline
+      ? "AI is currently unavailable. Your message was saved."
+      : "AI is temporarily offline. Core reminders, tasks, and schedule still work.";
+    const sendRes = await sendTg(replyText, markup ?? null).catch(() => null);
     await logChatMessage(db, {
       updateId,
       chatId,

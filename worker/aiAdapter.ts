@@ -846,6 +846,8 @@ export class AIAdapter {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+    // Plain-text paths must NOT use json_object mode (Groq wraps reply in JSON object)
+    const isPlainText = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
 
     try {
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -857,7 +859,7 @@ export class AIAdapter {
             { role: "system", content: request.systemPrompt },
             { role: "user", content: request.userPrompt },
           ],
-          response_format: { type: "json_object" },
+          ...(isPlainText ? {} : { response_format: { type: "json_object" } }),
           temperature: 0.1,
           max_tokens: 1024,
         }),
@@ -883,8 +885,7 @@ export class AIAdapter {
       }
 
       const resJson = (await response.json()) as any;
-      const rawText = resJson.choices?.[0]?.message?.content || "{}";
-      const isPlainText = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
+      const rawText = resJson.choices?.[0]?.message?.content || (isPlainText ? "" : "{}");
       const data = isPlainText ? ((rawText as any) as TOutput) : this.extractJsonPayload<TOutput>(rawText);
       return { data, rawText };
     } finally {
@@ -942,9 +943,24 @@ private extractJsonPayload<T = any>(rawText: any): T {
     });
 
     const rawText = typeof response === "string" ? response : typeof response?.response === "string" ? response.response : JSON.stringify(response);
-    const isPlainText = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
-    const data = isPlainText ? ((rawText as any) as TOutput) : this.extractJsonPayload<TOutput>(rawText);
-    return { data, rawText };
+    const isPlainTextWai = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
+    let waiData: TOutput;
+    if (isPlainTextWai) {
+      waiData = (rawText as any) as TOutput;
+    } else {
+      try {
+        waiData = this.extractJsonPayload<TOutput>(rawText);
+      } catch {
+        // Workers AI small models return plain text. Wrap in minimal valid telegram_assistant schema.
+        if (request.capability === "telegram_assistant") {
+          const synth: any = { intent: "chat", confidence: 0.85, reply_text: rawText.trim().slice(0, 500) };
+          waiData = synth as TOutput;
+        } else {
+          throw new Error(`Workers AI response is not valid JSON: ${rawText.slice(0, 150)}`);
+        }
+      }
+    }
+    return { data: waiData, rawText };
   }
 
   private async callGeminiProvider<TOutput>(
@@ -1025,6 +1041,8 @@ private extractJsonPayload<T = any>(rawText: any): T {
     const host = this.env?.OLLAMA_HOST || "http://localhost:11434";
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+    // Plain-text paths must NOT use json_object mode (Groq wraps reply in JSON object)
+    const isPlainText = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
 
     try {
       const response = await fetch(`${host}/api/generate`, {
