@@ -298,19 +298,8 @@ export class AIAdapter {
 
     // 4. Provider Scoring & Selection (Owner Primacy)
     let ownerOrder = this.getProviderOrder();
-    if (this.db) {
-      try {
-        const setting = await this.db.prepare("SELECT value FROM settings WHERE key = 'disabled_providers'").first<{ value: string }>();
-        if (setting?.value) {
-          const disabledList = setting.value.toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
-          ownerOrder = ownerOrder.filter(p => !disabledList.some(d => p.toLowerCase().includes(d)));
-        }
-      } catch {}
-    }
     const isGeminiParked = this.env?.GEMINI_ENABLED !== "1";
-    // Expand default candidates into configured profiles (including multiple key slots and local Ollama)
-    // Note: mock is only included if explicitly requested via simulatedFailure, never as an active candidate (P0-3)
-    const profileIds = [
+    let profileIds = [
       "groq_primary",
       "groq_secondary",
       "workers_ai",
@@ -318,6 +307,16 @@ export class AIAdapter {
       "ollama",
       ...(simulatedFailure ? ["mock"] : []),
     ];
+    if (this.db) {
+      try {
+        const setting = await this.db.prepare("SELECT value FROM settings WHERE key = 'disabled_providers'").first<{ value: string }>();
+        if (setting?.value) {
+          const disabledList = setting.value.toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
+          ownerOrder = ownerOrder.filter(p => !disabledList.some(d => p.toLowerCase().includes(d) || d.includes(p.toLowerCase())));
+          profileIds = profileIds.filter(p => !disabledList.some(d => p.toLowerCase().includes(d) || d.includes(p.toLowerCase())));
+        }
+      } catch {}
+    }
     const allConfigs = profileIds
       .map((id) => this.getProviderConfig(id))
       .filter((c): c is ProviderConfig => c !== null);
@@ -538,7 +537,16 @@ export class AIAdapter {
     request: AIRequest,
     now: Date = new Date()
   ): Promise<AIResponse<TOutput>> {
-    const providerOrder = this.getProviderOrder();
+    let providerOrder = this.getProviderOrder();
+    if (this.db) {
+      try {
+        const setting = await this.db.prepare("SELECT value FROM settings WHERE key = 'disabled_providers'").first<{ value: string }>();
+        if (setting?.value) {
+          const disabledList = setting.value.toLowerCase().split(",").map(s => s.trim()).filter(Boolean);
+          providerOrder = providerOrder.filter(p => !disabledList.some(d => p.toLowerCase().includes(d) || d.includes(p.toLowerCase())));
+        }
+      } catch {}
+    }
     let fallbackTriggered = false;
     let lastErrorCode: any = "provider_unavailable";
     let lastErrorMessage = "No available provider could fulfill the request";

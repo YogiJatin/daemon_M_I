@@ -370,10 +370,10 @@ async function processSingleMessage(
   }
 
   // F6: Bulk action triggers (detect in code, AI down OK)
-  const isBulkComplete = /^(complete|close|finish|archive)\s+(all|every)(\s+overdue)?\s+(tasks?|reminders?)/i.test(text) ||
+  const isBulkComplete = /^(complete|close|finish|archive)\s+(all|every)(\s+of\s+the)?(\s+overdue)?\s+(tasks?|reminders?)/i.test(text) ||
                          /^mark\s+(all|every)\s+overdue\s+(as\s+)?(completed|done|closed)/i.test(text) ||
                          /^\/cleanup\b/i.test(text);
-  const isBulkStopReminders = /^(stop|cancel|clear|mute)\s+(all|every)\s+reminders?/i.test(text);
+  const isBulkStopReminders = /^(stop|cancel|clear|mute)\s+(all|every)(\s+of\s+the)?\s+reminders?/i.test(text);
 
   if (isBulkComplete || isBulkStopReminders) {
     const todayIst = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);

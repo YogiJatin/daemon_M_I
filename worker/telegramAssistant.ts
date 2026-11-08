@@ -870,7 +870,11 @@ export async function renderTasksAndRemindersList(db: D1Database, now: Date): Pr
   // Reminders (next 7 days, top 10)
   if ((nextReminders.results || []).length > 0) {
     const lines = nextReminders.results.map((r: any) => {
-      const dt = new Date(new Date(r.scheduled_at).getTime() + IST_OFFSET_MS);
+      const scheduledMs = r.scheduled_at ? new Date(r.scheduled_at).getTime() : NaN;
+      if (isNaN(scheduledMs)) {
+        return `• ${r.title}`;
+      }
+      const dt = new Date(scheduledMs + IST_OFFSET_MS);
       const dStr = dt.toISOString().slice(0, 10);
       const tStr = dt.toISOString().slice(11, 16);
       return `• ${r.title} (${formatConfirmationDate(dStr, tStr)})`;
