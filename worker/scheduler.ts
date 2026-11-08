@@ -19,6 +19,7 @@
  */
 
 import { sendTelegramMessage, buildReminderInlineKeyboard } from "./telegram";
+import { formatConfirmationDate } from "./telegramAssistant";
 import { getISTDateParts } from "./dateParser";
 import { materializeRecurringOccurrences } from "./recurrenceEngine";
 import { materializeTimetableOccurrences, renderPrepDigestMessage } from "./timetableEngine";
@@ -229,7 +230,7 @@ export async function runScheduler(
            ORDER BY scheduled_at ASC
            LIMIT ?
          )
-       RETURNING id, task_id, deadline_version, stage, dedup_key, notification_kind, scheduled_at, retry_count, status`
+       RETURNING id, task_id, deadline_version, stage, dedup_key, notification_kind, scheduled_at, retry_count, status, test_run_id`
     )
     .bind(nowIso, leaseExpiryIso, nowIso, nowIso, boundedBatch)
     .all<{
@@ -242,6 +243,7 @@ export async function runScheduler(
       scheduled_at: string;
       retry_count: number;
       status: string;
+      test_run_id: string | null;
     }>();
 
   const rows = claimed.results ?? [];
@@ -355,6 +357,54 @@ export async function runScheduler(
         const dateStr = task.deadline_local_date ? ` (${task.deadline_local_date}${timeStr})` : timeStr;
         reminderText = `⏰ Reminder: ${task.title}${dateStr}`;
         replyMarkup = buildReminderInlineKeyboard(row.task_id);
+      }
+
+      // F3: Test isolation - scheduler never sends real Telegram messages for test rows
+      if (row.test_run_id) {
+        await db
+          .prepare(
+            `UPDATE notification_log
+             SET status = 'skipped',
+                 cap_reservation_state = 'released',
+                 error_code = 'test_run_id',
+                 lease_expires_at = NULL,
+                 updated_at = ?
+             WHERE id = ? AND status = 'claimed'`
+          )
+          .bind(nowIso, row.id)
+          .run();
+        continue;
+      }
+
+      // F5: Past class reminder for a class that already ended is marked missed, not sent
+      if (row.dedup_key.startsWith("class:") || row.stage === "class_prep") {
+        const classDate = row.dedup_key.split(":")[1];
+        if (classDate && classDate < istDate) {
+          await db
+            .prepare(
+              `UPDATE notification_log
+               SET status = 'missed',
+                   cap_reservation_state = 'released',
+                   error_code = 'class_ended',
+                   lease_expires_at = NULL,
+                   updated_at = ?
+               WHERE id = ? AND status = 'claimed'`
+            )
+            .bind(nowIso, row.id)
+            .run();
+          continue;
+        }
+      }
+
+      // F5: Stale reminders (> 120 min late) batched in missed reminders digest
+      const scheduledTimeMs = new Date(row.scheduled_at).getTime();
+      const delayMin = (now.getTime() - scheduledTimeMs) / (60 * 1000);
+      if (delayMin > 120 && !row.dedup_key.startsWith("prep-digest:") && !row.dedup_key.startsWith("catchup:")) {
+        reminderText = `⚠️ Missed reminders (already ${Math.round(delayMin / 60)}h past due):\n• ${task.title} (${formatConfirmationDate(task.deadline_local_date, task.deadline_time_local)})`;
+      } else if (!row.dedup_key.startsWith("prep-digest:") && !row.dedup_key.startsWith("catchup:")) {
+        // F9: Format reminder date and clock time in IST: "Sat 7 Nov, 9:00 AM"
+        const formattedDate = formatConfirmationDate(task.deadline_local_date, task.deadline_time_local);
+        reminderText = `⏰ Reminder: ${task.title} (${formattedDate})`;
       }
 
       // Dispatch to Telegram
