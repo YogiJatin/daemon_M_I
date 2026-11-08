@@ -832,7 +832,18 @@ export async function handleStatus(args: string, context?: CommandContext): Prom
     "⚡ *Worker & Scheduler:*",
     `• Scheduler: ${health?.consecutive_failures === 0 ? "🟢 Healthy" : "🔴 Failing"}`,
     `• Last Tick: ${health?.last_scheduler_success_at || "N/A"}`,
-    `• AI Providers: Groq primary, Workers AI secondary (Gemini: parked)`,
+    ...await (async () => {
+      const pHealth = await context.db.prepare(
+        "SELECT provider, status, consecutive_failures, last_failure_code, updated_at FROM provider_health"
+      ).all().catch(() => ({ results: [] }));
+      const groq = (pHealth.results || []).find((p: any) => p.provider?.includes("groq"));
+      const aiState = groq ? `Groq (${groq.status})` : "Groq primary (healthy)";
+      const reason = groq?.last_failure_code ? ` [Reason: ${groq.last_failure_code}]` : "";
+      return [
+        `• AI State: ${aiState}, Workers AI secondary (Gemini: parked)${reason}`,
+        `• Next AI Retry: Immediate on fallback`
+      ];
+    })(),
   ];
 
   await context.db

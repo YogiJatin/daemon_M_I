@@ -146,7 +146,7 @@ export class AIAdapter {
         providerType: "groq",
         keySlot: 1,
         apiKey: this.resolveApiKey("groq", 1) || undefined,
-        model: this.env?.GROQ_MODEL || "openai/gpt-oss-120b",
+        model: this.env?.GROQ_MODEL || "llama-3.3-70b-versatile",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 6000,
       };
@@ -157,7 +157,7 @@ export class AIAdapter {
         providerType: "groq",
         keySlot: 2,
         apiKey: this.resolveApiKey("groq", 2) || undefined,
-        model: this.env?.GROQ_MODEL_SECONDARY || this.env?.GROQ_MODEL || "openai/gpt-oss-20b",
+        model: this.env?.GROQ_MODEL_SECONDARY || this.env?.GROQ_MODEL || "llama-3.1-8b-instant",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 6000,
       };
@@ -170,7 +170,7 @@ export class AIAdapter {
         providerType: "gemini",
         keySlot: 1,
         apiKey: this.resolveApiKey("gemini", 1) || undefined,
-        model: this.env?.GEMINI_MODEL || "gemini-3.8-flash",
+        model: this.env?.GEMINI_MODEL || "gemini-2.0-flash",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 15000,
       };
@@ -181,7 +181,7 @@ export class AIAdapter {
         providerType: "gemini",
         keySlot: 2,
         apiKey: this.resolveApiKey("gemini", 2) || undefined,
-        model: this.env?.GEMINI_MODEL_SECONDARY || this.env?.GEMINI_MODEL || "gemini-3.8-flash",
+        model: this.env?.GEMINI_MODEL_SECONDARY || this.env?.GEMINI_MODEL || "gemini-1.5-flash",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 15000,
       };
@@ -876,7 +876,8 @@ export class AIAdapter {
 
       const resJson = (await response.json()) as any;
       const rawText = resJson.choices?.[0]?.message?.content || "{}";
-      const data = this.extractJsonPayload<TOutput>(rawText);
+      const isPlainText = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
+      const data = isPlainText ? ((rawText as any) as TOutput) : this.extractJsonPayload<TOutput>(rawText);
       return { data, rawText };
     } finally {
       clearTimeout(timeout);
@@ -933,7 +934,8 @@ private extractJsonPayload<T = any>(rawText: any): T {
     });
 
     const rawText = typeof response === "string" ? response : typeof response?.response === "string" ? response.response : JSON.stringify(response);
-    const data = this.extractJsonPayload<TOutput>(rawText);
+    const isPlainText = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
+    const data = isPlainText ? ((rawText as any) as TOutput) : this.extractJsonPayload<TOutput>(rawText);
     return { data, rawText };
   }
 

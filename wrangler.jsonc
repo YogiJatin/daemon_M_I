@@ -26,10 +26,10 @@
 
   "vars": {
     "HEALTHCHECKS_PING_URL": "",
-    "AI_PROVIDER_ORDER": "groq_primary,groq_secondary,workers_ai,gemini_primary,gemini_secondary,mock",
-    "GROQ_MODEL": "openai/gpt-oss-120b",
-    "GROQ_MODEL_SECONDARY": "openai/gpt-oss-20b",
-    "GEMINI_MODEL": "gemini-3.8-flash",
+    "AI_PROVIDER_ORDER": "groq_primary,groq_secondary,workers_ai",
+    "GROQ_MODEL": "llama-3.3-70b-versatile",
+    "GROQ_MODEL_SECONDARY": "llama-3.1-8b-instant",
+    "GEMINI_MODEL": "gemini-2.0-flash",
     "WORKERS_AI_MODEL": "@cf/meta/llama-3.1-8b-instruct-fast"
   },
 
