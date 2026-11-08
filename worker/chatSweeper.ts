@@ -76,7 +76,7 @@ export async function sweepStaleChatMessages(
       }
 
       sweptCount++;
-      const replyText = "AI is offline right now. Your message was not lost.";
+      const replyText = "AI is temporarily offline. Reminders, /tasks, and /today remain operational.";
       const markup = {
         inline_keyboard: [
           [

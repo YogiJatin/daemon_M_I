@@ -177,6 +177,42 @@ export async function editMessageReplyMarkup(
 /**
  * Core outbound Telegram sendMessage with full resilience (F2, F3, F6)
  */
+/**
+ * F1 Egress Guard: ONE function sits in front of every user-facing send.
+ * A string that parses as a JSON object, or contains "_mock", "reply_text"
+ * or "\"intent\"", is dropped, logged, and replaced by the code template.
+ */
+export function sanitizeOutboundMessage(text: string): string {
+  if (typeof text !== "string") return "";
+  const trimmed = text.trim();
+  let leaked = false;
+
+  if (
+    trimmed.includes("_mock") ||
+    trimmed.includes("reply_text") ||
+    trimmed.includes('"intent"') ||
+    trimmed.includes('\"intent\"')
+  ) {
+    leaked = true;
+  } else if (
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"))
+  ) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === "object" && parsed !== null) {
+        leaked = true;
+      }
+    } catch {}
+  }
+
+  if (leaked) {
+    console.warn("[EGRESS GUARD] Dropped leaked raw provider payload / JSON from outbound message:", trimmed.slice(0, 100));
+    return "AI is temporarily offline. Reminders, /tasks, and /today remain operational.";
+  }
+  return text;
+}
+
 export async function sendTelegramMessage(
   token: string,
   chatId: number | string,
@@ -184,6 +220,7 @@ export async function sendTelegramMessage(
   replyMarkup?: any,
   options?: TelegramOptions
 ): Promise<SendResult> {
+  text = sanitizeOutboundMessage(text);
   if (!token) {
     return { sent: true };
   }
