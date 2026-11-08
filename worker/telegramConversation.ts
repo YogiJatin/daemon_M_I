@@ -370,7 +370,7 @@ async function processSingleMessage(
   }
 
   // F6: Bulk action triggers (detect in code, AI down OK)
-  const isBulkComplete = /\b(complete|close|finish|archive)\b.*\b(all|every|those|these)\b.*\b(tasks?|overdue|reminders?)\b/i.test(text) ||
+  const isBulkComplete = /\b(complete|close|finish|archive)\b.*\b(all|every|those|these|them|everything)\b/i.test(text) ||
                          /\bmark\b.*\b(all|every|overdue|those|them)\b.*\b(completed|done|closed)\b/i.test(text) ||
                          /^\/cleanup\b/i.test(text);
   const isBulkStopReminders = /^(stop|cancel|clear|mute)\s+(all|every)(\s+of\s+(the|those))?\s+reminders?/i.test(text);
@@ -388,7 +388,10 @@ async function processSingleMessage(
     const remCount = (pendingReminders.results || []).length;
 
     const actionType = isBulkComplete ? "complete_overdue" : "stop_reminders";
-    const includeOpen = isBulkComplete && /\b(open|everything|all)\b/i.test(text) && !/\bonly\s+overdue\b/i.test(text) && /\b(open|all\s+of\s+those)\b/i.test(text);
+    const includeOpen = isBulkComplete && (
+      /\b(open|everything)\b/i.test(text) ||
+      /\b(all\s+of\s+(them|those|these)|them\s+all|close\s+all|complete\s+all)\b/i.test(text)
+    );
     const targetTasks = isBulkComplete
       ? (includeOpen ? [...(overdueTasks.results || []), ...(openNotDueTasks.results || [])] : (overdueTasks.results || []))
       : [];
@@ -443,8 +446,10 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
   }
 
   // F7: Natural tasks & reminders lists (pure D1 template, same answer with AI down)
-  if (/\b(what\s+are\s+my\s+tasks|what\s+tasks|my\s+tasks|tasks\s+and\s+reminders|\/tasks\b|\/reminders\b)\b/i.test(text) ||
-      (/\btasks\b/i.test(text) && /\b(remind|remanind|schedule)\b/i.test(text))) {
+  if (
+    /\b(what\s+are\s+my\s+(due\s+|open\s+|pending\s+)?tasks|what\s+(due\s+|open\s+|pending\s+)?tasks|which\s+tasks\s+are\s+due|my\s+tasks|due\s+tasks|show\s+(my\s+)?tasks|list\s+(my\s+)?tasks|tasks\s+and\s+reminders|\/tasks\b|\/reminders\b)\b/i.test(text) ||
+    (/\btasks\b/i.test(text) && /\b(remind|remanind|schedule|due)\b/i.test(text))
+  ) {
     const listText = await renderTasksAndRemindersList(db, now);
     await sendTg(listText).catch(() => null);
     await logChatMessage(db, {
@@ -1413,7 +1418,8 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
       if (
         /on track|tasks are|pending tasks|your schedule shows|progress looks/i.test(replyText) ||
         /I'?ll remind|All confirmed|\bsaved\b|\badded\b|\bcreated\b/i.test(replyText) ||
-        /completed|marked as|marked them|tasks have been|have marked|have completed|closed all/i.test(replyText) ||
+        /completed|marked as|marked them|tasks have been|have marked|have completed|closed all|closing all/i.test(replyText) ||
+        /closing.*windows|open windows|closed.*windows/i.test(replyText) ||
         /I can help you|I can assist with|I can set reminders|I can manage|feel free to ask/i.test(replyText)
       ) {
         replyText = "I haven't changed anything.";

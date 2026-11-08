@@ -805,7 +805,7 @@ export async function handleStatus(args: string, context?: CommandContext): Prom
   const [tasksCount, propCount, memCount, devices, outbox, health] = await Promise.all([
     context.db.prepare(`SELECT 
       SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_cnt,
-      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as done_cnt
+      SUM(CASE WHEN status = 'done' OR status = 'completed' THEN 1 ELSE 0 END) as done_cnt
       FROM tasks`).first<{ open_cnt: number; done_cnt: number }>().catch(() => ({ open_cnt: 0, done_cnt: 0 })),
     context.db.prepare(`SELECT COUNT(*) as cnt FROM task_proposals WHERE status = 'pending'`).first<{ cnt: number }>().catch(() => ({ cnt: 0 })),
     context.db.prepare(`SELECT COUNT(*) as cnt FROM memory_objects WHERE is_active = 1`).first<{ cnt: number }>().catch(() => ({ cnt: 0 })),
@@ -813,7 +813,7 @@ export async function handleStatus(args: string, context?: CommandContext): Prom
     context.db.prepare(`SELECT 
       SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_cnt,
       SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as deliv_cnt
-      FROM desktop_mirror_outbox`).first<{ pending_cnt: number; deliv_cnt: number }>().catch(() => ({ pending_cnt: 0, deliv_cnt: 0 })),
+      FROM mirror_outbox`).first<{ pending_cnt: number; deliv_cnt: number }>().catch(() => ({ pending_cnt: 0, deliv_cnt: 0 })),
     context.db.prepare(`SELECT consecutive_failures, last_scheduler_success_at FROM system_health WHERE id = 1`).first<{ consecutive_failures: number; last_scheduler_success_at: string }>().catch(() => null),
   ]);
 

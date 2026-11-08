@@ -26,7 +26,8 @@
 
   "vars": {
     "HEALTHCHECKS_PING_URL": "",
-    "AI_PROVIDER_ORDER": "groq_primary,groq_secondary,workers_ai",
+    "AI_PROVIDER_ORDER": "groq_primary,groq_secondary,gemini_primary,workers_ai",
+    "GEMINI_ENABLED": "1",
     "GROQ_MODEL": "openai/gpt-oss-120b",
     "GROQ_MODEL_SECONDARY": "openai/gpt-oss-20b",
     "GEMINI_MODEL": "gemini-2.0-flash",
