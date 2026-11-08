@@ -513,10 +513,10 @@ export async function renderD1ScheduleQuery(
     // 1. Task progress summary (G48)
     if (queryType === "summary") {
       const pendingRows = await db
-        .prepare("SELECT COUNT(*) as cnt FROM tasks WHERE status NOT IN ('done', 'cancelled')")
+        .prepare("SELECT COUNT(*) as cnt FROM tasks WHERE status = 'open'")
         .first<{ cnt: number }>();
       const overdueRows = await db
-        .prepare("SELECT COUNT(*) as cnt FROM tasks WHERE status NOT IN ('done', 'cancelled') AND deadline_local_date < ?")
+        .prepare("SELECT COUNT(*) as cnt FROM tasks WHERE status = 'open' AND deadline_local_date < ?")
         .bind(todayIST)
         .first<{ cnt: number }>();
       const doneRows = await db
@@ -524,7 +524,7 @@ export async function renderD1ScheduleQuery(
         .bind(todayIST + "T00:00:00.000Z")
         .first<{ cnt: number }>();
       const nextTask = await db
-        .prepare("SELECT title, deadline_local_date, deadline_time_local FROM tasks WHERE status NOT IN ('done', 'cancelled') ORDER BY deadline_local_date ASC NULLS LAST, deadline_time_local ASC NULLS LAST LIMIT 1")
+        .prepare("SELECT title, deadline_local_date, deadline_time_local FROM tasks WHERE status = 'open' ORDER BY deadline_local_date ASC NULLS LAST, deadline_time_local ASC NULLS LAST LIMIT 1")
         .first<{ title: string; deadline_local_date: string | null; deadline_time_local: string | null }>();
 
       const openCount = pendingRows?.cnt ?? 0;

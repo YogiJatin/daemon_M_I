@@ -482,6 +482,59 @@ export async function handleCallbackQuery(
     return { success: true, action: "snooze", taskId: task.id, message: `Snoozed: "${task.title}" for 1 hour` };
   }
 
+  // Bulk Operations callbacks
+  if (action === "bulk_confirm") {
+    const token = payload;
+    const op = await env.DB.prepare(
+      "SELECT token, action, filter_type, id_snapshot_json, snapshot_hash, expires_at, used FROM bulk_pending_operations WHERE token = ? AND used = 0"
+    ).bind(token).first<any>().catch(() => null);
+
+    if (!op) {
+      await clearKeyboard(botToken, chatId, messageId);
+      return { success: false, action, message: "Bulk operation already confirmed or expired." };
+    }
+    if (new Date(op.expires_at).getTime() < now.getTime()) {
+      await clearKeyboard(botToken, chatId, messageId);
+      return { success: false, action, message: "Bulk operation has expired." };
+    }
+
+    const ids: string[] = JSON.parse(op.id_snapshot_json || "[]");
+    const batchId = "batch_" + Math.random().toString(36).slice(2, 10).toUpperCase();
+
+    if (op.action === "complete_overdue") {
+      for (const id of ids) {
+        await env.DB.prepare("UPDATE tasks SET status = 'done', completed_via = 'bulk', updated_at = ? WHERE id = ?").bind(nowIso, id).run().catch(() => {});
+      }
+    } else if (op.action === "stop_reminders") {
+      for (const id of ids) {
+        await env.DB.prepare("UPDATE notification_log SET status = 'cancelled', updated_at = ? WHERE id = ?").bind(nowIso, id).run().catch(() => {});
+      }
+    }
+
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO bulk_batches (id, action, affected_ids_json, snapshot_hash, created_at) VALUES (?, ?, ?, ?, ?)").bind(batchId, op.action, op.id_snapshot_json, op.snapshot_hash, nowIso),
+      env.DB.prepare("UPDATE bulk_pending_operations SET used = 1 WHERE token = ?").bind(token),
+    ]).catch(() => {});
+
+    await clearKeyboard(botToken, chatId, messageId);
+    const msg = op.action === "complete_overdue"
+      ? `Completed ${ids.length} task(s). Send /undo to revert.`
+      : `Stopped ${ids.length} reminder(s). Send /undo to revert.`;
+    const { sendTelegramMessage } = await import("./telegram");
+    await sendTelegramMessage(botToken, chatId, msg).catch(() => {});
+    return { success: true, action, message: msg };
+  }
+
+  if (action === "bulk_cancel") {
+    const token = payload;
+    await env.DB.prepare("UPDATE bulk_pending_operations SET used = 1 WHERE token = ?").bind(token).run().catch(() => {});
+    await clearKeyboard(botToken, chatId, messageId);
+    const msg = "Bulk action cancelled. Nothing changed.";
+    const { sendTelegramMessage } = await import("./telegram");
+    await sendTelegramMessage(botToken, chatId, msg).catch(() => {});
+    return { success: true, action, message: msg };
+  }
+
   if (action === "details") {
     const timeStr = task.deadline_time_local ? ` at ${task.deadline_time_local}` : "";
     const dateStr = task.deadline_local_date ? ` (${task.deadline_local_date}${timeStr})` : "none";
