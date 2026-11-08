@@ -1,3 +1,54 @@
+
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const d: number[][] = [];
+  for (let i = 0; i <= m; i++) d[i] = [i];
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      d[i][j] = a[i - 1] === b[j - 1]
+        ? d[i - 1][j - 1]
+        : Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + 1);
+    }
+  }
+  return d[m][n];
+}
+
+const CANONICAL_TIME_WORDS = ["tomorrow", "tonight", "morning", "afternoon", "evening", "minutes", "minute", "hours"];
+const COMMON_TIME_ABBREVIATIONS: Record<string, string> = {
+  mins: "minutes",
+  min: "minute",
+  hrs: "hours",
+  hr: "hours",
+  tmrw: "tomorrow",
+  tmr: "tomorrow",
+  tom: "tomorrow",
+  evng: "evening",
+  mrng: "morning",
+};
+
+export function normalizeFuzzyTimeWords(text: string): { normalized: string; replacedWords: string[] } {
+  const words = text.split(/\s+/);
+  const replaced: string[] = [];
+  const normalizedWords = words.map(word => {
+    const cleanWord = word.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (COMMON_TIME_ABBREVIATIONS[cleanWord]) {
+      replaced.push(cleanWord);
+      return word.replace(new RegExp(cleanWord, "i"), COMMON_TIME_ABBREVIATIONS[cleanWord]);
+    }
+    if (cleanWord.length >= 5) {
+      for (const target of CANONICAL_TIME_WORDS) {
+        if (levenshtein(cleanWord, target) <= 2) {
+          replaced.push(cleanWord);
+          return word.replace(new RegExp(cleanWord, "i"), target);
+        }
+      }
+    }
+    return word;
+  });
+  return { normalized: normalizedWords.join(" "), replacedWords: replaced };
+}
+
 /**
  * worker/deterministicParser.ts — Deterministic-First Reminder & Intent Parser (A2, A4)
  *
@@ -99,7 +150,8 @@ export function parseExplicitReminderDeterministic(
   now: Date = new Date(),
   profile?: any
 ): ParsedReminder | null {
-  const trimmed = text.trim();
+  const { normalized: fuzzyText } = normalizeFuzzyTimeWords(text);
+  const trimmed = fuzzyText.trim();
   const lower = trimmed.toLowerCase();
 
   // 1. Slash command /add <text>

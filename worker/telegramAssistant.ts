@@ -556,7 +556,8 @@ export async function renderD1ScheduleQuery(
 
       let nextDueStr = "None scheduled";
       if (nextTask) {
-        nextDueStr = `${nextTask.title}${nextTask.deadline_time_local ? " at " + nextTask.deadline_time_local : ""}`;
+        const nextDueFormatted = formatConfirmationDate(nextTask.deadline_local_date || todayIST, nextTask.deadline_time_local);
+        nextDueStr = `${nextTask.title} (${nextDueFormatted})`;
       }
 
       return `Task Progress:\n• Open tasks: ${openCount}\n• Overdue: ${overdueCount}\n• Completed today: ${doneCount}\n• Next due: ${nextDueStr}`;
@@ -828,3 +829,79 @@ export function registerTelegramAssistantCapability(): void {
 
 // Auto-register upon module load
 registerTelegramAssistantCapability();
+
+
+export async function renderTasksAndRemindersList(db: D1Database, now: Date): Promise<string> {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const istNow = new Date(now.getTime() + IST_OFFSET_MS);
+  const todayIST = istNow.toISOString().slice(0, 10);
+
+  // 1. Overdue tasks (top 5, +N more)
+  const overdueTotal = await db
+    .prepare("SELECT COUNT(*) as cnt FROM tasks WHERE status = 'open' AND deadline_local_date < ?")
+    .bind(todayIST)
+    .first<{ cnt: number }>()
+    .catch(() => ({ cnt: 0 }));
+  const overdueRows = await db
+    .prepare("SELECT title, deadline_local_date, deadline_time_local FROM tasks WHERE status = 'open' AND deadline_local_date < ? ORDER BY deadline_local_date ASC LIMIT 5")
+    .bind(todayIST)
+    .all<{ title: string; deadline_local_date: string; deadline_time_local: string | null }>()
+    .catch(() => ({ results: [] }));
+
+  // 2. Due today
+  const todayRows = await db
+    .prepare("SELECT title, deadline_time_local FROM tasks WHERE status = 'open' AND deadline_local_date = ? ORDER BY deadline_time_local ASC NULLS LAST")
+    .bind(todayIST)
+    .all<{ title: string; deadline_time_local: string | null }>()
+    .catch(() => ({ results: [] }));
+
+  // 3. Reminders for the next 7 days (top 10)
+  const nextReminders = await db
+    .prepare(`
+      SELECT t.title, nl.scheduled_at, t.deadline_local_date, t.deadline_time_local
+      FROM notification_log nl
+      JOIN tasks t ON nl.task_id = t.id
+      WHERE nl.status = 'pending' AND nl.scheduled_at >= ?
+      ORDER BY nl.scheduled_at ASC LIMIT 10
+    `)
+    .bind(now.toISOString())
+    .all<{ title: string; scheduled_at: string; deadline_local_date: string | null; deadline_time_local: string | null }>()
+    .catch(() => ({ results: [] }));
+
+  const sections: string[] = ["📋 *Tasks & Reminders*"];
+
+  // Overdue section
+  const ovCount = overdueTotal?.cnt ?? 0;
+  if (ovCount > 0) {
+    const lines = (overdueRows.results || []).map((r: any) => `• ${r.title} (${formatConfirmationDate(r.deadline_local_date, r.deadline_time_local)})`);
+    if (ovCount > 5) {
+      lines.push(`  +${ovCount - 5} more overdue [Show more]`);
+    }
+    sections.push(`⚠️ *Overdue (${ovCount}):*\n${lines.join("\n")}`);
+  } else {
+    sections.push(`⚠️ *Overdue:* None`);
+  }
+
+  // Today section
+  if ((todayRows.results || []).length > 0) {
+    const lines = todayRows.results.map((r: any) => `• ${r.title} (${formatConfirmationDate(todayIST, r.deadline_time_local)})`);
+    sections.push(`📅 *Due Today:*\n${lines.join("\n")}`);
+  } else {
+    sections.push(`📅 *Due Today:* None`);
+  }
+
+  // Reminders (next 7 days, top 10)
+  if ((nextReminders.results || []).length > 0) {
+    const lines = nextReminders.results.map((r: any) => {
+      const dt = new Date(new Date(r.scheduled_at).getTime() + IST_OFFSET_MS);
+      const dStr = dt.toISOString().slice(0, 10);
+      const tStr = dt.toISOString().slice(11, 16);
+      return `• ${r.title} (${formatConfirmationDate(dStr, tStr)})`;
+    });
+    sections.push(`⏰ *Upcoming Reminders (Next 7 Days):*\n${lines.join("\n")}`);
+  } else {
+    sections.push(`⏰ *Upcoming Reminders:* None`);
+  }
+
+  return sections.join("\n\n");
+}

@@ -1,3 +1,11 @@
+
+async function computeSha256(str: string): Promise<string> {
+  const buf = new TextEncoder().encode(str);
+  const hashBuf = await crypto.subtle.digest("SHA-256", buf);
+  const hashArr = Array.from(new Uint8Array(hashBuf));
+  return hashArr.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
 /**
  * worker/telegramConversation.ts - Block 1 Conversational Telegram Handler + Intelligence Upgrade
  *
@@ -27,6 +35,7 @@ import {
   resolveAnchorTime,
   createProposalFromTask,
   renderD1ScheduleQuery,
+  renderTasksAndRemindersList,
   handleModifyPending,
   formatConfirmationDate,
 } from "./telegramAssistant";
@@ -263,6 +272,212 @@ async function processSingleMessage(
       .bind(nowIso(), userMsgRowId)
       .run()
       .catch(() => {});
+    return;
+  }
+
+  // F8: Check if this is a reply to [Edit title] force_reply
+  let isEditTitleReply = false;
+  if (replyToMessageId) {
+    const parentMsg = await db
+      .prepare("SELECT text FROM chat_messages WHERE message_id = ? OR telegram_message_id = ? LIMIT 1")
+      .bind(replyToMessageId, replyToMessageId)
+      .first<{ text: string }>()
+      .catch(() => null);
+    if (parentMsg?.text?.includes("Reply to this message with the new title for")) {
+      isEditTitleReply = true;
+    }
+  }
+  if (isEditTitleReply) {
+    const newTitle = text.trim();
+    const latestProp = await db
+      .prepare("SELECT id, title, proposed_local_date, proposed_local_time FROM task_proposals WHERE status = 'pending' ORDER BY created_at DESC LIMIT 1")
+      .first<{ id: string; title: string; proposed_local_date: string; proposed_local_time: string }>()
+      .catch(() => null);
+
+    if (latestProp && newTitle) {
+      await db
+        .prepare("UPDATE task_proposals SET title = ?, updated_at = ? WHERE id = ?")
+        .bind(newTitle, nowIso(), latestProp.id)
+        .run()
+        .catch(() => {});
+
+      const dateStr = formatConfirmationDate(latestProp.proposed_local_date, latestProp.proposed_local_time);
+      const bubbleText = `Proposal:\n  ${newTitle}\n⏰ Remind: ${dateStr}\n\nConfirm?`;
+      const markup = makeInlineKeyboard([
+        { text: "Confirm", callback_data: `confirm_proposal:${latestProp.id}` },
+        { text: "Edit title", callback_data: `edit_title:${latestProp.id}` },
+        { text: "Change time", callback_data: `change_time:${latestProp.id}` },
+        { text: "Cancel", callback_data: `reject_proposal:${latestProp.id}` },
+      ]);
+      await sendTg(bubbleText, markup).catch(() => null);
+      await logChatMessage(db, {
+        updateId,
+        chatId,
+        messageId,
+        role: "assistant",
+        text: bubbleText,
+        intent: "explicit_task",
+        confidence: 1.0,
+        outcome: "title_edited",
+        status: "sent",
+        replyMarkup: markup,
+        provider: "system",
+        latencyMs: 10,
+      });
+      await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+      return;
+    }
+  }
+
+  // F6: /undo command to restore bulk batches within 24h
+  if (/^\/undo\b/i.test(text.trim())) {
+    const oneDayAgo = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+    const batch = await db
+      .prepare("SELECT id, action, affected_ids_json, created_at FROM bulk_batches WHERE created_at >= ? AND undone_at IS NULL ORDER BY created_at DESC LIMIT 1")
+      .bind(oneDayAgo)
+      .first<{ id: string; action: string; affected_ids_json: string; created_at: string }>()
+      .catch(() => null);
+
+    if (!batch) {
+      const resp = "No bulk actions found within the last 24h to undo.";
+      await sendTg(resp).catch(() => null);
+      await logChatMessage(db, { updateId, chatId, messageId, role: "assistant", text: resp, intent: "command", confidence: 1.0, outcome: "undo_none", status: "sent", provider: "system", latencyMs: 5 });
+      await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+      return;
+    }
+
+    const ids: string[] = JSON.parse(batch.affected_ids_json || "[]");
+    let restoredTitles: string[] = [];
+    if (batch.action === "complete_overdue") {
+      for (const id of ids) {
+        await db.prepare("UPDATE tasks SET status = 'open', completed_via = NULL, updated_at = ? WHERE id = ?").bind(nowIso(), id).run().catch(() => {});
+      }
+      const titleRows = await db.prepare("SELECT title FROM tasks WHERE id IN (" + ids.map(() => "?").join(",") + ") LIMIT 5").bind(...ids).all<{ title: string }>().catch(() => ({ results: [] }));
+      restoredTitles = (titleRows.results || []).map((r: any) => r.title);
+    } else if (batch.action === "stop_reminders") {
+      for (const id of ids) {
+        await db.prepare("UPDATE notification_log SET status = 'pending', error_code = NULL, updated_at = ? WHERE id = ?").bind(nowIso(), id).run().catch(() => {});
+      }
+    }
+    await db.prepare("UPDATE bulk_batches SET undone_at = ? WHERE id = ?").bind(nowIso(), batch.id).run().catch(() => {});
+
+    const titleListStr = restoredTitles.length > 0 ? "\n• " + restoredTitles.join("\n• ") : "";
+    const resp = `Restored ${ids.length} ${batch.action === "complete_overdue" ? "task(s)" : "reminder(s)"} from batch ${batch.id.slice(0, 14)}:${titleListStr}`;
+    await sendTg(resp).catch(() => null);
+    await logChatMessage(db, { updateId, chatId, messageId, role: "assistant", text: resp, intent: "command", confidence: 1.0, outcome: "undo_executed", status: "sent", provider: "system", latencyMs: 15 });
+    await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+    return;
+  }
+
+  // F6: Bulk action triggers (detect in code, AI down OK)
+  const isBulkComplete = /^(complete|close|finish|archive)\s+(all|every)(\s+overdue)?\s+(tasks?|reminders?)/i.test(text) ||
+                         /^mark\s+(all|every)\s+overdue\s+(as\s+)?(completed|done|closed)/i.test(text) ||
+                         /^\/cleanup\b/i.test(text);
+  const isBulkStopReminders = /^(stop|cancel|clear|mute)\s+(all|every)\s+reminders?/i.test(text);
+
+  if (isBulkComplete || isBulkStopReminders) {
+    const todayIst = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+    const [overdueTasks, openNotDueTasks, pendingReminders] = await Promise.all([
+      db.prepare("SELECT id, title FROM tasks WHERE status = 'open' AND deadline_local_date < ? ORDER BY deadline_local_date ASC").bind(todayIst).all<{ id: string; title: string }>().catch(() => ({ results: [] })),
+      db.prepare("SELECT id, title FROM tasks WHERE status = 'open' AND (deadline_local_date IS NULL OR deadline_local_date >= ?) ORDER BY deadline_local_date ASC").bind(todayIst).all<{ id: string; title: string }>().catch(() => ({ results: [] })),
+      db.prepare("SELECT id FROM notification_log WHERE status = 'pending'").all<{ id: string }>().catch(() => ({ results: [] })),
+    ]);
+
+    const ovCount = (overdueTasks.results || []).length;
+    const openCount = (openNotDueTasks.results || []).length;
+    const remCount = (pendingReminders.results || []).length;
+
+    const actionType = isBulkComplete ? "complete_overdue" : "stop_reminders";
+    const targetIds = isBulkComplete
+      ? (overdueTasks.results || []).map((t: any) => t.id)
+      : (pendingReminders.results || []).map((r: any) => r.id);
+
+    const targetCount = targetIds.length;
+    const token = "blk_" + crypto.randomUUID().slice(0, 12);
+    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
+    const idSnapshotJson = JSON.stringify(targetIds);
+    const hash = await computeSha256(actionType + ":" + idSnapshotJson);
+
+    await db
+      .prepare("INSERT INTO bulk_pending_operations (token, action, filter_type, id_snapshot_json, snapshot_hash, expires_at, used, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)")
+      .bind(token, actionType, isBulkComplete ? "overdue" : "reminders", idSnapshotJson, hash, expiresAt, nowIso())
+      .run()
+      .catch(() => {});
+
+    const sampleTitles = (overdueTasks.results || []).slice(0, 5).map((t: any) => `• ${t.title}`).join("\n");
+    const sampleBlock = sampleTitles ? `\n\nSample items:\n${sampleTitles}` : "";
+
+    const confirmText = `Bulk Action Review:
+• Overdue tasks: ${ovCount}
+• Open (not yet due): ${openCount}
+• Pending reminders: ${remCount}${sampleBlock}
+
+Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stopping ${targetCount} reminder(s)`}?`;
+
+    const markup = makeInlineKeyboard([
+      { text: `Confirm ${targetCount}`, callback_data: `bulk_confirm:${token}` },
+      { text: "Cancel", callback_data: `bulk_cancel:${token}` },
+    ]);
+
+    await sendTg(confirmText, markup).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: confirmText,
+      intent: "command",
+      confidence: 1.0,
+      outcome: "bulk_review_shown",
+      status: "sent",
+      replyMarkup: markup,
+      provider: "system",
+      latencyMs: 15,
+    });
+    await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+    return;
+  }
+
+  // F7: Natural tasks & reminders lists (pure D1 template, same answer with AI down)
+  if (/^(what\s+are\s+my\s+tasks(\s+and\s+reminders)?|\/tasks\b|\/reminders\b|tasks\s+and\s+reminders)/i.test(text.trim())) {
+    const listText = await renderTasksAndRemindersList(db, now);
+    await sendTg(listText).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: listText,
+      intent: "query_tasks",
+      confidence: 1.0,
+      outcome: "d1_tasks_reminders_list",
+      status: "sent",
+      provider: "d1",
+      latencyMs: 10,
+    });
+    await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+    return;
+  }
+
+  // F2: Insult / hostility filter (calm one line, no task, no lecture)
+  const isInsult = /\b(you\s+(suck|are\s+stupid|are\s+dumb|are\s+useless|are\s+an\s+idiot)|useless\s+bot|shut\s+up|hate\s+you|fuck\s+u|fuck\s+you|bitch|bastard|idiot)\b/i.test(text);
+  if (isInsult) {
+    const calmReply = "I am here to help you manage your tasks and schedule. How can I assist you?";
+    await sendTg(calmReply).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: calmReply,
+      intent: "chat",
+      confidence: 1.0,
+      outcome: "calm_hostility_filtered",
+      status: "sent",
+      provider: "system",
+      latencyMs: 5,
+    });
+    await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
     return;
   }
 
@@ -1012,7 +1227,7 @@ async function processSingleMessage(
         .first<{ value: string }>()
         .catch(() => null);
       if (isImplicit && captureSetting?.value === "off") {
-        replyText = result.reply_text || "Got it.";
+        replyText = result.reply_text || "I haven't changed anything.";
         replyMarkup = undefined;
         break;
       }
@@ -1181,9 +1396,9 @@ async function processSingleMessage(
         /I'?ll remind|All confirmed|\bsaved\b|\badded\b|\bcreated\b/i.test(replyText) ||
         /I can help you|I can assist with|I can set reminders|I can manage|feel free to ask/i.test(replyText)
       ) {
-        replyText = "Got it! Let me know if you need anything.";
+        replyText = "I haven't changed anything.";
       }
-      if (!replyText) replyText = "Got it.";
+      if (!replyText) replyText = "I haven't changed anything.";
       break;
     }
   }
