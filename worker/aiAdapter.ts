@@ -1035,23 +1035,11 @@ export class AIAdapter {
       if (!response.ok) {
         const errorBody = await response.text().catch(() => "(unreadable)");
         console.error("[Gemini] HTTP", response.status, "error:", errorBody.slice(0, 300));
-        let shapeNote = "";
-        if (response.status === 503) {
-          try {
-            const probe = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-            const pBody = await probe.text().catch(() => "");
-            shapeNote = ` [shape probe gemini-3.8-flash: HTTP ${probe.status} ${pBody.slice(0, 150)}]`;
-          } catch (e: any) {
-            shapeNote = ` [shape probe error: ${e.message}]`;
-          }
-        }
-        const err: any = new Error(`Gemini API error: ${response.status}${shapeNote}`);
+        // No retry probe here: a second live request from inside an error handler doubles
+        // the failure latency and spends the fallback budget for no new information.
+        const err: any = new Error(`Gemini API error: ${response.status}`);
         err.status = response.status;
-        err.body = errorBody + shapeNote;
+        err.body = errorBody;
         if (response.status === 429) {
           const retryHeader = response.headers.get("retry-after");
           const retrySec = retryHeader ? parseFloat(retryHeader) : NaN;

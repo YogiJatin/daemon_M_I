@@ -1446,28 +1446,6 @@ export async function handleApiRequest(
     // 14. AI CAPABILITIES & TASK PROPOSALS INBOX (Block 6)
     // =======================================================================
 
-    // GET /api/v1/internal/test/gemini-probe
-    if (method === "GET" && path === "/api/v1/internal/test/gemini-probe") {
-      const apiKey = (env as any).GEMINI_API_KEY_1;
-      const model = (env as any).GEMINI_MODEL || "gemini-3.8-flash";
-      const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), 6000);
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] }),
-          signal: controller.signal,
-        });
-        clearTimeout(t);
-        const body = await res.text();
-        return jsonSuccess({ status: res.status, body: body.slice(0, 300) });
-      } catch (err: any) {
-        clearTimeout(t);
-        return jsonSuccess({ error: err.message });
-      }
-    }
-
     // GET /api/v1/ai/canary — Block 0: live provider canary check
     if (method === "GET" && path === "/api/v1/ai/canary") {
       const adapter = new AIAdapter(env, env.DB);

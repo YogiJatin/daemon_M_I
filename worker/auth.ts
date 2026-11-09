@@ -22,6 +22,28 @@ export interface SessionRecord {
 }
 
 /**
+ * Constant-time string comparison.
+ *
+ * Both inputs are hashed first, so the comparison always walks 32 bytes and never
+ * leaks the length or the position of the first differing character.
+ */
+export async function constantTimeEqual(a: string, b: string): Promise<boolean> {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const enc = new TextEncoder();
+  const [digestA, digestB] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(a)),
+    crypto.subtle.digest("SHA-256", enc.encode(b)),
+  ]);
+  const bytesA = new Uint8Array(digestA);
+  const bytesB = new Uint8Array(digestB);
+  let diff = 0;
+  for (let i = 0; i < bytesA.length; i++) {
+    diff |= bytesA[i] ^ bytesB[i];
+  }
+  return diff === 0;
+}
+
+/**
  * Computes SHA-256 hex digest of a token for secure storage at rest.
  */
 export async function hashToken(token: string): Promise<string> {
@@ -152,29 +174,12 @@ export async function authenticateRequest(
   request: Request,
   db: D1Database,
   envOwnerId?: string,
-  now: Date = new Date(),
-  webhookSecretEnv?: string
+  now: Date = new Date()
 ): Promise<{ authenticated: boolean; session?: SessionRecord; error?: string }> {
-  // 0. System secret check (used by automated test suites with webhook secret)
-  const webhookSecretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-  if (webhookSecretEnv && webhookSecretHeader && webhookSecretHeader === webhookSecretEnv) {
-    return {
-      authenticated: true,
-      session: {
-        id: "system-admin-session",
-        token_hash: "system",
-        owner_user_id: envOwnerId || "owner",
-        workspace_id: "default",
-        expires_at: new Date(now.getTime() + 86400000).toISOString(),
-        revoked_at: null,
-        user_agent: "system:runner",
-        ip_address: "127.0.0.1",
-        last_seen_at: now.toISOString(),
-        created_at: now.toISOString(),
-      },
-    };
-  }
-
+  // There is deliberately no shortcut here. Presenting the Telegram webhook secret
+  // used to mint a synthetic admin session, so one leaked secret granted full API
+  // access. Internal test endpoints have their own gate (worker/internalAuth.ts) and
+  // everything else needs a real session token.
   let token: string | null = null;
 
   // 1. Try Authorization: Bearer <token>

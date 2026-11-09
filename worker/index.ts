@@ -40,7 +40,8 @@ import {
   getSchedulePreview,
 } from "./timetableEngine";
 import { getISTDateParts, istToUtcDate } from "./dateParser";
-import { authenticateRequest } from "./auth";
+import { authenticateRequest, constantTimeEqual } from "./auth";
+import { authorizeInternalRequest, testRoutesEnabled } from "./internalAuth";
 import { handleApiRequest, jsonError } from "./apiRouter";
 import {
   createPairingCode,
@@ -118,7 +119,6 @@ export default {
       url.pathname === "/api/v1/auth/pair" ||
       url.pathname === "/api/v1/telegram/webhook" ||
       url.pathname === "/webhook" ||
-      url.pathname.startsWith("/api/v1/internal/") ||
       url.pathname.startsWith("/api/v1/desktop/");
 
     // -------------------------------------------------------------------------
@@ -142,7 +142,7 @@ export default {
     if (request.method === "POST" && url.pathname === "/api/v1/desktop/pair") {
       const body = (await request.json().catch(() => ({}))) as any;
       if (body.action === "create_code") {
-        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
         if (!auth.authenticated) return jsonError("unauthorized", "Owner authentication required", 401);
         const code = await createPairingCode(env.DB);
         return Response.json({ ok: true, code });
@@ -159,7 +159,7 @@ export default {
 
     // Revoke desktop device: POST /api/v1/desktop/devices/:id/revoke
     if (request.method === "POST" && url.pathname.startsWith("/api/v1/desktop/devices/") && url.pathname.endsWith("/revoke")) {
-      const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+      const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
       if (!auth.authenticated) return jsonError("unauthorized", "Owner authentication required", 401);
       const match = url.pathname.match(/\/api\/v1\/desktop\/devices\/([^/]+)\/revoke/);
       const devId = match ? match[1] : "";
@@ -210,7 +210,7 @@ export default {
       request.method === "POST" &&
       (url.pathname === "/api/v1/internal/test/enqueue-mirror" || url.pathname === "/api/v1/desktop/export-obsidian")
     ) {
-      const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+      const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
       if (!auth.authenticated) return jsonError("unauthorized", "Owner authentication required", 401);
       const body = (await request.json().catch(() => ({}))) as any;
       const jobId = await enqueueMirrorJob(env.DB, {
@@ -223,14 +223,22 @@ export default {
       return Response.json({ ok: true, jobId });
     }
 
+    // Every /api/v1/internal/* endpoint runs raw SQL or forces scheduler work. They are
+    // absent in production (ENABLE_TEST_ROUTES unset) and otherwise need TEST_ADMIN_TOKEN
+    // or a real owner session. This runs before the generic API middleware so an
+    // internal path can never fall through to it.
+    if (url.pathname.startsWith("/api/v1/internal/")) {
+      const internal = await authorizeInternalRequest(request, env, env.DB, new Date());
+      if (!internal.ok) {
+        if (!testRoutesEnabled(env)) {
+          return new Response(null, { status: 404 });
+        }
+        return jsonError("unauthorized", "Internal endpoint requires TEST_ADMIN_TOKEN or an owner session", 401);
+      }
+    }
+
     if (!isExempt && url.pathname.startsWith("/api/v1/")) {
-      const auth = await authenticateRequest(
-        request,
-        env.DB,
-        env.TELEGRAM_OWNER_ID,
-        new Date(),
-        env.TELEGRAM_WEBHOOK_SECRET
-      );
+      const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
 
       if (!auth.authenticated) {
         return jsonError("unauthorized", "Authentication required to access this system service", 401);
@@ -245,11 +253,6 @@ export default {
 
     // Block 2A & 2B: Manual/Test scheduler trigger (authenticated with webhook secret)
     if (request.method === "POST" && url.pathname === "/api/v1/internal/scheduler/run") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      if (!secretHeader || secretHeader !== env.TELEGRAM_WEBHOOK_SECRET) {
-        return new Response("Unauthorized", { status: 401 });
-      }
-
       let reqBody: any = {};
       try {
         reqBody = await request.json();
@@ -270,11 +273,6 @@ export default {
 
     // Block 2A: Test endpoint for task edits (TEST-2A.4 title-only vs deadline edits)
     if (request.method === "POST" && url.pathname === "/api/v1/internal/test/task-edit") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      if (!secretHeader || secretHeader !== env.TELEGRAM_WEBHOOK_SECRET) {
-        return new Response("Unauthorized", { status: 401 });
-      }
-
       const body = (await request.json()) as any;
       if (body.action === "updateTitle") {
         await updateTaskTitle(env.DB, body.taskId, body.title, new Date());
@@ -297,17 +295,9 @@ export default {
       return Response.json({ ok: true, task, notifs: notifs.results });
     }
 
-    // Internal test endpoint for fast D1 test queries (authenticated by webhook secret or session)
+    // Internal test endpoint for fast D1 test queries. Authorisation is handled once,
+    // above, by authorizeInternalRequest (ENABLE_TEST_ROUTES + TEST_ADMIN_TOKEN).
     if (request.method === "POST" && url.pathname === "/api/v1/internal/test/d1-query") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      let authorized = Boolean(secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET);
-      if (!authorized) {
-        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
-        authorized = auth.authenticated;
-      }
-      if (!authorized) {
-        return new Response("Unauthorized", { status: 401 });
-      }
       const body = (await request.json()) as any;
       const binds = Array.isArray(body.binds) ? body.binds : [];
       try {
@@ -321,11 +311,6 @@ export default {
 
     // Block 2B: Test endpoints for quiet hours, prep digest & catchup digest
     if (request.method === "POST" && url.pathname === "/api/v1/internal/test/block2b") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      if (!secretHeader || secretHeader !== env.TELEGRAM_WEBHOOK_SECRET) {
-        return new Response("Unauthorized", { status: 401 });
-      }
-
       const body = (await request.json()) as any;
       const now = body.now ? new Date(body.now) : new Date();
 
@@ -356,16 +341,6 @@ export default {
 
     // 0.7 Provider Audit & Live Canary Endpoint
     if (request.method === "POST" && url.pathname === "/api/v1/internal/test/provider-audit") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      let authorized = Boolean(secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET);
-      if (!authorized) {
-        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
-        authorized = auth.authenticated;
-      }
-      if (!authorized) {
-        return new Response("Unauthorized", { status: 401 });
-      }
-
       const results: any = {};
       const envAny = env as any;
       const groqKey = envAny.GROQ_API_KEY_1 || envAny.GROQ_API_KEY;
@@ -438,13 +413,10 @@ export default {
 
     // GET /api/v1/recurrence-rules
     if (request.method === "GET" && url.pathname === "/api/v1/recurrence-rules") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -459,13 +431,10 @@ export default {
 
     // POST /api/v1/recurrence-rules
     if (request.method === "POST" && url.pathname === "/api/v1/recurrence-rules") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -486,13 +455,10 @@ export default {
     // POST /api/v1/recurrence-rules/:id/pause
     const pauseMatch = url.pathname.match(/^\/api\/v1\/recurrence-rules\/([^/]+)\/pause$/);
     if (request.method === "POST" && pauseMatch) {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -510,13 +476,10 @@ export default {
     // POST /api/v1/recurrence-rules/:id/resume
     const resumeMatch = url.pathname.match(/^\/api\/v1\/recurrence-rules\/([^/]+)\/resume$/);
     if (request.method === "POST" && resumeMatch) {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -534,13 +497,10 @@ export default {
     // PATCH /api/v1/recurrence-rules/:id
     const editMatch = url.pathname.match(/^\/api\/v1\/recurrence-rules\/([^/]+)$/);
     if (request.method === "PATCH" && editMatch) {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -554,13 +514,10 @@ export default {
 
     // POST /api/v1/internal/test/recurrence — Canonical Acceptance Tests (TEST-3A.1 to TEST-3A.6)
     if (request.method === "POST" && url.pathname === "/api/v1/internal/test/recurrence") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -998,13 +955,10 @@ export default {
 
     // GET /api/v1/timetable (or with ?preview=14)
     if (request.method === "GET" && url.pathname === "/api/v1/timetable") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -1035,13 +989,10 @@ export default {
 
     // POST /api/v1/timetable — Create semester, subject, slot, material, exception, or holiday
     if (request.method === "POST" && url.pathname === "/api/v1/timetable") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -1127,13 +1078,10 @@ export default {
     // PATCH /api/v1/timetable/:id
     const timetablePatchMatch = url.pathname.match(/^\/api\/v1\/timetable\/([^/]+)$/);
     if (request.method === "PATCH" && timetablePatchMatch) {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -1154,13 +1102,10 @@ export default {
     // DELETE /api/v1/timetable/:id
     const timetableDeleteMatch = url.pathname.match(/^\/api\/v1\/timetable\/([^/]+)$/);
     if (request.method === "DELETE" && timetableDeleteMatch) {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -1195,13 +1140,10 @@ export default {
 
     // POST /api/v1/internal/test/timetable — Acceptance Test Runner (TEST-3B.1 to TEST-3B.7)
     if (request.method === "POST" && url.pathname === "/api/v1/internal/test/timetable") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      const authHeader = request.headers.get("Authorization");
-      const isAuth =
-        (secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET) ||
-        (authHeader && authHeader === `Bearer ${env.TELEGRAM_WEBHOOK_SECRET}`);
-
-      if (!isAuth) {
+      // Owner routes accept only a real session token. The Telegram webhook secret
+      // proves a webhook came from Telegram; it is not an API credential.
+      const owner = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
+      if (!owner.authenticated) {
         return new Response("Unauthorized", { status: 401 });
       }
 
@@ -1577,16 +1519,6 @@ export default {
 
     // Internal test endpoint: Telegram Webhook Diagnostic (Fix Brief 0 F7 & Step 1 item 2)
     if (url.pathname === "/api/v1/internal/test/telegram-webhook-info") {
-      const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
-      let authorized = Boolean(secretHeader && secretHeader === env.TELEGRAM_WEBHOOK_SECRET);
-      if (!authorized) {
-        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
-        authorized = auth.authenticated;
-      }
-      if (!authorized) {
-        return new Response("Unauthorized", { status: 401 });
-      }
-
       if (!env.TELEGRAM_BOT_TOKEN || env.TELEGRAM_BOT_TOKEN.startsWith("mock:")) {
         return Response.json({ ok: false, error: "Bot token not configured or mock" });
       }
@@ -1622,9 +1554,12 @@ export default {
       const secretHeader = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
       const configuredSecret = env.TELEGRAM_WEBHOOK_SECRET;
 
-      let authorized = Boolean(secretHeader && secretHeader === configuredSecret);
+      let authorized = Boolean(
+        secretHeader && configuredSecret && (await constantTimeEqual(secretHeader, configuredSecret))
+      );
       if (!authorized) {
-        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date(), env.TELEGRAM_WEBHOOK_SECRET);
+        // An owner session may also POST a webhook payload for self-testing.
+        const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
         authorized = auth.authenticated;
       }
 
@@ -1802,10 +1737,11 @@ export default {
   // Block 2A & 2B: One-minute Cron Trigger scheduler entrypoint
   async scheduled(controller, env): Promise<void> {
     const scheduledTime = controller.scheduledTime ? new Date(controller.scheduledTime) : new Date();
+    // Booleans only: the owner id is a private Telegram identifier and has no place in logs.
     console.log({
       hasBotToken: !!env.TELEGRAM_BOT_TOKEN,
-      ownerId: env.TELEGRAM_OWNER_ID,
-      ownerType: typeof env.TELEGRAM_OWNER_ID,
+      hasOwnerId: !!env.TELEGRAM_OWNER_ID,
+      scheduledAt: scheduledTime.toISOString(),
     });
     // Cron sweeper for stale chat messages (Part A1 + Fix Brief 0 F4)
     await sweepStaleChatMessages(env.DB, env.TELEGRAM_BOT_TOKEN, scheduledTime, env.TELEGRAM_OWNER_ID);
@@ -1815,7 +1751,7 @@ export default {
     const sevenDaysAgo = new Date(scheduledTime.getTime() - 7 * 24 * 3600 * 1000).toISOString();
     await env.DB.prepare("DELETE FROM chat_messages WHERE created_at < ?").bind(thirtyDaysAgo).run().catch(() => {});
     await env.DB.prepare("DELETE FROM telegram_updates WHERE created_at < ?").bind(sevenDaysAgo).run().catch(() => {});
-    await env.DB.prepare("DELETE FROM desktop_mirror_outbox WHERE status = 'delivered' AND created_at < ?").bind(thirtyDaysAgo).run().catch(() => {});
+    await env.DB.prepare("DELETE FROM mirror_outbox WHERE status IN ('delivered', 'superseded') AND created_at < ?").bind(thirtyDaysAgo).run().catch(() => {});
 
     // Phase 1 (Block 4): Autonomous Morning & Evening Briefings
     await checkAndDispatchBriefings(env.DB, env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_OWNER_ID, scheduledTime).catch(() => {});
