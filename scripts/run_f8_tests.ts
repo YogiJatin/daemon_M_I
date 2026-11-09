@@ -14,10 +14,21 @@
 import * as fs from "fs";
 import * as crypto from "crypto";
 
-const DEPLOYED_URL = "https://personal-ai-os.jatin-personal-ai.workers.dev";
+import { assertSafeTarget, parseTarget } from "./lib/testGuard";
+
+// Defaults to wrangler dev on 127.0.0.1:8787; production needs --allow-remote.
+const TEST_TARGET = parseTarget();
+assertSafeTarget("run_f8_tests", TEST_TARGET);
+
+const DEPLOYED_URL = TEST_TARGET.baseUrl;
 const WEBHOOK_URL = `${DEPLOYED_URL}/webhook`;
 const OWNER_ID = 8364430714;
-const SECRET_TOKEN = "5d5eb296-6d63-455b-b9f2-fe9fbf49fa87";
+// The webhook secret is never committed. Export it for the shell that runs this suite.
+const SECRET_TOKEN = process.env.TELEGRAM_WEBHOOK_SECRET ?? "";
+if (SECRET_TOKEN.length === 0) {
+  console.error("run_f8_tests: TELEGRAM_WEBHOOK_SECRET is not set. Export it before running (value stays out of git).");
+  process.exit(1);
+}
 
 const rawToken = "f8_test_token_" + crypto.randomBytes(16).toString("hex");
 const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
@@ -25,7 +36,7 @@ const sessionId = "f8-sess-" + crypto.randomBytes(8).toString("hex");
 const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 const nowIso = new Date().toISOString();
 import { execSync } from "child_process";
-execSync(`npx wrangler d1 execute personal-ai-os-db --remote --command="INSERT OR REPLACE INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES (\'${sessionId}\', \'${tokenHash}\', \'8364430714\', \'default\', \'${expiresAt}\', \'${nowIso}\', \'${nowIso}\');"`, { stdio: "inherit" });
+execSync(`npx wrangler d1 execute personal-ai-os-db ${TEST_TARGET.d1Flag} --command="INSERT OR REPLACE INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES (\'${sessionId}\', \'${tokenHash}\', \'8364430714\', \'default\', \'${expiresAt}\', \'${nowIso}\', \'${nowIso}\');"`, { stdio: "inherit" });
 
 async function executeD1(sql: string, binds: any[] = []): Promise<any[]> {
   try {
@@ -66,7 +77,7 @@ async function main() {
   // Create temporary session
   const { execSync } = await import("child_process");
   execSync(
-    `npx wrangler d1 execute personal-ai-os-db --remote --command="INSERT OR REPLACE INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES ('${sessionId}', '${tokenHash}', '${OWNER_ID}', 'default', '${expiresAt}', '${nowIso}', '${nowIso}');"`,
+    `npx wrangler d1 execute personal-ai-os-db ${TEST_TARGET.d1Flag} --command="INSERT OR REPLACE INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES ('${sessionId}', '${tokenHash}', '${OWNER_ID}', 'default', '${expiresAt}', '${nowIso}', '${nowIso}');"`,
     { stdio: "pipe" }
   );
 

@@ -11,9 +11,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { execSync } from "child_process";
+import { assertSafeTarget, parseTarget } from "./lib/testGuard";
 
 const ROOT_DIR = process.cwd();
-const DEPLOYED_URL = "https://personal-ai-os.jatin-personal-ai.workers.dev";
+// Defaults to wrangler dev on 127.0.0.1:8787; production needs --allow-remote.
+const TEST_TARGET = parseTarget();
+assertSafeTarget("run_golden", TEST_TARGET);
+const DEPLOYED_URL = TEST_TARGET.baseUrl;
 const DEPLOYED_WEBHOOK_URL = `${DEPLOYED_URL}/api/v1/telegram/webhook`;
 const GOLDEN_JSON_PATH = path.resolve(ROOT_DIR, "tests/golden.json");
 
@@ -58,7 +62,7 @@ async function main() {
     `INSERT INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES ('${sessionId}', '${tokenHash}', '${ownerId}', 'default', '${expiresAt}', '${nowIso}', '${nowIso}');`,
     "utf8"
   );
-  execSync(`npx wrangler d1 execute personal-ai-os-db --remote --file="${tempSql}"`, { stdio: "ignore" });
+  execSync(`npx wrangler d1 execute personal-ai-os-db ${TEST_TARGET.d1Flag} --file="${tempSql}"`, { stdio: "ignore" });
   try { fs.unlinkSync(tempSql); } catch {}
   console.log("Test session active.\n");
 

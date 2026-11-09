@@ -6,15 +6,18 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { execSync } from "child_process";
+import { assertSafeTarget, CleanupRegistry, newTestRunId, parseTarget } from "./lib/testGuard";
 
-const DEPLOYED_URL = "https://personal-ai-os.jatin-personal-ai.workers.dev";
+// Defaults to wrangler dev on 127.0.0.1:8787; production needs --allow-remote.
+const TEST_TARGET = parseTarget();
+assertSafeTarget("run_golden_block2", TEST_TARGET);
+
+const DEPLOYED_URL = TEST_TARGET.baseUrl;
 const DEPLOYED_WEBHOOK_URL = `${DEPLOYED_URL}/webhook`;
 const TEST_CHAT_ID = "-10022330099";
 const TEST_SENDER_ID = "8364430714";
-
-const devVars = fs.readFileSync(".dev.vars", "utf8");
-const botTokenMatch = devVars.match(/TELEGRAM_BOT_TOKEN="?([^"\n]+)"?/);
-const BOT_TOKEN = botTokenMatch ? botTokenMatch[1].trim() : "";
+const TEST_RUN_ID = newTestRunId("b2");
+const cleanup = new CleanupRegistry();
 
 const rawToken = "golden_b2_token_" + crypto.randomBytes(16).toString("hex");
 const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
@@ -22,9 +25,9 @@ const sessionId = "b2-sess-" + crypto.randomBytes(8).toString("hex");
 const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 const nowIso = new Date().toISOString();
 
-console.log("Seeding test session in remote D1...");
+console.log(`Seeding test session in ${TEST_TARGET.remote ? "remote" : "local"} D1 (run ${TEST_RUN_ID})...`);
 execSync(
-  `npx wrangler d1 execute personal-ai-os-db --remote --command="INSERT OR REPLACE INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES ('${sessionId}', '${tokenHash}', '${TEST_SENDER_ID}', 'default', '${expiresAt}', '${nowIso}', '${nowIso}');"`,
+  `npx wrangler d1 execute personal-ai-os-db ${TEST_TARGET.d1Flag} --command="INSERT OR REPLACE INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES ('${sessionId}', '${tokenHash}', '${TEST_SENDER_ID}', 'default', '${expiresAt}', '${nowIso}', '${nowIso}');"`,
   { stdio: "pipe" }
 );
 
@@ -45,6 +48,16 @@ async function executeD1Query(sql: string, binds: any[] = []): Promise<any[]> {
   } catch {}
   return [];
 }
+
+// Teardown runs even when a case throws, so a failed run cannot leave fixtures behind.
+cleanup.register(async () => {
+  await executeD1Query(`DELETE FROM auth_sessions WHERE id = '${sessionId}';`);
+});
+cleanup.register(async () => {
+  await executeD1Query(
+    `DELETE FROM memory_objects WHERE id LIKE 'mem_seed_%' OR id IN ('mem_m12_priv', 'mem_m11_fake_time');`
+  );
+});
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -642,4 +655,9 @@ async function main() {
   fs.writeFileSync("scripts/block2_results.json", JSON.stringify(results, null, 2));
 }
 
-main().catch(console.error);
+main()
+  .catch(console.error)
+  .finally(async () => {
+    const failures = await cleanup.runAll();
+    if (failures > 0) process.exitCode = 1;
+  });

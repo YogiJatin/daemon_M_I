@@ -6,7 +6,13 @@ import { pathToFileURL } from "url";
 import { runMirrorAgent, validateJob } from "../desktop_agent/mirror_agent";
 import { neutralizeObsidianContent } from "../worker/desktopMirrorService";
 
-const DEPLOYED_URL = "https://personal-ai-os.jatin-personal-ai.workers.dev";
+import { assertSafeTarget, parseTarget } from "./lib/testGuard";
+
+// Defaults to wrangler dev on 127.0.0.1:8787; production needs --allow-remote.
+const TEST_TARGET = parseTarget();
+assertSafeTarget("run_block3_tests", TEST_TARGET);
+
+const DEPLOYED_URL = TEST_TARGET.baseUrl;
 const TEST_SENDER_ID = "8364430714";
 
 const rawOwnerToken = "b3_owner_" + crypto.randomBytes(8).toString("hex");
@@ -53,7 +59,7 @@ async function main() {
   // 0. Seed owner auth session
   const seedSql = `INSERT OR REPLACE INTO auth_sessions (id, token_hash, owner_user_id, workspace_id, expires_at, created_at, last_seen_at) VALUES ('${sessionId}', '${ownerTokenHash}', '${TEST_SENDER_ID}', 'default', '${expiresAt}', '${nowIso}', '${nowIso}');`;
   const { execSync } = await import("child_process");
-  const tempSql = path.resolve(process.cwd(), ".tmp_b3_sess.sql"); fs.writeFileSync(tempSql, seedSql, "utf8"); execSync(`npx wrangler d1 execute personal-ai-os-db --remote --file="${tempSql}"`, { stdio: "inherit" }); try { fs.unlinkSync(tempSql); } catch {}
+  const tempSql = path.resolve(process.cwd(), ".tmp_b3_sess.sql"); fs.writeFileSync(tempSql, seedSql, "utf8");  execSync(`npx wrangler d1 execute personal-ai-os-db ${TEST_TARGET.d1Flag} --file="${tempSql}"`, { stdio: "inherit" }); try { fs.unlinkSync(tempSql); } catch {}
 
   // ---------------------------------------------------------------------------
   // B3-01: Pairing code lifecycle (works once, expires, locks at 5 failures, D1 holds only hashes)
