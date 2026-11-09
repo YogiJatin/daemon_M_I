@@ -41,7 +41,7 @@ it("a bare interrogative asks for a request instead of claiming missing data", (
   const what = matchDeterministicReply("What", MORNING);
   assert.ok(what, "What should match");
   assert.strictEqual(what!.kind, "fragment");
-  assert.strictEqual(what!.reply, "Specify the request, sir.");
+  assert.strictEqual(what!.reply, "I didn't catch that, sir. What do you need?");
 });
 
 it("greetings are time aware in IST", () => {

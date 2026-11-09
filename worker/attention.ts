@@ -10,7 +10,7 @@
  * - Deterministic /attention command renderer (ZERO LLM calls).
  */
 
-import { getISTDateParts } from "./dateParser";
+import { getISTDateParts, istToUtcDate } from "./dateParser";
 
 export type AttentionPool = "pool_a" | "pool_b";
 export type AttentionReason =
@@ -54,9 +54,9 @@ export function isQuietHoursIST(now: Date = new Date()): boolean {
 export function getISTDayRange(now: Date = new Date()): { localDate: string; startIso: string; endIso: string } {
   const parts = getISTDateParts(now);
   const localDate = parts.localDate; // YYYY-MM-DD
-  // IST is UTC+05:30. Day starts at localDate 00:00:00 IST = (previous day 18:30:00 UTC)
-  const [year, month, day] = localDate.split("-").map(Number);
-  const startUtc = new Date(Date.UTC(year, month - 1, day, 0, 0, 0) - 5.5 * 3600 * 1000);
+  // Day starts at localDate 00:00:00 IST, which istToUtcDate expresses as an explicit
+  // offset instead of a hand-written +05:30 arithmetic.
+  const startUtc = istToUtcDate(localDate, "00:00");
   const endUtc = new Date(startUtc.getTime() + 24 * 3600 * 1000);
 
   return {

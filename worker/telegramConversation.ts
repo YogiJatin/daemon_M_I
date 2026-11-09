@@ -53,6 +53,7 @@ import { handleForgetMemory, restoreLatestMemory } from "./memoryActions";
 import { normalizeActions } from "./intentSchema";
 import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
 import { matchDeterministicReply } from "./greetingMatcher";
+import { applyReplyStyle } from "./replyStyle";
 import { getISTDateParts } from "./dateParser";
 
 // ---------------------------------------------------------------------------
@@ -187,6 +188,30 @@ async function logChatMessage(
   return id;
 }
 
+/**
+ * Appends a guard or linter decision to this turn's user row, so `/why` can explain a
+ * reply after the fact without a second table. Best-effort: never fails a turn.
+ */
+export async function recordTurnDecision(db: D1Database, rowId: string, code: string): Promise<void> {
+  if (!rowId || !code) return;
+  try {
+    await db
+      .prepare(
+        `UPDATE chat_messages
+            SET outcome = CASE
+                  WHEN outcome IS NULL OR outcome = '' THEN ?
+                  ELSE substr(outcome || ' ' || ?, 1, 300)
+                END,
+                updated_at = ?
+          WHERE id = ?`
+      )
+      .bind(code, code, nowIso(), rowId)
+      .run();
+  } catch {
+    // A missing log row must never change what the owner receives.
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Daily AI budget check
 // ---------------------------------------------------------------------------
@@ -227,8 +252,25 @@ async function processSingleMessage(
   const startProcessing = Date.now();
   const botToken: string = env.TELEGRAM_BOT_TOKEN;
   const turnActionResults: string[] = [];
-  const sendTg = (txt: string, markup?: any) =>
-    sendTelegramMessage(botToken, chatId, txt, markup, { testStubs: Boolean(testStubs), db, egress: { actionResults: turnActionResults } });
+  const sendTg = (txt: string, markup?: any) => {
+    // One funnel: every chat reply passes the persona style gate and records what it did.
+    const styled = applyReplyStyle(txt);
+    const recorded = [
+      ...styled.decisions,
+      ...styled.violations.map((violation) => `style_blocked_${violation.code}`),
+    ];
+    if (recorded.length > 0) {
+      void recordTurnDecision(db, userMsgRowId, `guard:${recorded.join(",")}`);
+    }
+    return sendTelegramMessage(botToken, chatId, styled.text, markup, {
+      testStubs: Boolean(testStubs),
+      db,
+      egress: { actionResults: turnActionResults },
+      onGuardDecision: (decision: string) => {
+        void recordTurnDecision(db, userMsgRowId, `guard:${decision}`);
+      },
+    });
+  };
 
   // 0. Forwarded Data-Only Check (G21, Non-negotiable Rule 11)
   if (isForwarded) {

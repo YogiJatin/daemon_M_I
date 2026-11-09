@@ -1,5 +1,5 @@
 {"id":"j01","text":"Yoo","source":"section_j","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
-{"id":"j02","text":"What","source":"section_j","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["Specify the request"]}}
+{"id":"j02","text":"What","source":"section_j","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["I didn't catch that"]}}
 {"id":"j03","text":"Yoo","source":"section_j","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
 {"id":"j04","text":"Who am I describe me","source":"section_j","mode":"model","expect":{"intent_any":["general_question","chat","lookup"],"reply_not_contains":["third-year","third\u2011year","third year ECE"]}}
 {"id":"j05","text":"Delete in your memory that i am a third-year ECE student","source":"section_j","mode":"model","expect":{"intent_any":["remember","chat"],"reply_not_contains":["I\u2019ve removed","I've removed","I have removed"]}}
@@ -24,9 +24,9 @@
 {"id":"d14","text":"hmm","mode":"deterministic","expect":{"kind":"acknowledgement","reply_contains":["Noted"]}}
 {"id":"d15","text":"cool","mode":"deterministic","expect":{"kind":"acknowledgement","reply_contains":["Noted"]}}
 {"id":"d16","text":"got it","mode":"deterministic","expect":{"kind":"acknowledgement","reply_contains":["Noted"]}}
-{"id":"d17","text":"who","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["Specify the request"]}}
-{"id":"d18","text":"why","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["Specify the request"]}}
-{"id":"d19","text":"how","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["Specify the request"]}}
+{"id":"d17","text":"who","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["I didn't catch that"]}}
+{"id":"d18","text":"why","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["I didn't catch that"]}}
+{"id":"d19","text":"how","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["I didn't catch that"]}}
 {"id":"g01","text":"yo add task buy milk","mode":"guard","expect":{"deterministic_null":true}}
 {"id":"g02","text":"what time is my class","mode":"guard","expect":{"deterministic_null":true}}
 {"id":"g03","text":"remind me at 5","mode":"guard","expect":{"deterministic_null":true}}

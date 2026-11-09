@@ -32,6 +32,8 @@ export interface TelegramOptions {
   parseMode?: "HTML" | "Markdown" | "MarkdownV2";
   /** Chat-turn egress context. Omit for reminders/digests so they are never rewritten. */
   egress?: EgressContext;
+  /** Called when a guard rewrites or drops the text, so the turn can record why. */
+  onGuardDecision?: (decision: string) => void;
 }
 
 // Global in-memory state across requests within isolate
@@ -186,7 +188,11 @@ export async function editMessageReplyMarkup(
  * A string that parses as a JSON object, or contains "_mock", "reply_text"
  * or "\"intent\"", is dropped, logged, and replaced by the code template.
  */
-export function sanitizeOutboundMessage(text: string, ctx?: EgressContext): string {
+export function sanitizeOutboundMessage(
+  text: string,
+  ctx?: EgressContext,
+  onDecision?: (decision: string) => void
+): string {
   if (typeof text !== "string") return "";
   const trimmed = text.trim();
   let leaked = false;
@@ -212,9 +218,14 @@ export function sanitizeOutboundMessage(text: string, ctx?: EgressContext): stri
 
   if (leaked) {
     console.warn("[EGRESS GUARD] Dropped leaked raw provider payload / JSON from outbound message:", trimmed.slice(0, 100));
+    onDecision?.("blocked_leaked_payload");
     return "AI is temporarily offline. Reminders, /tasks, and /today remain operational.";
   }
-  return guardReply(text, ctx).text;
+  const verdict = guardReply(text, ctx);
+  if (verdict.blocked) {
+    onDecision?.(`blocked_claim:${verdict.reason || "action_claim_without_commit"}`);
+  }
+  return verdict.text;
 }
 
 export async function sendTelegramMessage(
@@ -224,7 +235,7 @@ export async function sendTelegramMessage(
   replyMarkup?: any,
   options?: TelegramOptions
 ): Promise<SendResult> {
-  text = sanitizeOutboundMessage(text, options?.egress);
+  text = sanitizeOutboundMessage(text, options?.egress, options?.onGuardDecision);
   if (!token) {
     return { sent: true };
   }

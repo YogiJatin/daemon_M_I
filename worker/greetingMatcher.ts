@@ -143,7 +143,8 @@ export function matchDeterministicReply(text: string, now: Date = new Date()): D
   }
 
   if (FRAGMENTS.has(normalized)) {
-    return { reply: "Specify the request, sir.", kind: "fragment" };
+    // A bare interrogative is not a command: ask what he needs without instructing him.
+    return { reply: "I didn't catch that, sir. What do you need?", kind: "fragment" };
   }
 
   return null;

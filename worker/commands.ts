@@ -153,7 +153,7 @@ export function handleStart(args: string, _context?: CommandContext): CommandRes
     args,
     success: true,
     response:
-      "👋 Personal AI OS\n\nCommands:\n/add <title> or /add <date> | <title>\n/today — tasks due today and overdue\n/done <id> — mark a task done\n/snooze <id> <preset> — snooze (1h, +Nh, tonight, tomorrow, YYYY-MM-DD HH:mm)\n/pause — pause reminders\n/resume — resume reminders\n/health — system status\n/help — this message",
+      "👋 Personal AI OS\n\nCommands:\n/add <title> or /add <date> | <title>\n/today — tasks due today and overdue\n/done <id> — mark a task done\n/snooze <id> <preset> — snooze (1h, +Nh, tonight, tomorrow, YYYY-MM-DD HH:mm)\n/pause — pause reminders\n/resume — resume reminders\n/why [turn] — how the last reply was produced\n/health — system status\n/help — this message",
   };
 }
 
@@ -163,7 +163,7 @@ export function handleHelp(args: string, _context?: CommandContext): CommandResu
     args,
     success: true,
     response:
-      "Commands:\n/add <title>\n/add <date> | <title>  (date: today, tomorrow, fri, 18:00, +2h, YYYY-MM-DD)\n/today — due today and overdue\n/done <id> — complete a task\n/snooze <id> <preset>  (1h, +Nh, tonight, tomorrow, YYYY-MM-DD HH:mm)\n/pause / /resume — pause or resume reminders\n/health — system status\n\nOr just send any plain text to capture it as a task with no date.",
+      "Commands:\n/add <title>\n/add <date> | <title>  (date: today, tomorrow, fri, 18:00, +2h, YYYY-MM-DD)\n/today — due today and overdue\n/done <id> — complete a task\n/snooze <id> <preset>  (1h, +Nh, tonight, tomorrow, YYYY-MM-DD HH:mm)\n/pause / /resume — pause or resume reminders\n/why [turn] — intent, provider and guard decisions for a reply\n/health — system status\n\nOr just send any plain text to capture it as a task with no date.",
   };
 }
 
@@ -1772,6 +1772,67 @@ async function handleCapture(args: string, context?: CommandContext): Promise<Co
   const response = await handleCaptureCommand(args, db, new Date());
   return { command: "capture", args, success: true, response };
 }
+/**
+ * `/why [updateId]` - explains the last chat turn (or a specific one) from what was
+ * already recorded: intent, provider, latency, guard/linter decisions and the reply.
+ * No new table: chat_messages is the per-turn record, and guard decisions are appended
+ * to the user row's outcome as `guard:<code>` entries.
+ */
+async function explainTurn(db: D1Database, arg: string): Promise<string> {
+  let updateId: number | null = arg && /^\d+$/.test(arg.trim()) ? Number(arg.trim()) : null;
+  try {
+    if (updateId === null) {
+      const latest = await db
+        // update_id is monotonic per chat, so it breaks ties between same-instant rows.
+        .prepare("SELECT update_id FROM chat_messages WHERE role = 'user' ORDER BY update_id DESC, created_at DESC LIMIT 1")
+        .first<{ update_id: number }>();
+      if (!latest) return "No turns recorded yet.";
+      updateId = latest.update_id;
+    }
+
+    const rows = await db
+      .prepare(
+        `SELECT role, intent, provider, latency_ms, outcome, status,
+                substr(COALESCE(text, ''), 1, 240) AS text
+           FROM chat_messages
+          WHERE update_id = ?
+          ORDER BY created_at ASC`
+      )
+      .bind(updateId)
+      .all<{
+        role: string;
+        intent: string | null;
+        provider: string | null;
+        latency_ms: number | null;
+        outcome: string | null;
+        status: string | null;
+        text: string;
+      }>();
+
+    const records = rows.results || [];
+    if (records.length === 0) return `No turn recorded for update ${updateId}.`;
+
+    const userRow = records.find((row) => row.role === "user");
+    const replyRow = records.find((row) => row.role === "assistant");
+    const decisions = (userRow?.outcome || "")
+      .split(/\s+/)
+      .filter((part) => part.startsWith("guard:"))
+      .join(", ") || "none recorded";
+
+    const oneLine = (value: string) => value.replace(/\s+/g, " ").trim();
+    const lines = [
+      `Why (turn ${updateId})`,
+      `You: ${oneLine(userRow?.text || "(not recorded)")}`,
+      `Read as: ${replyRow?.intent || "unknown"} via ${replyRow?.provider || "unknown"} in ${replyRow?.latency_ms ?? "?"}ms`,
+      `Guard decisions: ${decisions}`,
+      `Replied: ${replyRow ? oneLine(replyRow.text) : "(no reply recorded)"}`,
+    ];
+    return lines.join("\n");
+  } catch (err: any) {
+    return `Could not read the turn record: ${err?.message || "unknown error"}`;
+  }
+}
+
 export async function routeCommand(text: string, context?: CommandContext): Promise<CommandResult | null> {
   const trimmed = text.trim();
   if (!trimmed.startsWith("/")) {
@@ -1935,6 +1996,11 @@ export async function routeCommand(text: string, context?: CommandContext): Prom
       if (!context?.db) return { command: "about", args, success: false, response: "No DB." };
       const res = await handleAboutCommand(args, context.db, context.now);
       return { command: "about", args, success: res.success, response: res.response };
+    }
+    case "why": {
+      if (!context?.db) return { command: "why", args, success: false, response: "No DB." };
+      const response = await explainTurn(context.db, args);
+      return { command: "why", args, success: true, response };
     }
     default:
       return null;

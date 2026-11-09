@@ -693,7 +693,7 @@ export async function handleModifyPending(
     // If userText contains explicit "pm" and h is 1-12, treat as PM
     if (userText && /\d\s*pm/i.test(userText) && h <= 12) h = h < 12 ? h + 12 : 12;
     const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-    const todayIst = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+    const todayIst = getISTDateParts(now).localDate;
 
     await db
       .prepare(
