@@ -6,7 +6,11 @@
 
 - [x] S1 Fix tests/unit_chat_fragments.ts — DONE (commit 15ca947)
 - [x] S2 npx tsc -b exits 0; commit all code — DONE (commit 15ca947)
-- [ ] S3 wrangler d1 export --remote into backups/
+- [x] S3 wrangler d1 export --remote into backups/ — DONE
+  - File: backups/d1-pre-webhook-20261109-20261109-171116.sql
+  - Size: 696391 bytes
+  - CREATE TABLE count: 61
+  - INSERT INTO count: 1304
 - [ ] S4 Migration 0026 on remote D1
 - [ ] S5 Rotate webhook secret
 - [ ] S6 Deploy
@@ -21,3 +25,5 @@
 - tsc -b: exit 0
 - Commit 15ca947: Fix DATA block escaping regression in system_results path.
 - Commit 432a5dc: Update RUN_STATE.md for webhook hardening pass progress.
+- Commit 12e41c9: Update RUN_STATE.md to mark S1 and S2 as DONE.
+- Backup created: backups/d1-pre-webhook-20261109-20261109-171116.sql (696391 bytes)
