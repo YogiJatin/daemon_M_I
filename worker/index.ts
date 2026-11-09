@@ -227,6 +227,9 @@ export default {
     // absent in production (ENABLE_TEST_ROUTES unset) and otherwise need TEST_ADMIN_TOKEN
     // or a real owner session. This runs before the generic API middleware so an
     // internal path can never fall through to it.
+    // An internal path that passes this gate must NOT then be re-challenged by the owner
+    // session check below, or a valid TEST_ADMIN_TOKEN could never reach its handler.
+    let internalAuthorized = false;
     if (url.pathname.startsWith("/api/v1/internal/")) {
       const internal = await authorizeInternalRequest(request, env, env.DB, new Date());
       if (!internal.ok) {
@@ -235,9 +238,10 @@ export default {
         }
         return jsonError("unauthorized", "Internal endpoint requires TEST_ADMIN_TOKEN or an owner session", 401);
       }
+      internalAuthorized = true;
     }
 
-    if (!isExempt && url.pathname.startsWith("/api/v1/")) {
+    if (!internalAuthorized && !isExempt && url.pathname.startsWith("/api/v1/")) {
       const auth = await authenticateRequest(request, env.DB, env.TELEGRAM_OWNER_ID, new Date());
 
       if (!auth.authenticated) {
