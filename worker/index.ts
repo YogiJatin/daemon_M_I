@@ -42,6 +42,7 @@ import {
 import { getISTDateParts, istToUtcDate } from "./dateParser";
 import { authenticateRequest, constantTimeEqual } from "./auth";
 import { authorizeInternalRequest, testRoutesEnabled } from "./internalAuth";
+import { expireStaleTelegramUpdates } from "./telegramLedger";
 import { handleApiRequest, jsonError } from "./apiRouter";
 import {
   createPairingCode,
@@ -1750,11 +1751,16 @@ export default {
     // Cron sweeper for stale chat messages (Part A1 + Fix Brief 0 F4)
     await sweepStaleChatMessages(env.DB, env.TELEGRAM_BOT_TOKEN, scheduledTime, env.TELEGRAM_OWNER_ID);
 
+    // Age-bounded ledger expiry: a turn that never reached a terminal state must not look
+    // like work in flight forever. Expired is terminal, so nothing is ever replayed.
+    await expireStaleTelegramUpdates(env.DB, scheduledTime).catch(() => 0);
+
     // Phase 0.5: Retention cleanups: chat_messages 30d, telegram_updates 7d, delivered mirror_outbox 30d
     const thirtyDaysAgo = new Date(scheduledTime.getTime() - 30 * 24 * 3600 * 1000).toISOString();
     const sevenDaysAgo = new Date(scheduledTime.getTime() - 7 * 24 * 3600 * 1000).toISOString();
     await env.DB.prepare("DELETE FROM chat_messages WHERE created_at < ?").bind(thirtyDaysAgo).run().catch(() => {});
-    await env.DB.prepare("DELETE FROM telegram_updates WHERE created_at < ?").bind(sevenDaysAgo).run().catch(() => {});
+    // telegram_updates has received_at, not created_at: the old statement silently failed.
+    await env.DB.prepare("DELETE FROM telegram_updates WHERE received_at < ?").bind(sevenDaysAgo).run().catch(() => {});
     await env.DB.prepare("DELETE FROM mirror_outbox WHERE status IN ('delivered', 'superseded') AND created_at < ?").bind(thirtyDaysAgo).run().catch(() => {});
 
     // Phase 1 (Block 4): Autonomous Morning & Evening Briefings

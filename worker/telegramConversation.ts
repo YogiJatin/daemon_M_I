@@ -54,6 +54,7 @@ import { normalizeActions } from "./intentSchema";
 import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
 import { matchDeterministicReply } from "./greetingMatcher";
 import { applyReplyStyle } from "./replyStyle";
+import { finalizeTelegramUpdate } from "./telegramLedger";
 import { getISTDateParts } from "./dateParser";
 
 // ---------------------------------------------------------------------------
@@ -1686,6 +1687,7 @@ async function handleConversation(
   const leaseMs = parseInt(env.CHAT_LEASE_MS || String(DEFAULT_LEASE_MS), 10);
   const totalBudgetMs = parseInt(env.CONVERSATION_BUDGET_MS || String(DEFAULT_TOTAL_BUDGET_MS), 10);
   const deadline = Date.now() + totalBudgetMs;
+  let failureCode: string | null = null;
 
   // Insert user message with status 'received'
   const userMsgRowId = await logChatMessage(db, {
@@ -1778,8 +1780,11 @@ async function handleConversation(
     }
   } catch (err) {
     console.error("[handleConversation] Unhandled error:", err);
+    failureCode = "conversation_error";
   } finally {
     await releaseLease(db, String(chatId), updateId);
+    // A chat turn must not stay 'received' forever: it either replied or it failed.
+    await finalizeTelegramUpdate(db, updateId, new Date(), failureCode);
   }
 }
 
