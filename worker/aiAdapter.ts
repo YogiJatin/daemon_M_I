@@ -89,7 +89,60 @@ function getCircuitState(providerId: string): CircuitState {
 }
 
 /** Hard ceiling for chat/reply generation across every provider. */
-export const MAX_CHAT_TEMPERATURE = 0.2;
+/** Chat output stays near-deterministic; anything above this is clamped down. */
+export const MAX_CHAT_TEMPERATURE = 0.1;
+
+/**
+ * Groq strict mode requires every property to appear in `required` and
+ * `additionalProperties: false` at every object level. Capability schemas are written
+ * for humans, so normalise them here instead of maintaining two copies.
+ *
+ * A property marked `nullable: true` becomes type [<type>, "null"], which is how the
+ * classifier expresses "may be empty" without dropping the key from the response.
+ */
+export function toStrictJsonSchema(schema: Record<string, any>): Record<string, any> {
+  const clone = JSON.parse(JSON.stringify(schema));
+  const walk = (node: any): any => {
+    if (!node || typeof node !== "object") return node;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return node;
+    }
+    if (node.nullable === true) {
+      delete node.nullable;
+      if (typeof node.type === "string") node.type = [node.type, "null"];
+    }
+    if (node.type === "array" && node.items) walk(node.items);
+    if (node.properties && typeof node.properties === "object") {
+      node.additionalProperties = false;
+      node.required = Object.keys(node.properties);
+      Object.values(node.properties).forEach(walk);
+    }
+    return node;
+  };
+  return walk(clone);
+}
+
+/**
+ * Gemini's responseSchema uses the OpenAPI subset: upper-case type names and no
+ * additionalProperties keyword.
+ */
+export function toGeminiSchema(schema: Record<string, any>): Record<string, any> {
+  const clone = JSON.parse(JSON.stringify(schema));
+  const walk = (node: any): any => {
+    if (!node || typeof node !== "object") return node;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return node;
+    }
+    delete node.additionalProperties;
+    if (typeof node.type === "string") node.type = node.type.toUpperCase();
+    if (node.items) walk(node.items);
+    if (node.properties) Object.values(node.properties).forEach(walk);
+    return node;
+  };
+  return walk(clone);
+}
 
 /**
  * Clamps a requested temperature to [0, 0.2]. Defaults to 0.1 (deterministic).
@@ -394,6 +447,7 @@ export class AIAdapter {
         userPrompt: canonicalXml,
         inputContext: input,
         privacyClass,
+        outputSchema: capability.outputSchema,
         simulatedFailure,
         temperature: typeof (input as any)?.temperature === "number" ? (input as any).temperature : undefined,
       };
@@ -414,6 +468,7 @@ export class AIAdapter {
               userPrompt: `${canonicalXml}\n\n${(verification as any).repairPrompt}`,
               inputContext: input,
               privacyClass,
+              outputSchema: capability.outputSchema,
             };
             const repairRes = await this.callProvider<any>(config, repairReq, now);
             const secondCheck = capability.validator(repairRes.data, builder.getIndexedRecordIds());
@@ -870,8 +925,15 @@ export class AIAdapter {
     // Plain-text paths must NOT use json_object mode (Groq wraps reply in JSON object)
     const isPlainText = request.responseFormat === "text";
 
-    try {
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    // Prefer a strict JSON schema when the capability declares one, so the provider
+    // enforces the shape instead of us hoping the prompt did.
+    const strictFormat = !isPlainText && request.outputSchema
+      ? { type: "json_schema", json_schema: { name: "daemon_output", strict: true, schema: toStrictJsonSchema(request.outputSchema) } }
+      : null;
+    const jsonObjectFormat = isPlainText ? {} : { type: "json_object" };
+
+    const sendGroq = (responseFormat: any) =>
+      fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
@@ -880,12 +942,30 @@ export class AIAdapter {
             { role: "system", content: request.systemPrompt },
             { role: "user", content: request.userPrompt },
           ],
-          ...(isPlainText ? {} : { response_format: { type: "json_object" } }),
+          ...(isPlainText ? {} : { response_format: responseFormat }),
           temperature: resolveTemperature(request.temperature),
           max_tokens: 1024,
         }),
         signal: controller.signal,
       });
+
+    try {
+      let response = await sendGroq(strictFormat || jsonObjectFormat);
+
+      // A model that rejects the schema should still answer in JSON rather than take the
+      // whole turn down, so downgrade exactly once instead of failing the provider.
+      if (!response.ok && strictFormat && response.status === 400) {
+        const firstBody = await response.text().catch(() => "");
+        if (/response_format|json_schema|schema/i.test(firstBody)) {
+          console.warn("[Groq] json_schema rejected, retrying with json_object:", firstBody.slice(0, 160));
+          response = await sendGroq(jsonObjectFormat);
+        } else {
+          const err: any = new Error(`Groq API error: 400`);
+          err.status = 400;
+          err.body = firstBody;
+          throw err;
+        }
+      }
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => "(unreadable)");
@@ -1024,7 +1104,12 @@ export class AIAdapter {
       contents: [{ parts: [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }] }],
       generationConfig: {
         temperature: resolveTemperature(request.temperature),
-        ...(isPlainText ? {} : { responseMimeType: "application/json" }),
+        ...(isPlainText
+          ? {}
+          : {
+              responseMimeType: "application/json",
+              ...(request.outputSchema ? { responseSchema: toGeminiSchema(request.outputSchema) } : {}),
+            }),
         thinkingConfig: { thinkingBudget: 0 },
       },
     };

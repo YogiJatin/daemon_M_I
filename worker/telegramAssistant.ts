@@ -742,6 +742,75 @@ export function registerTelegramAssistantCapability(): void {
       actions: "array optional",
     }),
 
+    // Sent to providers that support schema-enforced JSON (Groq strict, Gemini
+    // responseSchema). The adapter downgrades to plain JSON mode if a model rejects it.
+    outputSchema: {
+      type: "object",
+      properties: {
+        intent: { type: "string" },
+        confidence: { type: "number" },
+        reply_needed: { type: "boolean" },
+        reply_text: { type: "string" },
+        tasks: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              date_phrase: { type: "string", nullable: true },
+              offset_days: { type: "integer", nullable: true },
+              hour: { type: "integer", nullable: true },
+              minute: { type: "integer", nullable: true },
+              anchor: { type: "string", nullable: true },
+              priority: { type: "string", nullable: true },
+            },
+          },
+        },
+        query: {
+          type: "object",
+          properties: {
+            type: { type: "string", nullable: true },
+            date: { type: "string", nullable: true },
+          },
+        },
+        lookup: {
+          type: "object",
+          properties: {
+            kind: { type: "string", nullable: true },
+            query: { type: "string", nullable: true },
+            place: { type: "string", nullable: true },
+            when: { type: "string", nullable: true },
+          },
+        },
+        memory: {
+          type: "object",
+          properties: { text: { type: "string", nullable: true } },
+        },
+        actions: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string" },
+              query: { type: "string", nullable: true },
+              text: { type: "string", nullable: true },
+              title: { type: "string", nullable: true },
+              date_phrase: { type: "string", nullable: true },
+              offset_days: { type: "integer", nullable: true },
+              hour: { type: "integer", nullable: true },
+              minute: { type: "integer", nullable: true },
+              anchor: { type: "string", nullable: true },
+              priority: { type: "string", nullable: true },
+              query_type: { type: "string", nullable: true },
+              kind: { type: "string", nullable: true },
+              place: { type: "string", nullable: true },
+              when: { type: "string", nullable: true },
+            },
+          },
+        },
+      },
+    },
+
     contextBuilder: async (_db, input, builder, now) => {
       const prompt = buildAssistantUserPrompt(
         input.userText,

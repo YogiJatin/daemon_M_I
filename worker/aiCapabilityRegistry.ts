@@ -39,6 +39,12 @@ export interface AICapabilityDefinition<TInput = any, TOutput = any> {
   timeoutMs: number;
   systemRules: string;
   outputContract: string;
+  /**
+   * Optional JSON Schema for the expected response. When present the adapter asks the
+   * provider to enforce it (Groq json_schema strict, Gemini responseSchema); when absent
+   * the provider only knows the output must be JSON.
+   */
+  outputSchema?: Record<string, any>;
   contextBuilder: (db: D1Database, input: TInput, builder: AIContextBuilder, now: Date) => Promise<void>;
   validator: (data: any, indexedIds: Set<string>) => { valid: boolean; errors: string[] };
   handler: (db: D1Database, validatedOutput: any, input: TInput, now: Date) => Promise<TOutput>;
