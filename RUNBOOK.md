@@ -79,6 +79,31 @@ Send the following commands directly in Telegram:
    curl -F "url=https://personal-ai-os.jatin-personal-ai.workers.dev/api/v1/telegram/webhook" -F "secret_token=<NEW_SECRET>" https://api.telegram.org/bot<NEW_TOKEN>/setWebhook
    ```
 
+### 4.1b. Rotating TELEGRAM_WEBHOOK_SECRET (must be paired)
+
+Rotating only one side takes the bot offline: Telegram keeps sending the old secret and the
+Worker answers every update with `401`, silently. Worker secrets cannot be read back, so the
+pairing step needs the real bot token on the owner's machine.
+
+1. Put the real bot token in `.dev.vars` (gitignored) as `TELEGRAM_BOT_TOKEN`.
+   A real token is about 46 characters; the placeholder is 28 and returns `404 Not Found`.
+2. Generate a secret and write it to the Worker:
+   ```powershell
+   node -e "const c=require('crypto');console.log(c.randomBytes(32).toString('hex'))" | Out-File -Encoding ascii backups/.new_webhook_secret
+   Get-Content backups/.new_webhook_secret | npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
+   ```
+3. Teach Telegram the same value, then verify:
+   ```powershell
+   npx tsx scripts/set_webhook.ts
+   ```
+   It prints only lengths and `ok` flags, calls `setWebhook` with `allowed_updates=[message,callback_query]`,
+   and re-reads `getWebhookInfo` to confirm the URL and that no `last_error_message` is present.
+4. `npx tsx scripts/set_webhook.ts` exits 2 without a real token rather than pretending to work.
+
+Note: the pre-2026-11 production value (`5d5eb296-...`) is still hardcoded in
+`scripts/query_d1_status.cjs`, `scripts/run_golden.ts` and `tests/test_failover_ai.ts`.
+That is why it must be rotated: those files are tracked in git.
+
 ### 4.2. Revoking Desktop Device Access
 In Telegram send:
 ```text
@@ -96,7 +121,7 @@ npx wrangler d1 execute personal-ai-os-db --remote --command="UPDATE desktop_dev
 - **Scheduled Data Retention**:
   - `chat_messages`: Purged after 30 days.
   - `telegram_updates`: Purged after 7 days.
-  - `desktop_mirror_outbox` (delivered): Purged after 30 days.
+  - `mirror_outbox` (delivered, superseded): Purged after 30 days.
 - **Database Backup Drill**:
   ```powershell
   npx tsx scripts/backup_drill.ts
