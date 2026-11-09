@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "tsx scripts/run_unit_tests.ts",
+    "eval:live": "tsx scripts/eval_live.ts",
     "preview": "npm run build && vite preview",
     "predeploy": "npx tsx scripts/deploy_model_guard.ts",
     "deploy": "npm run predeploy && npm run build && wrangler deploy",

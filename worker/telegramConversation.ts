@@ -53,6 +53,7 @@ import { handleForgetMemory, restoreLatestMemory } from "./memoryActions";
 import { normalizeActions } from "./intentSchema";
 import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
 import { matchDeterministicReply } from "./greetingMatcher";
+import { getISTDateParts } from "./dateParser";
 
 // ---------------------------------------------------------------------------
 // Budget & timing constants
@@ -417,7 +418,7 @@ async function processSingleMessage(
   const isBulkStopReminders = /^(stop|cancel|clear|mute)\s+(all|every)(\s+of\s+(the|those))?\s+reminders?/i.test(text);
 
   if (isBulkComplete || isBulkStopReminders) {
-    const todayIst = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+    const todayIst = getISTDateParts(now).localDate;
     const [overdueTasks, openNotDueTasks, pendingReminders] = await Promise.all([
       db.prepare("SELECT id, title FROM tasks WHERE status = 'open' AND deadline_local_date < ? ORDER BY deadline_local_date ASC").bind(todayIst).all<{ id: string; title: string }>().catch(() => ({ results: [] })),
       db.prepare("SELECT id, title FROM tasks WHERE status = 'open' AND (deadline_local_date IS NULL OR deadline_local_date >= ?) ORDER BY deadline_local_date ASC").bind(todayIst).all<{ id: string; title: string }>().catch(() => ({ results: [] })),
@@ -1337,7 +1338,7 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     // SCHEDULE EXCEPTION (B4, G19)
     // -------------------------
     case "schedule_exception": {
-      const istDate = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+      const istDate = getISTDateParts(now).localDate;
       const timeMatch = text.match(/(\d{1,2}(?::\d{2})?(?:\s*[ap]m)?)/i);
       let overrideTime = "16:30";
       if (timeMatch) {
@@ -1357,9 +1358,7 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
 
       const formattedOverride = formatTime12h(overrideTime);
       const formattedNow = formatTime12h(
-        `${String(new Date(now.getTime() + 5.5 * 3600 * 1000).getUTCHours()).padStart(2, "0")}:${String(
-          new Date(now.getTime() + 5.5 * 3600 * 1000).getUTCMinutes()
-        ).padStart(2, "0")}`
+        `${getISTDateParts(now).hours}:${getISTDateParts(now).minutes}`
       );
 
       replyText = `Leaving college updated to ${formattedOverride} today (you told me at ${formattedNow}).\nShift reminder "pick up groceries on the way home from college" from 4:15 PM to ${formattedOverride}?`;
@@ -1425,7 +1424,7 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
 
       // Check daily implicit cap (G28, default 3)
       if (isImplicit) {
-        const todayIst = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+        const todayIst = getISTDateParts(now).localDate;
         const capRow = await db
           .prepare(
             `SELECT COUNT(*) as cnt FROM task_proposals

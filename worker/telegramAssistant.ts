@@ -1,4 +1,4 @@
-import { formatConfirmationDate } from "./dateParser";
+import { formatConfirmationDate, getISTDateParts } from "./dateParser";
 /**
  * worker/telegramAssistant.ts - telegram_assistant AI Capability
  *
@@ -661,7 +661,7 @@ export async function handleModifyPending(
       }
 
       const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-      const todayIst = new Date(now.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+      const todayIst = getISTDateParts(now).localDate;
 
       await db
         .prepare(

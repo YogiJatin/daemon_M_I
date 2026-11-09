@@ -1,0 +1,60 @@
+{"id":"j01","text":"Yoo","source":"section_j","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"j02","text":"What","source":"section_j","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["Specify the request"]}}
+{"id":"j03","text":"Yoo","source":"section_j","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"j04","text":"Who am I describe me","source":"section_j","mode":"model","expect":{"intent_any":["general_question","chat","lookup"],"reply_not_contains":["third-year","third\u2011year","third year ECE"]}}
+{"id":"j05","text":"Delete in your memory that i am a third-year ECE student","source":"section_j","mode":"model","expect":{"intent_any":["remember","chat"],"reply_not_contains":["I\u2019ve removed","I've removed","I have removed"]}}
+{"id":"j06","text":"Okay delete in your memory about me being 3 year ece student","source":"section_j","mode":"model","expect":{"intent_any":["remember","chat"],"reply_not_contains":["I\u2019ve removed","I've removed"]}}
+{"id":"j07","text":"Who am I describe me","source":"section_j","mode":"model","expect":{"intent_any":["general_question","chat","lookup"],"reply_not_contains":["third-year","third\u2011year"]}}
+{"id":"j08","text":"What are you made up of","source":"section_j","mode":"model","expect":{"intent_any":["general_question","chat"],"reply_not_contains":["Anything else"]}}
+{"id":"j09","text":"Who are you","source":"section_j","mode":"model","expect":{"intent_any":["general_question","chat"],"reply_not_contains":["here to support you","Anything else"]}}
+{"id":"j10","text":"How will you call me","source":"section_j","mode":"model","expect":{"intent_any":["chat","general_question"],"reply_not_contains":["whenever you like"]}}
+{"id":"d01","text":"hi","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"d02","text":"Hello!","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"d03","text":"hey","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"d04","text":"Good morning","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"d05","text":"gm","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"d06","text":"namaste","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"d07","text":"yo","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"d08","text":"sup","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"d09","text":"good evening","mode":"deterministic","expect":{"kind":"greeting","reply_contains":["sir"]}}
+{"id":"d10","text":"ok","mode":"deterministic","expect":{"kind":"acknowledgement","reply_contains":["Noted"]}}
+{"id":"d11","text":"okay","mode":"deterministic","expect":{"kind":"acknowledgement","reply_contains":["Noted"]}}
+{"id":"d12","text":"thanks","mode":"deterministic","expect":{"kind":"acknowledgement","reply_contains":["Noted"]}}
+{"id":"d13","text":"noted","mode":"deterministic","expect":{"kind":"acknowledgement","reply_contains":["Noted"]}}
+{"id":"d14","text":"hmm","mode":"deterministic","expect":{"kind":"acknowledgement","reply_contains":["Noted"]}}
+{"id":"d15","text":"cool","mode":"deterministic","expect":{"kind":"acknowledgement","reply_contains":["Noted"]}}
+{"id":"d16","text":"got it","mode":"deterministic","expect":{"kind":"acknowledgement","reply_contains":["Noted"]}}
+{"id":"d17","text":"who","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["Specify the request"]}}
+{"id":"d18","text":"why","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["Specify the request"]}}
+{"id":"d19","text":"how","mode":"deterministic","expect":{"kind":"fragment","reply_contains":["Specify the request"]}}
+{"id":"g01","text":"yo add task buy milk","mode":"guard","expect":{"deterministic_null":true}}
+{"id":"g02","text":"what time is my class","mode":"guard","expect":{"deterministic_null":true}}
+{"id":"g03","text":"remind me at 5","mode":"guard","expect":{"deterministic_null":true}}
+{"id":"g04","text":"when is my next class","mode":"guard","expect":{"deterministic_null":true}}
+{"id":"g05","text":"ok so add a reminder for tomorrow","mode":"guard","expect":{"deterministic_null":true}}
+{"id":"m01","text":"Submit DBMS assignment tomorrow at 5pm","mode":"model","expect":{"intent_any":["explicit_task","implicit_commitment"],"reply_not_contains":["No data"]}}
+{"id":"m02","text":"Remind me to call mom at 8pm today","mode":"model","expect":{"intent_any":["explicit_reminder","explicit_task"],"reply_not_contains":["No data"]}}
+{"id":"m03","text":"I have to finish the lab report by Friday","mode":"model","expect":{"intent_any":["implicit_commitment","explicit_task"],"reply_not_contains":["No data"]}}
+{"id":"m04","text":"What is my schedule today?","mode":"model","expect":{"intent_any":["query_schedule","query_tasks"]}}
+{"id":"m05","text":"Which tasks are due this week?","mode":"model","expect":{"intent_any":["query_tasks","query_schedule"]}}
+{"id":"m06","text":"Mark the milk task as done","mode":"model","expect":{"intent_any":["modify_pending","chat","query_tasks"]}}
+{"id":"m07","text":"Remember that I prefer morning classes","mode":"model","expect":{"intent_any":["remember"]}}
+{"id":"m08","text":"I am leaving college at 4:30 today","mode":"model","expect":{"intent_any":["schedule_exception","chat","implicit_commitment"]}}
+{"id":"m09","text":"What is the capital of France?","mode":"model","expect":{"intent_any":["general_question","lookup"]}}
+{"id":"m10","text":"Who won the 2022 football world cup?","mode":"model","expect":{"intent_any":["lookup","general_question"]}}
+{"id":"m11","text":"Thanks, that is all for now","mode":"model","expect":{"intent_any":["chat","general_question"]}}
+{"id":"m12","text":"asdkjhasd qwerty","mode":"model","expect":{"intent_any":["unclear","chat"]}}
+{"id":"m13","text":"Add task: pay electricity bill on 15 Nov","mode":"model","expect":{"intent_any":["explicit_task","implicit_commitment"]}}
+{"id":"m14","text":"Remind me to submit the form tomorrow morning","mode":"model","expect":{"intent_any":["explicit_reminder","explicit_task"]}}
+{"id":"m15","text":"I need to email the professor about the extension","mode":"model","expect":{"intent_any":["implicit_commitment","explicit_task"]}}
+{"id":"m16","text":"Am I free at 3pm tomorrow?","mode":"model","expect":{"intent_any":["query_schedule","query_tasks"]}}
+{"id":"m17","text":"Show me my open tasks","mode":"model","expect":{"intent_any":["query_tasks"]}}
+{"id":"m18","text":"Delete the reminder about groceries","mode":"model","expect":{"intent_any":["modify_pending","chat","remember"],"reply_not_contains":["I\u2019ve removed","I've removed"]}}
+{"id":"m19","text":"Remember my roll number is 21EC1042","mode":"model","expect":{"intent_any":["remember"]}}
+{"id":"m20","text":"I will be home late today, shift my evening reminder","mode":"model","expect":{"intent_any":["schedule_exception","modify_pending","chat"]}}
+{"id":"m21","text":"Why is the sky blue?","mode":"model","expect":{"intent_any":["general_question","lookup"]}}
+{"id":"m22","text":"What is the weather in Hyderabad right now?","mode":"model","expect":{"intent_any":["lookup","general_question","query_schedule"]}}
+{"id":"m23","text":"I am feeling tired today","mode":"model","expect":{"intent_any":["chat","general_question"]}}
+{"id":"m24","text":"kbkjsdf lorem ipsum dolor","mode":"model","expect":{"intent_any":["unclear","chat"]}}
+{"id":"m25","text":"Add a task to buy groceries today at 6pm","mode":"model","expect":{"intent_any":["explicit_task","implicit_commitment"]}}
+{"id":"m26","text":"Remind me about the project review on Monday 10am","mode":"model","expect":{"intent_any":["explicit_reminder","explicit_task"]}}

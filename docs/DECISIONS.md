@@ -413,3 +413,15 @@ Each entry explains **what** was decided, **why**, and any **trade-offs**.
 **Context**: The owner wants memories readable in the vault, but vault edits must never become a second source of truth, and private memories must not leave D1.
 **Decision**: D1 enqueues `mirror_outbox` jobs (`action` upsert/delete) keyed by `memory:<id>` after a committed write or delete; private memories and rows without a committed change never enqueue. The desktop agent deletes only the note matching a delete job, inside the vault allowlist. A reconcile pass with a 24h settings marker re-enqueues missing upserts and soft-delete tombstones.
 **Consequences**: The vault stays a read-only projection. A lost or offline agent self-heals within a day; vault edits are preserved as conflict copies, never written back.
+
+## ADR-051 - Audit Remediation: Grounded Persona, Schema-Enforced Output, Suppressed Reminders
+**Date**: 2026-11-09
+**Context**: A read-only audit (`docs/AUDIT_2026-11-08.md`) found sixteen issues across data hygiene, auth, prompt behaviour, structured output, scheduling, escaping and observability. Ten real production turns showed greetings answered with "No data.", action claims that D1 never committed, and reminders queued for archived tasks.
+**Decision**:
+1. Fixture data, dead settings and stray devices were removed from production D1, and 103 reminders pointing at archived tasks were suppressed, not deleted.
+2. Test runners default to loopback; production targets require `--allow-remote`. Internal routes 404 unless `ENABLE_TEST_ROUTES=1` and a `TEST_ADMIN_TOKEN` of at least 32 characters is presented; the webhook secret no longer mints a synthetic admin session.
+3. One daemon persona block is shared by the chat and answer prompts, the "No data." instruction is gone, greetings/acknowledgements/bare question words are answered deterministically in code, and the egress guard normalises Unicode before checking action claims.
+4. Chat output uses provider-side JSON schemas (`json_schema` for Groq, `responseSchema` for Gemini) with a one-time downgrade to plain JSON mode, and the chat temperature ceiling drops to 0.1.
+5. The daily cap applies only to re-nudges of unacknowledged reminders; first fires are never counted, and pending rows for closed tasks in the same batch are cancelled.
+6. No `turn_log` table: `chat_messages` already stores intent, confidence, provider, latency and outcome per turn, and a second per-turn table would duplicate the task-state source of truth the SRS forbids.
+**Consequences**: Every prompt edit now has a regression signal (`npm test`, `npm run eval:live` over 60 cases). Reminder caps no longer starve legitimate first fires. Live provider behaviour still needs the owner's keys in `.dev.vars`, because production keeps them as Worker secrets that cannot be read back.
