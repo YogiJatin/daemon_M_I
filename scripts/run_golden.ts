@@ -12,6 +12,7 @@ import * as path from "path";
 import * as crypto from "crypto";
 import { execSync } from "child_process";
 import { assertSafeTarget, parseTarget } from "./lib/testGuard";
+import { requireWebhookSecret } from "./lib/devVars";
 
 const ROOT_DIR = process.cwd();
 // Defaults to wrangler dev on 127.0.0.1:8787; production needs --allow-remote.
@@ -237,7 +238,7 @@ async function main() {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       Authorization: `Bearer ${rawToken}`,
-      "X-Telegram-Bot-Api-Secret-Token": "5d5eb296-6d63-455b-b9f2-fe9fbf49fa87",
+      "X-Telegram-Bot-Api-Secret-Token": requireWebhookSecret(),
       "X-Test-Clock": testClock,
       "X-Test-Stubs": testStubs,
     };

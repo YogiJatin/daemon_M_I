@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
+import { requireWebhookSecret } from "../scripts/lib/devVars";
 
 async function main() {
-  const webhookSecret = "5d5eb296-6d63-455b-b9f2-fe9fbf49fa87";
+  const webhookSecret = requireWebhookSecret();
   const updateId = Math.floor(Math.random() * 1000000) + 100000;
 
   console.log(`Sending /ai command via webhook with update_id ${updateId}...`);

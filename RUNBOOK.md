@@ -100,9 +100,10 @@ pairing step needs the real bot token on the owner's machine.
    and re-reads `getWebhookInfo` to confirm the URL and that no `last_error_message` is present.
 4. `npx tsx scripts/set_webhook.ts` exits 2 without a real token rather than pretending to work.
 
-Note: the pre-2026-11 production value (`5d5eb296-...`) is still hardcoded in
-`scripts/query_d1_status.cjs`, `scripts/run_golden.ts` and `tests/test_failover_ai.ts`.
-That is why it must be rotated: those files are tracked in git.
+Note: the pre-2026-11 production value was hardcoded in `scripts/query_d1_status.cjs`,
+`scripts/run_golden.ts` and `tests/test_failover_ai.ts`; all three now read
+`scripts/lib/devVars.ts` (env or `.dev.vars`). Rotation is still required, because the old
+value remains in git history and in every clone of it.
 
 ### 4.2. Revoking Desktop Device Access
 In Telegram send:

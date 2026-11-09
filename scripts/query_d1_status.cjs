@@ -1,4 +1,19 @@
-const secret = "5d5eb296-6d63-455b-b9f2-fe9fbf49fa87";
+// Secret comes from the environment or the gitignored .dev.vars, never from this file.
+function loadSecret() {
+  if (process.env.TELEGRAM_WEBHOOK_SECRET) return process.env.TELEGRAM_WEBHOOK_SECRET;
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const file = path.join(__dirname, "..", ".dev.vars");
+    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+      const match = line.match(/^\s*TELEGRAM_WEBHOOK_SECRET\s*=\s*(.*)$/);
+      if (match) return match[1].trim().replace(/^["']|["']$/g, '');
+    }
+  } catch {}
+  throw new Error("TELEGRAM_WEBHOOK_SECRET is not set (use .dev.vars or the environment).");
+}
+
+const secret = loadSecret();
 const url = "https://personal-ai-os.jatin-personal-ai.workers.dev/api/v1/internal/test/d1-query";
 
 async function query(sql, binds = []) {
