@@ -20,6 +20,13 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Hermetic suite: failover is exercised through simulatedFailure and the mock
+// profile, so any real provider call is a bug. Block it loudly instead of
+// sending placeholder keys to Groq.
+globalThis.fetch = (() => {
+  throw new Error("unit_ai_failover: live network access blocked - this suite runs on mocks only");
+}) as unknown as typeof fetch;
+
 let passCount = 0;
 let failCount = 0;
 
@@ -145,10 +152,12 @@ async function runFailoverTests() {
   const tasksBefore = (await mockDb.prepare("SELECT count(*) as cnt FROM tasks").first())?.cnt || 0;
   const proposalsBefore = (await mockDb.prepare("SELECT count(*) as cnt FROM task_proposals").first())?.cnt || 0;
 
-  // Run AI capability
+  // Run AI capability. simulatedFailure routes to the deterministic mock
+  // provider, so placeholder keys are never sent to a live Groq endpoint.
   const taskBreakdownRes = await aiCaps.taskBreakdown(
     { title: "Plan sprint roadmap" },
-    "personal"
+    "personal",
+    "429"
   );
 
   assert(taskBreakdownRes.ok === true, "AI taskBreakdown executes successfully");

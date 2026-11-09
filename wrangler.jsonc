@@ -31,7 +31,8 @@
     "GROQ_MODEL": "openai/gpt-oss-120b",
     "GROQ_MODEL_SECONDARY": "openai/gpt-oss-20b",
     "GEMINI_MODEL": "gemini-2.0-flash",
-    "WORKERS_AI_MODEL": "@cf/meta/llama-3.2-3b-instruct"
+    "WORKERS_AI_MODEL": "@cf/meta/llama-3.2-3b-instruct",
+    "WEBHOOK_URL": "https://personal-ai-os.jatin-personal-ai.workers.dev/api/v1/telegram/webhook"
   },
 
   "triggers": {

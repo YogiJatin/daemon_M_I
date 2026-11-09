@@ -8,6 +8,7 @@ interface __BaseEnv_Env {
 	TELEGRAM_WEBHOOK_SECRET: string;
 	TELEGRAM_OWNER_ID: string;
 	HEALTHCHECKS_PING_URL: string;
+	WEBHOOK_URL: string;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
@@ -20,7 +21,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "TELEGRAM_BOT_TOKEN" | "TELEGRAM_WEBHOOK_SECRET" | "TELEGRAM_OWNER_ID" | "HEALTHCHECKS_PING_URL">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "TELEGRAM_BOT_TOKEN" | "TELEGRAM_WEBHOOK_SECRET" | "TELEGRAM_OWNER_ID" | "HEALTHCHECKS_PING_URL" | "WEBHOOK_URL">> {}
 }
 declare module "*.txt" {
 	const value: string;

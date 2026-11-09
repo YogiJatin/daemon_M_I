@@ -34,7 +34,7 @@ async function main() {
 
 Step 1: Generate a pairing code in Telegram
   - Open your Telegram bot.
-  - Send the command: /pair
+  - Send the command: /pair desktop
   - You will receive an 8-character pairing code valid for 10 minutes.
 
 Step 2: Run the pairing command in terminal

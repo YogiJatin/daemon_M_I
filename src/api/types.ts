@@ -29,7 +29,7 @@ export interface ClassOccurrence {
   status: 'planned' | 'completed' | 'attended' | 'cancelled' | 'missed';
   subject_name: string;
   subject_code?: string | null;
-  color?: string;
+  color?: string | null;
   materials?: Array<{
     materialType: string;
     title: string;
@@ -78,6 +78,14 @@ export interface WeekSchedule {
   }>;
 }
 
+export interface WebhookSyncState {
+  at: string;
+  action: string;
+  ok: boolean;
+  tg_description: string;
+  last_error_message: string;
+}
+
 export interface SystemStatus {
   overall_status: 'healthy' | 'degraded' | 'paused' | 'offline';
   reminders_paused: boolean;
@@ -116,6 +124,7 @@ export interface SystemStatus {
     ready: boolean;
     disarmed: boolean;
   };
+  webhook: WebhookSyncState | null;
 }
 
 export interface AuditEventItem {

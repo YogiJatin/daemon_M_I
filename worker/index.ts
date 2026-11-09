@@ -1,4 +1,5 @@
 import { runGmailIngestionCron } from "./gmailIngestion";
+import { maybeSyncWebhook } from "./webhookSync";
 import { routeCommand } from "./commands";
 import { handleNonSlashMessage } from "./telegramConversation";
 import { AIAdapter } from "./aiAdapter";
@@ -1742,6 +1743,23 @@ export default {
   // Block 2A & 2B: One-minute Cron Trigger scheduler entrypoint
   async scheduled(controller, env): Promise<void> {
     const scheduledTime = controller.scheduledTime ? new Date(controller.scheduledTime) : new Date();
+    // Webhook self-heal (P0): run only every 5 minutes, at most one setWebhook per 30 min.
+    // Never derive the target URL from request input; it comes only from the configured var.
+    if (scheduledTime.getMinutes() % 5 === 0) {
+      try {
+        await maybeSyncWebhook(
+          {
+            WEBHOOK_URL: env.WEBHOOK_URL,
+            TELEGRAM_BOT_TOKEN: env.TELEGRAM_BOT_TOKEN,
+            TELEGRAM_WEBHOOK_SECRET: env.TELEGRAM_WEBHOOK_SECRET,
+          },
+          env.DB,
+        );
+      } catch (err) {
+        console.error('webhook_sync_tick_error:', (err && (err as any).message ? (err as any).message : String(err)).slice(0, 200));
+      }
+    }
+
     // Booleans only: the owner id is a private Telegram identifier and has no place in logs.
     console.log({
       hasBotToken: !!env.TELEGRAM_BOT_TOKEN,

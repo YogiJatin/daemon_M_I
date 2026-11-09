@@ -36,6 +36,9 @@ dist-ssr
 backups/
 backup_pre_block0.sql
 
+# Desktop agent pairing token (secret, generated locally by npm run agent:pair)
+.desktop_token.enc
+
 # Desktop agent — local settings contain vault path (personal, not committed)
 desktop-agent/settings.json
 # PowerShell sync script — local only (contains vault config reference)

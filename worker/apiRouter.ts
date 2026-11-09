@@ -61,6 +61,7 @@ import {
 import { InputRouter } from "./inputRouter";
 import { handleMemoryApi } from "./memoryApi";
 import { handleDesktopApi } from "./desktopApi";
+import type { WebhookSyncState } from "../src/api/types";
 
 // ---------------------------------------------------------------------------
 // Standard Envelopes & Error Helpers
@@ -1339,8 +1340,19 @@ export async function handleApiRequest(
           ready: false,
           disarmed: true,
         },
+        webhook: readWebhookSyncState(env.DB),
       });
     }
+
+  function readWebhookSyncState(db: D1Database): WebhookSyncState | null {
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'webhook_sync_state'").first();
+    if (!row || typeof (row as any).value !== 'object') return null;
+    try {
+      return JSON.parse(String((row as any).value)) as WebhookSyncState;
+    } catch {
+      return null;
+    }
+  }
 
     // 12. SUGGESTIONS SERVICE (Deterministic Rule-Based Nudges)
     // =======================================================================
