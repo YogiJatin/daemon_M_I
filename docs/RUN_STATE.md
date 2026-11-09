@@ -19,7 +19,11 @@
   - Set via: wrangler secret put TELEGRAM_WEBHOOK_SECRET
   - Updated in .dev.vars with same quoting style
   - Secret never printed
-- [ ] S6 Deploy
+- [x] S6 Deploy — DONE
+  - deploy_model_guard.ts: PASS
+  - npm run build: exit 0
+  - wrangler deploy: exit 0
+  - Version ID: 52480a9f-7236-496e-9648-e091aa5ec428
 - [ ] S7 Verify self-heal
 - [ ] S8 Auth check against live Worker
 - [ ] S9 SELECT telegram_updates and chat_messages
@@ -34,7 +38,9 @@
 - Commit 12e41c9: Update RUN_STATE.md to mark S1 and S2 as DONE.
 - Commit a94a85e: Update RUN_STATE.md to mark S3 as DONE with backup details.
 - Commit 24d0566: Update RUN_STATE.md to mark S4 as DONE.
+- Commit cc4b874: Update RUN_STATE.md to mark S5 as DONE.
 - Backup created: backups/d1-pre-webhook-20261109-20261109-171116.sql (696391 bytes)
 - Migration 0026 applied: 2026-11-09 09:42:09
 - Stale received rows: 0
 - Secret rotated: TELEGRAM_WEBHOOK_SECRET updated in cloud and .dev.vars
+- Deploy version ID: 52480a9f-7236-496e-9648-e091aa5ec428
