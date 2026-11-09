@@ -43,3 +43,4 @@ backup_pre_block0.sql
 desktop-agent/settings.json
 # PowerShell sync script — local only (contains vault config reference)
 scripts/obsidian-vault.conf
+tests/debug_prompt.ts

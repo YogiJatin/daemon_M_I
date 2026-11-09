@@ -198,3 +198,32 @@ export function withSystemResults(prompt: string, results: string[] = []): strin
 
   return body ? `${body}\n\n${block.join("\n")}` : block.join("\n");
 }
+
+export function assertSystemResultsEscaped(prompt: string): void {
+  if (!prompt.includes(SYSTEM_RESULTS_HEADER)) return;
+
+  // Find the opening <DATA type="system_results"> immediately before the header.
+  const openTag = '<DATA type="system_results">';
+  const openIndex = prompt.indexOf(openTag);
+  if (openIndex < 0) {
+    throw new Error("system_results block is missing its opening tag");
+  }
+
+  const bodyStart = openIndex + openTag.length;
+  const closeIndex = prompt.indexOf("</DATA>", bodyStart);
+  if (closeIndex < 0) {
+    throw new Error("system_results block is missing its closing tag");
+  }
+
+  const body = prompt.slice(bodyStart, closeIndex);
+
+  // The body must not contain a literal closing tag.
+  if (body.includes("</DATA>")) {
+    throw new Error("system_results body contains an unescaped closing tag");
+  }
+
+  // The body must not contain a literal opening tag of any DATA block.
+  if (body.includes("<DATA ") || body.includes("<DATA>")) {
+    throw new Error("system_results body contains an unescaped opening tag");
+  }
+}

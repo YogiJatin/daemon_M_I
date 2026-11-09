@@ -16,7 +16,7 @@ import { formatConfirmationDate, getISTDateParts } from "./dateParser";
 
 import { AICapabilityRegistry } from "./aiCapabilityRegistry";
 import { getCapabilityManifest, renderHelpResponse } from "./capabilityManifest";
-import { renderDaemonSystemPrompt, withSystemResults } from "./prompts";
+import { renderDaemonSystemPrompt, withSystemResults, assertSystemResultsEscaped } from "./prompts";
 import { resolveExtendedAnchor, ExtendedAnchor } from "./dailyRhythm";
 
 export type AssistantIntent =
@@ -142,7 +142,8 @@ export function buildAssistantUserPrompt(
   settings: Record<string, string>,
   recentTasks: any[],
   replyToProposal?: any,
-  recentChat: string[] = []
+  recentChat: string[] = [],
+  systemResultsParam: string[] = []
 ): string {
   const ist = new Intl.DateTimeFormat("en-IN", {
     timeZone: "Asia/Kolkata",
@@ -197,7 +198,13 @@ export function buildAssistantUserPrompt(
   lines.push(`\nClassify and respond in valid JSON.`);
   // The grounding verifier compares the reply against this exact text, so the SYSTEM
   // RESULTS section must be part of the prompt that is built here.
-  return withSystemResults(lines.join("\n"));
+  const preprocessedResults = (systemResultsParam ?? [])
+    .map((r) => escapeDataValue(String(r ?? "")))
+    .filter((r) => r.length > 0);
+  const joined = lines.join("\n");
+  const prompt = withSystemResults(joined, preprocessedResults);
+  assertSystemResultsEscaped(prompt);
+  return prompt;
 }
 
 // ---------------------------------------------------------------------------
