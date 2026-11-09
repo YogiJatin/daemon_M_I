@@ -1250,10 +1250,19 @@ export async function handleApiRequest(
         "SELECT last_seen_at, agent_version FROM desktop_devices WHERE revoked_at IS NULL ORDER BY last_seen_at DESC LIMIT 1"
       ).first<any>().catch(() => null);
 
+      // mirror_outbox is the real table; the old desktop_mirror_outbox name never existed,
+      // so this queue used to report zeros for every status.
       const mirrorCounts = await env.DB.prepare(
-        "SELECT status, COUNT(*) as cnt FROM desktop_mirror_outbox GROUP BY status"
+        "SELECT status, COUNT(*) as cnt FROM mirror_outbox GROUP BY status"
       ).all<{ status: string; cnt: number }>().catch(() => ({ results: [] }));
-      const mirrorQueue: Record<string, number> = { pending: 0, delivered: 0, conflict: 0, failed: 0 };
+      const mirrorQueue: Record<string, number> = {
+        pending: 0,
+        claimed: 0,
+        delivered: 0,
+        conflict: 0,
+        failed: 0,
+        superseded: 0,
+      };
       for (const r of mirrorCounts.results || []) {
         mirrorQueue[r.status] = r.cnt;
       }

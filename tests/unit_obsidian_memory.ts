@@ -13,7 +13,13 @@ import * as path from "node:path";
 
 import { createMockD1 } from "./mockD1";
 import { formatMemoryNote, isMirrorableMemory } from "../worker/obsidianMirror";
-import { enqueueMemoryMirror, reconcileMemoryMirror } from "../worker/desktopMirrorService";
+import {
+  acknowledgeMirrorJob,
+  claimPendingMirrorJobs,
+  enqueueMemoryMirror,
+  MIRROR_MAX_ATTEMPTS,
+  reconcileMemoryMirror,
+} from "../worker/desktopMirrorService";
 import { handleDeleteMemoryCallback } from "../worker/memoryService";
 import { processJob } from "../desktop_agent/mirror_agent";
 
@@ -118,7 +124,8 @@ async function main() {
     );
     const old = await db.prepare("SELECT status FROM mirror_outbox WHERE id = ?").bind(first).first<any>();
     const live = await db.prepare("SELECT status FROM mirror_outbox WHERE id = ?").bind(second).first<any>();
-    assert.strictEqual(old.status, "failed");
+    // 'superseded' is its own terminal status: nothing failed, the newer job replaced it.
+    assert.strictEqual(old.status, "superseded");
     assert.strictEqual(live.status, "pending");
   });
 
@@ -203,6 +210,53 @@ async function main() {
     } finally {
       fs.rmSync(vault, { recursive: true, force: true });
     }
+  });
+
+  await it("a late ack on a superseded job is ignored instead of reviving stale content", async () => {
+    const db = createMockD1();
+    insertMemory(db, { id: "mem_up3", canonical_text: "v1" });
+    const first = await enqueueMemoryMirror(
+      db,
+      { id: "mem_up3", type: "fact", title: "t", canonical_text: "v1", created_at: "x" },
+      "upsert"
+    );
+    await enqueueMemoryMirror(
+      db,
+      { id: "mem_up3", type: "fact", title: "t", canonical_text: "v2", created_at: "x" },
+      "upsert"
+    );
+
+    const ackResult = await acknowledgeMirrorJob(db, first as string, {
+      status: "failed",
+      error: "agent could not write",
+    });
+    assert.strictEqual(ackResult.success, true);
+
+    const after = await db.prepare("SELECT status, last_error FROM mirror_outbox WHERE id = ?").bind(first).first<any>();
+    assert.strictEqual(after.status, "superseded");
+    assert.ok(String(after.last_error).startsWith("Superseded by newer job"));
+  });
+
+  await it("retry ceiling stops a job after MIRROR_MAX_ATTEMPTS claims", async () => {
+    const db = createMockD1();
+    insertMemory(db, { id: "mem_retry", canonical_text: "retry me" });
+    const jobId = await enqueueMemoryMirror(
+      db,
+      { id: "mem_retry", type: "fact", title: "t", canonical_text: "retry me", created_at: "x" },
+      "upsert"
+    );
+
+    // Pretend the agent claimed it the maximum number of times without acking.
+    await db
+      .prepare("UPDATE mirror_outbox SET attempts = ? WHERE id = ?")
+      .bind(MIRROR_MAX_ATTEMPTS, jobId)
+      .run();
+
+    await claimPendingMirrorJobs(db, "dev_test", 10);
+
+    const job = await db.prepare("SELECT status, last_error FROM mirror_outbox WHERE id = ?").bind(jobId).first<any>();
+    assert.strictEqual(job.status, "failed");
+    assert.ok(String(job.last_error).includes(`Max retry attempts (${MIRROR_MAX_ATTEMPTS})`));
   });
 
   console.log(`\nTOTAL: ${passed + failed} | PASSED: ${passed} | FAILED: ${failed}`);

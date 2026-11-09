@@ -744,9 +744,10 @@ export async function handleHealth(args: string, context?: CommandContext): Prom
     context.db
       .prepare(`SELECT 
                   SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_cnt,
-                  SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_cnt
+                  SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_cnt,
+                  SUM(CASE WHEN status = 'superseded' THEN 1 ELSE 0 END) as superseded_cnt
                 FROM mirror_outbox`)
-      .first<{ pending_cnt: number | null; failed_cnt: number | null }>()
+      .first<{ pending_cnt: number | null; failed_cnt: number | null; superseded_cnt: number | null }>()
       .catch(() => null),
     context.db
       .prepare(`SELECT COUNT(*) as cnt FROM (SELECT update_id FROM telegram_updates GROUP BY update_id HAVING COUNT(*) > 1)`)
@@ -781,7 +782,7 @@ export async function handleHealth(args: string, context?: CommandContext): Prom
       : "Healthchecks: not configured",
     "",
     `Desktop Agent: ${desktopDev?.last_seen ? "Last seen " + desktopDev.last_seen : "Never connected"}`,
-    `Mirror Queue: ${outboxCounts?.pending_cnt ?? 0} pending, ${outboxCounts?.failed_cnt ?? 0} failed`,
+    `Mirror Queue: ${outboxCounts?.pending_cnt ?? 0} pending, ${outboxCounts?.failed_cnt ?? 0} failed, ${outboxCounts?.superseded_cnt ?? 0} superseded`,
     "",
     "Observability (24h):",
     `• Telegram redeliveries: ${redelivRows?.cnt ?? 0}`,
@@ -812,8 +813,9 @@ export async function handleStatus(args: string, context?: CommandContext): Prom
     context.db.prepare(`SELECT COUNT(*) as cnt, MAX(last_seen_at) as last_seen FROM desktop_devices WHERE revoked_at IS NULL`).first<{ cnt: number; last_seen: string | null }>().catch(() => ({ cnt: 0, last_seen: null })),
     context.db.prepare(`SELECT 
       SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_cnt,
-      SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as deliv_cnt
-      FROM mirror_outbox`).first<{ pending_cnt: number; deliv_cnt: number }>().catch(() => ({ pending_cnt: 0, deliv_cnt: 0 })),
+      SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as deliv_cnt,
+      SUM(CASE WHEN status = 'superseded' THEN 1 ELSE 0 END) as superseded_cnt
+      FROM mirror_outbox`).first<{ pending_cnt: number; deliv_cnt: number; superseded_cnt: number }>().catch(() => ({ pending_cnt: 0, deliv_cnt: 0, superseded_cnt: 0 })),
     context.db.prepare(`SELECT consecutive_failures, last_scheduler_success_at FROM system_health WHERE id = 1`).first<{ consecutive_failures: number; last_scheduler_success_at: string }>().catch(() => null),
   ]);
 
@@ -827,7 +829,7 @@ export async function handleStatus(args: string, context?: CommandContext): Prom
     "",
     "💻 *Desktop Mirror:*",
     `• Devices: ${devices?.cnt ?? 0} paired (${devices?.last_seen ? "Last seen " + devices.last_seen : "Never"})`,
-    `• Outbox Queue: ${outbox?.pending_cnt ?? 0} pending, ${outbox?.deliv_cnt ?? 0} delivered`,
+    `• Outbox Queue: ${outbox?.pending_cnt ?? 0} pending, ${outbox?.deliv_cnt ?? 0} delivered, ${outbox?.superseded_cnt ?? 0} superseded`,
     "",
     "⚡ *Worker & Scheduler:*",
     `• Scheduler: ${health?.consecutive_failures === 0 ? "🟢 Healthy" : "🔴 Failing"}`,

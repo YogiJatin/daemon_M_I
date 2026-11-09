@@ -12,6 +12,12 @@
 import { checkAndRedactSecrets } from "./secretsGuard";
 import { formatMemoryNote, isMirrorableMemory, MemoryNoteInput } from "./obsidianMirror";
 
+/**
+ * After this many claims a job stops being retried and is marked failed,
+ * so one bad job cannot occupy every mirror pull forever.
+ */
+export const MIRROR_MAX_ATTEMPTS = 5;
+
 export interface MirrorJobRecord {
   id: string;
   dedupe_key: string | null;
@@ -19,7 +25,7 @@ export interface MirrorJobRecord {
   filename: string;
   content: string;
   content_sha256: string;
-  status: "pending" | "claimed" | "delivered" | "conflict" | "failed";
+  status: "pending" | "claimed" | "delivered" | "conflict" | "failed" | "superseded";
   attempts: number;
   claimed_by: string | null;
   claimed_until: string | null;
@@ -252,12 +258,14 @@ export async function enqueueMirrorJob(
   const cleanContent = neutralizeObsidianContent(params.content, params.isUntrusted);
   const contentSha = await sha256Hex(cleanContent);
 
-  // If a pending/claimed job with the same dedupe_key exists, supersede it!
+  // If a pending/claimed job with the same dedupe_key exists, supersede it.
+  // 'superseded' is its own terminal status: nothing went wrong, so it must not
+  // be counted as a failure or retried.
   if (params.dedupeKey) {
     await db
       .prepare(
         `UPDATE mirror_outbox
-         SET status = 'failed', last_error = 'Superseded by newer job ${jobId}', updated_at = ?
+         SET status = 'superseded', last_error = 'Superseded by newer job ${jobId}', updated_at = ?
          WHERE dedupe_key = ? AND status IN ('pending', 'claimed')`
       )
       .bind(nowIso, params.dedupeKey)
@@ -301,18 +309,18 @@ export async function claimPendingMirrorJobs(
     .prepare(
       `UPDATE mirror_outbox
        SET status = 'pending', claimed_by = NULL, claimed_until = NULL, updated_at = ?
-       WHERE status = 'claimed' AND claimed_until < ? AND attempts < 5`
+       WHERE status = 'claimed' AND claimed_until < ? AND attempts < ${MIRROR_MAX_ATTEMPTS}`
     )
     .bind(nowIso, nowIso)
     .run()
     .catch(() => {});
 
-  // Mark jobs exceeding 5 attempts as failed
+  // Mark jobs that exhausted the retry ceiling as failed
   await db
     .prepare(
       `UPDATE mirror_outbox
-       SET status = 'failed', last_error = 'Max retry attempts (5) exceeded', updated_at = ?
-       WHERE status IN ('pending', 'claimed') AND attempts >= 5`
+       SET status = 'failed', last_error = 'Max retry attempts (${MIRROR_MAX_ATTEMPTS}) exceeded', updated_at = ?
+       WHERE status IN ('pending', 'claimed') AND attempts >= ${MIRROR_MAX_ATTEMPTS}`
     )
     .bind(nowIso)
     .run()
@@ -376,6 +384,12 @@ export async function acknowledgeMirrorJob(
   // Idempotent: if already delivered, ignore duplicate ack
   if (current.status === "delivered" && ack.status === "delivered") {
     return { success: true, message: "Job already delivered (idempotent)." };
+  }
+
+  // A superseded job was replaced by a newer one for the same dedupe key. Accepting
+  // its late ack would revive stale content or report a failure that never happened.
+  if (current.status === "superseded") {
+    return { success: true, message: "Job was superseded by a newer job; ack ignored." };
   }
 
   await db
