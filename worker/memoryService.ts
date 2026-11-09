@@ -442,33 +442,72 @@ export async function retrieveMemoriesForPrompt(
 ): Promise<{ xmlBlock: string; injectedIds: string[] }> {
   const nowIso = now.toISOString();
 
-  const rows = await db
-    .prepare(
-      `SELECT id, canonical_text, source, trust, created_at
-       FROM memory_objects
-       WHERE deleted_at IS NULL
-         AND sensitivity != 'private'
-         AND (expires_at IS NULL OR expires_at > ?)
-       ORDER BY created_at DESC
-       LIMIT 25`
-    )
-    .bind(nowIso)
-    .all<{
-      id: string;
-      canonical_text: string;
-      source: string;
-      trust: string;
-      created_at: string;
-    }>()
-    .catch(() => ({ results: [] }));
+  type MemoryRow = {
+    id: string;
+    canonical_text: string;
+    source: string;
+    trust: string;
+    created_at: string;
+  };
 
-  const memories = rows.results || [];
+  const CANDIDATES = 25;
+  const baseWhere =
+    "deleted_at IS NULL AND sensitivity != 'private' AND (expires_at IS NULL OR expires_at > ?)";
+  const queryWords = queryText
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 2)
+    .slice(0, 8);
+
+  // Relevance first, recency second. Selecting only the newest 25 rows meant an older
+  // memory that actually answered the question was never even considered.
+  const memories: MemoryRow[] = [];
+  const seen = new Set<string>();
+
+  if (queryWords.length > 0) {
+    const likeClauses = queryWords.map(() => "lower(canonical_text) LIKE ?").join(" OR ");
+    const matched = await db
+      .prepare(
+        `SELECT id, canonical_text, source, trust, created_at
+         FROM memory_objects
+         WHERE ${baseWhere} AND (${likeClauses})
+         ORDER BY created_at DESC
+         LIMIT ?`
+      )
+      .bind(nowIso, ...queryWords.map((w) => `%${w}%`), CANDIDATES)
+      .all<MemoryRow>()
+      .catch(() => ({ results: [] as MemoryRow[] }));
+
+    for (const row of matched.results || []) {
+      memories.push(row);
+      seen.add(row.id);
+    }
+  }
+
+  if (memories.length < CANDIDATES) {
+    const recent = await db
+      .prepare(
+        `SELECT id, canonical_text, source, trust, created_at
+         FROM memory_objects
+         WHERE ${baseWhere}
+         ORDER BY created_at DESC
+         LIMIT ?`
+      )
+      .bind(nowIso, CANDIDATES)
+      .all<MemoryRow>()
+      .catch(() => ({ results: [] as MemoryRow[] }));
+
+    for (const row of recent.results || []) {
+      if (seen.has(row.id)) continue;
+      memories.push(row);
+      seen.add(row.id);
+      if (memories.length >= CANDIDATES) break;
+    }
+  }
+
   if (memories.length === 0) {
     return { xmlBlock: "", injectedIds: [] };
   }
-
-  // Rank by word match on queryText if present, else recency
-  const queryWords = queryText.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
   const scored = memories.map((m) => {
     let matchCount = 0;
     const lower = m.canonical_text.toLowerCase();

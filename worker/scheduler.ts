@@ -268,18 +268,28 @@ export async function runScheduler(
           .bind(row.task_id)
           .first();
 
-        // Suppression 1: Task completed/dismissed
-        if (!task || task.status === "done" || task.status === "dismissed") {
+        // Suppression 1: the task is gone or closed. 'archived' used to fall through
+        // this check, which is why pending notifications kept accumulating against
+        // archived tasks long after they could ever fire.
+        const closedReason = !task
+          ? "task_missing"
+          : task.status === "archived"
+            ? "task_archived"
+            : task.status === "done" || task.status === "dismissed"
+              ? "task_completed_or_dismissed"
+              : null;
+
+        if (closedReason) {
           await db
             .prepare(
               `UPDATE notification_log
                SET status = 'suppressed',
-                   error_code = 'task_completed_or_dismissed',
+                   error_code = ?,
                    lease_expires_at = NULL,
                    updated_at = ?
                WHERE id = ? AND status = 'claimed'`
             )
-            .bind(nowIso, row.id)
+            .bind(closedReason, nowIso, row.id)
             .run();
 
           result.suppressedCount++;
@@ -309,16 +319,32 @@ export async function runScheduler(
       const isIndividual = row.notification_kind === "individual" || row.notification_kind === "reminder";
       let hasCapReservation = false;
 
-      if (isIndividual && !row.dedup_key.startsWith("prep-digest:") && !row.dedup_key.startsWith("catchup:")) {
+      // SRS §9.7: a first-fire reminder for a new deadline is never counted, delayed or
+      // suppressed. Only a repeat for the same task and stage (a re-nudge) spends budget.
+      const isRenudge =
+        isIndividual && task
+          ? Boolean(
+              await db
+                .prepare(
+                  `SELECT 1 AS hit FROM notification_log
+                   WHERE task_id = ? AND stage = ? AND status = 'sent' AND id != ? LIMIT 1`
+                )
+                .bind(row.task_id, row.stage, row.id)
+                .first()
+            )
+          : false;
+
+      if (isRenudge && !row.dedup_key.startsWith("prep-digest:") && !row.dedup_key.startsWith("catchup:")) {
         const reserved = await reserveDailyCap(db, istDate, boundedDailyCap, nowIso);
         if (!reserved) {
-          // Cap exhausted for today! Do not send, defer to next day
+          // Re-nudge cap exhausted for today. This is a deliberate budget decision, not
+          // a delivery failure, so it is suppressed rather than retried as failed.
           await db
             .prepare(
               `UPDATE notification_log
-               SET status = 'failed',
+               SET status = 'suppressed',
                    cap_reservation_state = 'none',
-                   error_code = 'daily_cap_exhausted',
+                   error_code = 'renudge_cap_exhausted',
                    lease_expires_at = NULL,
                    updated_at = ?
                WHERE id = ? AND status = 'claimed'`
@@ -632,6 +658,24 @@ export async function runScheduler(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     result.errors.push(`Timetable maintenance: ${msg}`);
+  }
+
+  // 4d. Same-batch cancellation: whatever closed a task this tick also voids its other
+  // pending notifications, so they cannot fire on a later tick.
+  try {
+    const cancelled = await db
+      .prepare(
+        `UPDATE notification_log
+         SET status = 'suppressed', error_code = 'task_closed', lease_expires_at = NULL, updated_at = ?
+         WHERE status = 'pending'
+           AND task_id IN (SELECT id FROM tasks WHERE status IN ('done', 'dismissed', 'archived'))`
+      )
+      .bind(nowIso)
+      .run();
+    result.suppressedCount += Number((cancelled as any)?.meta?.changes ?? 0);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    result.errors.push(`Same-batch cancellation: ${msg}`);
   }
 
   // 5. Update system_health scheduler heartbeat on EVERY tick (TEST-2B.8, reliability invariant)

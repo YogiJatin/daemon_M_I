@@ -209,8 +209,6 @@ export async function buildMorningBriefingText(
     "",
     "✅ *Tasks Due Today:*",
     taskSection,
-    "",
-    "_Have a focused and productive day!_",
   ].join("\n");
 }
 
@@ -267,7 +265,7 @@ export async function buildEveningBriefingText(
     .first<{ cnt: number }>();
 
   return [
-    `🌙 *Evening Briefing* — Review & Tomorrow's Outlook`,
+    `🌙 *Evening Briefing* — ${days[weekday] || "Today"}, ${localDate}`,
     "",
     `📊 *Today's Progress:*`,
     `• Completed: ${doneRows?.cnt ?? 0} tasks`,
@@ -276,8 +274,6 @@ export async function buildEveningBriefingText(
     "",
     `🗓️ *Tomorrow (${tomorrowName}):*`,
     tmrClassSection,
-    "",
-    `_Wind down and get ready for tomorrow._`,
   ]
     .filter(Boolean)
     .join("\n");
