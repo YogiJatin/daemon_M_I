@@ -30,6 +30,12 @@ export interface AIRequest<TInput = any> {
   privacyClass: PrivacyClass;
   outputSchema?: Record<string, any>;
   timeoutMs?: number; // default: 6000ms
+  /**
+   * Output shape for this call. "text" disables provider JSON modes; "json" (default)
+   * asks the provider for structured output. This is an explicit request field on
+   * purpose: it used to be inferred from the wording of systemPrompt.
+   */
+  responseFormat?: "json" | "text";
   correlationId?: string;
   simulatedFailure?: "429" | "503" | "timeout" | "malformed_json" | "privacy_blocked"; // for test suites
   temperature?: number; // optional per-request override, clamped to MAX_CHAT_TEMPERATURE
@@ -862,7 +868,7 @@ export class AIAdapter {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
     // Plain-text paths must NOT use json_object mode (Groq wraps reply in JSON object)
-    const isPlainText = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
+    const isPlainText = request.responseFormat === "text";
 
     try {
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -907,7 +913,7 @@ export class AIAdapter {
       clearTimeout(timeout);
     }
   }  /**
-   * Returns plain text as-is for plain-text prompts; otherwise strict JSON.
+   * Returns plain text as-is for responseFormat: "text" requests; otherwise strict JSON.
    * Providers share this so plain-text answers never get JSON-ified.
    */
   private parseProviderOutput<T>(rawText: string, isPlainText: boolean): T {
@@ -954,7 +960,7 @@ export class AIAdapter {
     const aiBinding = this.env?.AI;
     if (!aiBinding) throw new Error("Cloudflare Workers AI binding (env.AI) not configured");
 
-    const isPlainTextWai = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
+    const isPlainTextWai = request.responseFormat === "text";
 
     const response: any = await aiBinding.run(config.model, {
       messages: [
@@ -1012,7 +1018,7 @@ export class AIAdapter {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 15000);
 
-    const isPlainText = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
+    const isPlainText = request.responseFormat === "text";
 
     const payload: any = {
       contents: [{ parts: [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }] }],
@@ -1054,7 +1060,7 @@ export class AIAdapter {
 
       const resJson = (await response.json()) as any;
       const rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || (isPlainText ? "" : "{}");
-      const data = this.parseProviderOutput<TOutput>(rawText, Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt)));
+      const data = this.parseProviderOutput<TOutput>(rawText, request.responseFormat === "text");
       return { data, rawText };
     } finally {
       clearTimeout(timeout);
@@ -1072,7 +1078,7 @@ export class AIAdapter {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
     // Plain-text paths must NOT use json_object mode (Groq wraps reply in JSON object)
-    const isPlainText = Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt));
+    const isPlainText = request.responseFormat === "text";
 
     try {
       const response = await fetch(`${host}/api/generate`, {
@@ -1095,7 +1101,7 @@ export class AIAdapter {
 
       const resJson = (await response.json()) as any;
       const rawText = resJson.response || "{}";
-      const data = this.parseProviderOutput<TOutput>(rawText, Boolean(request.systemPrompt && /plain text/i.test(request.systemPrompt)));
+      const data = this.parseProviderOutput<TOutput>(rawText, request.responseFormat === "text");
       return { data, rawText };
     } finally {
       clearTimeout(timeout);

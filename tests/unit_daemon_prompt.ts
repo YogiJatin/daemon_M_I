@@ -15,7 +15,8 @@
 import assert from "node:assert";
 import {
   DAEMON_SYSTEM_PROMPT,
-  DAEMON_PLAIN_ANSWER_PROMPT,
+  DAEMON_ANSWER_PROMPT,
+  DAEMON_PERSONA,
   renderDaemonSystemPrompt,
 } from "../worker/prompts";
 import { AIAdapter, resetCircuitBreakers, MAX_CHAT_TEMPERATURE } from "../worker/aiAdapter";
@@ -93,10 +94,11 @@ async function main() {
     assert.doesNotMatch(DAEMON_SYSTEM_PROMPT, /Friendly, dry humor/);
   });
 
-  await it("forbids invented facts and action claims", () => {
-    assert.match(DAEMON_SYSTEM_PROMPT, /reply "No data\."/);
+  await it("forbids invented facts and action claims without a fixed dead-end", () => {
+    assert.match(DAEMON_SYSTEM_PROMPT, /Never guess and never invent a fact about the owner/);
     assert.match(DAEMON_SYSTEM_PROMPT, /Never claim an action was done/);
     assert.match(DAEMON_SYSTEM_PROMPT, /emit the structured action only/i);
+    assert.doesNotMatch(DAEMON_SYSTEM_PROMPT, /reply "No data\."/);
   });
 
   await it("keeps language matching for English, Hinglish and Telugu", () => {
@@ -126,9 +128,20 @@ async function main() {
     assert.match(capability!.systemRules, /ANCHOR MAPPINGS/);
   });
 
-  await it("plain-text answer prompt is marked for the adapter's JSON bypass", () => {
-    assert.match(DAEMON_PLAIN_ANSWER_PROMPT, /plain text/i);
-    assert.match(DAEMON_PLAIN_ANSWER_PROMPT, /No data/);
+  await it("answer prompt shares the persona and no longer dead-ends on a fixed string", () => {
+    assert.match(DAEMON_ANSWER_PROMPT, /You are Daemon/);
+    assert.ok(DAEMON_ANSWER_PROMPT.startsWith(DAEMON_PERSONA), "persona block must lead the answer prompt");
+    assert.doesNotMatch(DAEMON_ANSWER_PROMPT, /reply exactly: No data/i);
+    // The old adapter contract sniffed this phrase out of the prompt text.
+    assert.doesNotMatch(DAEMON_ANSWER_PROMPT, /plain text/i);
+  });
+
+  await it("classifier prompt carries the persona instead of the old STYLE/TRUTH split", () => {
+    assert.ok(DAEMON_SYSTEM_PROMPT.startsWith(DAEMON_PERSONA), "persona block must lead the classifier prompt");
+    assert.doesNotMatch(DAEMON_SYSTEM_PROMPT, /^STYLE$/m);
+    assert.doesNotMatch(DAEMON_SYSTEM_PROMPT, /^TRUTH$/m);
+    assert.doesNotMatch(DAEMON_SYSTEM_PROMPT, /reply "No data\."/i);
+    assert.match(DAEMON_SYSTEM_PROMPT, /ANCHOR MAPPINGS/);
   });
 
   console.log("\n=== Provider temperature ceiling ===");
@@ -185,7 +198,8 @@ async function main() {
       const res = await adapter.execute<any>(
         {
           capability: "telegram_assistant",
-          systemPrompt: DAEMON_PLAIN_ANSWER_PROMPT,
+          systemPrompt: DAEMON_ANSWER_PROMPT,
+          responseFormat: "text",
           userPrompt: "<DATA type=\"memory\">- [mem_1] third-year ECE student</DATA>",
           inputContext: {},
           privacyClass: "personal",

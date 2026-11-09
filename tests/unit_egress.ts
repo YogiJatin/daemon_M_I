@@ -12,7 +12,12 @@
  */
 
 import assert from "node:assert";
-import { guardReply, containsActionClaim, NO_ACTION_TEXT } from "../worker/egressGuard";
+import {
+  guardReply,
+  containsActionClaim,
+  NO_ACTION_TEXT,
+  normalizeForClaimCheck,
+} from "../worker/egressGuard";
 import { sanitizeOutboundMessage } from "../worker/telegram";
 
 let passed = 0;
@@ -47,8 +52,32 @@ it("detects first-person completed-action claims", () => {
 
 it("does not treat factual mid-sentence uses as claims", () => {
   assert.strictEqual(containsActionClaim("The report completed early."), false);
-  assert.strictEqual(containsActionClaim("No data."), false);
+  assert.strictEqual(containsActionClaim("No record of that, sir."), false);
   assert.strictEqual(containsActionClaim("Your next class is at 10:00."), false);
+});
+
+it("detects claims written with curly or full-width punctuation", () => {
+  // Typographic apostrophe (U+2019) instead of ASCII.
+  assert.strictEqual(containsActionClaim("I\u2019ve removed 3 memories."), true);
+  // Full-width letters and apostrophe.
+  assert.strictEqual(containsActionClaim("\uFF29\uFF07\uFF56\uFF45 deleted it."), true);
+  // Em dash after a leading verb.
+  assert.strictEqual(containsActionClaim("Done\u2014removed the note."), true);
+  // Non-breaking space between words.
+  assert.strictEqual(containsActionClaim("I've\u00A0scheduled your reminder."), true);
+});
+
+it("detects the phrasings that used to slip through", () => {
+  assert.strictEqual(containsActionClaim("I've gone ahead and deleted it."), true);
+  assert.strictEqual(containsActionClaim("Consider it done."), true);
+  assert.strictEqual(containsActionClaim("Your task has been added."), true);
+  assert.strictEqual(containsActionClaim("Marked it as done."), true);
+  assert.strictEqual(containsActionClaim("I have already cancelled it."), true);
+});
+
+it("normalises punctuation and whitespace for claim detection", () => {
+  assert.strictEqual(normalizeForClaimCheck("  I\u2019ve   REMOVED it. "), "i've removed it.");
+  assert.strictEqual(normalizeForClaimCheck("Done\u2014removed"), "done-removed");
 });
 
 it("allows the exact committed code result", () => {

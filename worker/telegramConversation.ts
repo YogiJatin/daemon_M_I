@@ -47,7 +47,7 @@ import {
   handleMemoriesCommand,
 } from "./memoryService";
 import { parseRegionalDateWords } from "./dateLexicon";
-import { DAEMON_PLAIN_ANSWER_PROMPT } from "./prompts";
+import { DAEMON_ANSWER_PROMPT } from "./prompts";
 import { preRouteIntent } from "./intentPreRouter";
 import { handleForgetMemory, restoreLatestMemory } from "./memoryActions";
 import { normalizeActions } from "./intentSchema";
@@ -1264,13 +1264,14 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
           memRes.xmlBlock,
           aboutContext,
           `<DATA type="user_message">\n${text}\n</DATA>`,
-          "Answer using only the DATA above. If it does not contain the answer, reply exactly: No data."
+          "Answer using only the DATA above. If it does not contain the answer, say briefly what you do not have and stop."
         ].filter(Boolean).join("\n\n");
 
         try {
           const answerAi = await adapter.execute({
             capability: "telegram_assistant",
-            systemPrompt: DAEMON_PLAIN_ANSWER_PROMPT,
+            systemPrompt: DAEMON_ANSWER_PROMPT,
+            responseFormat: "text",
             temperature: 0.1,
             userPrompt: answerPrompt,
             inputContext: { userText: text },
@@ -1529,13 +1530,14 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
           memRes.xmlBlock,
           aboutContext,
           `<DATA type="user_message">\n${text}\n</DATA>`,
-          "Answer using only the DATA above. If it does not contain the answer, reply exactly: No data."
+          "Answer using only the DATA above. If it does not contain the answer, say briefly what you do not have and stop."
         ].filter(Boolean).join("\n\n");
 
         try {
           const answerAi = await adapter.execute({
             capability: "telegram_assistant",
-            systemPrompt: DAEMON_PLAIN_ANSWER_PROMPT,
+            systemPrompt: DAEMON_ANSWER_PROMPT,
+            responseFormat: "text",
             temperature: 0.1,
             userPrompt: answerPrompt,
             inputContext: { userText: text },
