@@ -52,6 +52,7 @@ import { preRouteIntent } from "./intentPreRouter";
 import { handleForgetMemory, restoreLatestMemory } from "./memoryActions";
 import { normalizeActions } from "./intentSchema";
 import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
+import { matchDeterministicReply } from "./greetingMatcher";
 
 // ---------------------------------------------------------------------------
 // Budget & timing constants
@@ -269,6 +270,34 @@ async function processSingleMessage(
       outcome: "memories_template",
       status: "sent",
       provider: "d1",
+      latencyMs: Date.now() - startProcessing,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db
+      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+      .bind(nowIso(), userMsgRowId)
+      .run()
+      .catch(() => {});
+    return;
+  }
+
+  // 0.6 Greetings and bare fragments get a code-generated reply, never a lookup.
+  // Production answered "Yoo" and "What" with "No data." because both reached the
+  // classifier; a greeting is not a missing fact.
+  const deterministic = matchDeterministicReply(text, now);
+  if (deterministic) {
+    const sendRes = await sendTg(deterministic.reply).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: deterministic.reply,
+      intent: "chat",
+      confidence: 1.0,
+      outcome: `deterministic_${deterministic.kind}`,
+      status: "sent",
+      provider: "deterministic",
       latencyMs: Date.now() - startProcessing,
       telegramMessageId: sendRes?.telegramMessageId,
     });

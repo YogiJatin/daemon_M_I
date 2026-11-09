@@ -123,6 +123,19 @@ export function buildAssistantSystemPrompt(ownerName: string, manifest: string):
 // ---------------------------------------------------------------------------
 // User Prompt Builder with Recent Chat Context
 // ---------------------------------------------------------------------------
+
+/**
+ * User text and task titles are untrusted data. Without escaping, a message containing
+ * `</DATA>` closes our block and whatever follows reads as instructions. Escape the
+ * delimiters so DATA blocks can only ever contain data.
+ */
+export function escapeDataValue(value: string): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 export function buildAssistantUserPrompt(
   userText: string,
   now: Date,
@@ -142,8 +155,8 @@ export function buildAssistantUserPrompt(
   lines.push(`<DATA type="context">`);
   lines.push(`Current time (IST): ${ist}`);
   lines.push(`Day of week: ${now.toLocaleDateString("en-IN", { weekday: "long", timeZone: "Asia/Kolkata" })}`);
-  if (settings?.owner_name) lines.push(`Owner: ${settings.owner_name}`);
-  if (settings?.home_city) lines.push(`Home city: ${settings.home_city}`);
+  if (settings?.owner_name) lines.push(`Owner: ${escapeDataValue(settings.owner_name)}`);
+  if (settings?.home_city) lines.push(`Home city: ${escapeDataValue(settings.home_city)}`);
   lines.push(`Morning anchor: ${settings?.morning_anchor_time || "08:00"}`);
   lines.push(`Evening anchor: ${settings?.evening_anchor_time || "20:00"}`);
   lines.push(`Buffer after class: ${settings?.buffer_after_class_min || "15"} min`);
@@ -153,7 +166,7 @@ export function buildAssistantUserPrompt(
   if (recentChat.length > 0) {
     lines.push(`<DATA type="recent_chat">`);
     for (const turn of recentChat.slice(-8)) {
-      lines.push(turn);
+      lines.push(escapeDataValue(turn));
     }
     lines.push(`</DATA>`);
   }
@@ -161,22 +174,24 @@ export function buildAssistantUserPrompt(
   if (recentTasks.length > 0) {
     lines.push(`<DATA type="recent_tasks">`);
     for (const t of recentTasks.slice(0, 5)) {
-      lines.push(`- [${t.id}] ${t.title}${t.deadline_local_time ? " @ " + t.deadline_local_time : ""} (${t.status})`);
+      lines.push(
+        `- [${escapeDataValue(t.id)}] ${escapeDataValue(t.title)}${t.deadline_local_time ? " @ " + escapeDataValue(t.deadline_local_time) : ""} (${escapeDataValue(t.status)})`
+      );
     }
     lines.push(`</DATA>`);
   }
 
   if (replyToProposal) {
     lines.push(`<DATA type="referenced_proposal">`);
-    lines.push(`id: ${replyToProposal.id}`);
-    lines.push(`title: ${replyToProposal.title}`);
-    lines.push(`date: ${replyToProposal.proposed_local_date || "today"}`);
-    lines.push(`time: ${replyToProposal.proposed_local_time || "none"}`);
+    lines.push(`id: ${escapeDataValue(replyToProposal.id)}`);
+    lines.push(`title: ${escapeDataValue(replyToProposal.title)}`);
+    lines.push(`date: ${escapeDataValue(replyToProposal.proposed_local_date || "today")}`);
+    lines.push(`time: ${escapeDataValue(replyToProposal.proposed_local_time || "none")}`);
     lines.push(`</DATA>`);
   }
 
   lines.push(`<DATA type="user_message">`);
-  lines.push(userText);
+  lines.push(escapeDataValue(userText));
   lines.push(`</DATA>`);
 
   lines.push(`\nClassify and respond in valid JSON.`);
