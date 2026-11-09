@@ -48,6 +48,7 @@
 - Commit cc4b874: Update RUN_STATE.md to mark S5 as DONE.
 - Commit 2f0ac0d: Update RUN_STATE.md to mark S6 as DONE with deploy version ID.
 - Commit 27afb9f: Update RUN_STATE.md to mark S7 as DONE with final webhook state.
+- Commit 7d45374: Update RUN_STATE.md to mark S8 as BLOCKED B1.
 - Backup created: backups/d1-pre-webhook-20261109-20261109-171116.sql (696391 bytes)
 - Migration 0026 applied: 2026-11-09 09:42:09
 - Stale received rows: 0
