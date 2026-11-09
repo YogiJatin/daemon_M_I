@@ -55,6 +55,8 @@ import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deter
 import { matchDeterministicReply } from "./greetingMatcher";
 import { applyReplyStyle } from "./replyStyle";
 import { finalizeTelegramUpdate } from "./telegramLedger";
+import { UNGROUNDED_REPLY, verifyReplyGrounding } from "./groundingVerifier";
+import { buildAssistantUserPrompt } from "./telegramAssistant";
 import { getISTDateParts } from "./dateParser";
 
 // ---------------------------------------------------------------------------
@@ -1273,6 +1275,28 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     result.memory = { text: rememberAction.text };
     if (result.intent === "chat" || result.intent === "general_question") {
       result.intent = "remember";
+    }
+  }
+
+  // Narrow grounding check: ids, dates, times and numbers in the reply must exist in what
+  // the model was actually given. Weekdays, month and product names are not checked.
+  if (result && typeof result.reply_text === "string" && result.reply_text.trim()) {
+    const groundingSource = buildAssistantUserPrompt(
+      text,
+      now,
+      settingsObj as Record<string, string>,
+      [],
+      replyToProposal,
+      recentChat
+    );
+    const verdict = verifyReplyGrounding(result.reply_text, [groundingSource]);
+    if (!verdict.grounded) {
+      void recordTurnDecision(
+        db,
+        userMsgRowId,
+        `guard:grounding_blocked:${verdict.ungrounded.slice(0, 3).join("|")}`
+      );
+      result.reply_text = UNGROUNDED_REPLY;
     }
   }
 

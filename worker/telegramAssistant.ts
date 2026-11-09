@@ -16,7 +16,7 @@ import { formatConfirmationDate, getISTDateParts } from "./dateParser";
 
 import { AICapabilityRegistry } from "./aiCapabilityRegistry";
 import { getCapabilityManifest, renderHelpResponse } from "./capabilityManifest";
-import { renderDaemonSystemPrompt } from "./prompts";
+import { renderDaemonSystemPrompt, withSystemResults } from "./prompts";
 import { resolveExtendedAnchor, ExtendedAnchor } from "./dailyRhythm";
 
 export type AssistantIntent =
@@ -195,7 +195,9 @@ export function buildAssistantUserPrompt(
   lines.push(`</DATA>`);
 
   lines.push(`\nClassify and respond in valid JSON.`);
-  return lines.join("\n");
+  // The grounding verifier compares the reply against this exact text, so the SYSTEM
+  // RESULTS section must be part of the prompt that is built here.
+  return withSystemResults(lines.join("\n"));
 }
 
 // ---------------------------------------------------------------------------

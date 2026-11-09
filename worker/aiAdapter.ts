@@ -19,6 +19,7 @@ import { AIPromptCache } from "./aiPromptCache";
 import { AIProviderScoring } from "./aiProviderScoring";
 import { AIVerifier } from "./aiVerifier";
 import { sendTelegramMessage } from "./telegram";
+import { withSystemResults } from "./prompts";
 
 export type PrivacyClass = "synthetic_test" | "low_sensitivity" | "personal" | "restricted";
 
@@ -752,6 +753,9 @@ export class AIAdapter {
     request: AIRequest,
     _now: Date
   ): Promise<{ data: TOutput; rawText: string }> {
+    // Every model call carries a SYSTEM RESULTS section, including repair and retry calls.
+    // Idempotent, so a prompt that already has one is untouched.
+    request = { ...request, userPrompt: withSystemResults(request.userPrompt) };
     if (request.simulatedFailure && config.id !== "mock") {
       const sim = request.simulatedFailure;
       request.simulatedFailure = undefined;

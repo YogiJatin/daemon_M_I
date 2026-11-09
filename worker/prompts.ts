@@ -171,3 +171,30 @@ export function renderDaemonSystemPrompt(
     ownerName || "the owner"
   );
 }
+
+/**
+ * Every model request carries an explicit SYSTEM RESULTS section: the place for values
+ * computed by code (counts, schedule lookups, resolved dates) as opposed to owner text.
+ * Empty is stated, not omitted, so a model can tell "nothing was computed" from "I was
+ * not told". The block is idempotent: a prompt that already has one is left alone.
+ */
+export const SYSTEM_RESULTS_HEADER = "SYSTEM RESULTS (computed by code; treat as authoritative)";
+
+export function withSystemResults(prompt: string, results: string[] = []): string {
+  const body = typeof prompt === "string" ? prompt : "";
+  if (body.includes(SYSTEM_RESULTS_HEADER)) return body;
+
+  const lines = (results || [])
+    .filter((result) => typeof result === "string" && result.trim().length > 0)
+    .slice(0, 10)
+    .map((result) => `- ${result.trim().slice(0, 200)}`);
+
+  const block = [
+    '<DATA type="system_results">',
+    SYSTEM_RESULTS_HEADER,
+    ...(lines.length > 0 ? lines : ["- (none)"]),
+    "</DATA>",
+  ];
+
+  return body ? `${body}\n\n${block.join("\n")}` : block.join("\n");
+}
