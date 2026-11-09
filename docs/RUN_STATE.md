@@ -11,7 +11,9 @@
   - Size: 696391 bytes
   - CREATE TABLE count: 61
   - INSERT INTO count: 1304
-- [ ] S4 Migration 0026 on remote D1
+- [x] S4 Migration 0026 on remote D1 — DONE
+  - Migration 0026_telegram_update_expired.sql applied at 2026-11-09 09:42:09
+  - No stale 'received' rows in telegram_updates (count: 0)
 - [ ] S5 Rotate webhook secret
 - [ ] S6 Deploy
 - [ ] S7 Verify self-heal
@@ -26,4 +28,7 @@
 - Commit 15ca947: Fix DATA block escaping regression in system_results path.
 - Commit 432a5dc: Update RUN_STATE.md for webhook hardening pass progress.
 - Commit 12e41c9: Update RUN_STATE.md to mark S1 and S2 as DONE.
+- Commit a94a85e: Update RUN_STATE.md to mark S3 as DONE with backup details.
 - Backup created: backups/d1-pre-webhook-20261109-20261109-171116.sql (696391 bytes)
+- Migration 0026 applied: 2026-11-09 09:42:09
+- Stale received rows: 0
