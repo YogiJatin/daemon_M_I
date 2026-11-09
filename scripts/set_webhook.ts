@@ -67,8 +67,9 @@ async function main(): Promise<void> {
   const secret = readSecret(process.argv.slice(2));
   if (!secret) {
     console.log("BLOCKED: no webhook secret available.");
-    console.log("  Expected backups/.new_webhook_secret, or pass --secret <value>.");
-    console.log("  Must match the Worker's TELEGRAM_WEBHOOK_SECRET exactly.");
+    console.log("  Pass the value the Worker is holding: --secret <value>");
+    console.log("  (or, after a rotation, write the new value to backups/.new_webhook_secret first).");
+    console.log("  It must match the Worker's TELEGRAM_WEBHOOK_SECRET exactly, or every update 401s.");
     process.exit(2);
   }
 
