@@ -29,7 +29,10 @@
   - Final state: ok=true, action=healthy
   - setWebhook recorded at 2026-11-09T11:50:27.835Z
   - All polls after that show healthy state
-- [ ] S8 Auth check against live Worker
+- [ ] S8 Auth check against live Worker — BLOCKED B1
+  - Reason: Cannot call Telegram from this machine (no real bot token)
+  - scripts/set_webhook.ts exists at scripts/set_webhook.ts
+  - OWNER_STEPS.md needs to be written with exact commands for the owner
 - [ ] S9 SELECT telegram_updates and chat_messages
 - [ ] S10 Final report
 
@@ -44,6 +47,7 @@
 - Commit 24d0566: Update RUN_STATE.md to mark S4 as DONE.
 - Commit cc4b874: Update RUN_STATE.md to mark S5 as DONE.
 - Commit 2f0ac0d: Update RUN_STATE.md to mark S6 as DONE with deploy version ID.
+- Commit 27afb9f: Update RUN_STATE.md to mark S7 as DONE with final webhook state.
 - Backup created: backups/d1-pre-webhook-20261109-20261109-171116.sql (696391 bytes)
 - Migration 0026 applied: 2026-11-09 09:42:09
 - Stale received rows: 0
@@ -51,3 +55,4 @@
 - Deploy version ID: 52480a9f-7236-496e-9648-e091aa5ec428
 - Polling log: /tmp/webhook_poll.log
 - Final webhook_sync_state: {"at":"2026-11-09T12:05:28.023Z","action":"healthy","ok":true,"tg_description":"none","last_error_message":"none"}
+- S8 blocked: Need owner to run scripts/set_webhook.ts with real TELEGRAM_BOT_TOKEN
