@@ -1,0 +1,3 @@
+#!/bin/sh
+# Pre-commit integrity gate: truncated modules and stripped regex backslashes.
+npx tsx scripts/integrity_check.ts || { echo "pre-commit: integrity check failed; commit aborted." >&2; exit 1; }
