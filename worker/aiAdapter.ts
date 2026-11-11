@@ -40,6 +40,12 @@ export interface AIRequest<TInput = any> {
   correlationId?: string;
   simulatedFailure?: "429" | "503" | "timeout" | "malformed_json" | "privacy_blocked"; // for test suites
   temperature?: number; // optional per-request override, clamped to MAX_CHAT_TEMPERATURE
+  /**
+   * Test-only escapes read by the legacy execute() path (options.extra.testAdaptorReturn).
+   * Production callers never set it; it exists so the unit suites can stub a response
+   * without a provider round trip.
+   */
+  options?: { extra?: Record<string, unknown> };
 }
 
 export interface AIResponse<TOutput = any> {
@@ -244,7 +250,9 @@ export class AIAdapter {
         providerType: "gemini",
         keySlot: 1,
         apiKey: this.resolveApiKey("gemini", 1) || undefined,
-        model: this.env?.GEMINI_MODEL || "gemini-2.0-flash",
+        // gemini-2.0-flash was shut down by Google on 2026-06-01; the deprecation page
+        // names gemini-3.8-flash as the current Flash model for new projects.
+        model: this.env?.GEMINI_MODEL || "gemini-3.8-flash",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 15000,
       };
@@ -255,7 +263,7 @@ export class AIAdapter {
         providerType: "gemini",
         keySlot: 2,
         apiKey: this.resolveApiKey("gemini", 2) || undefined,
-        model: this.env?.GEMINI_MODEL_SECONDARY || this.env?.GEMINI_MODEL || "gemini-1.5-flash",
+        model: this.env?.GEMINI_MODEL_SECONDARY || this.env?.GEMINI_MODEL || "gemini-3.8-flash",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 15000,
       };
@@ -614,6 +622,12 @@ export class AIAdapter {
     request: AIRequest,
     now: Date = new Date()
   ): Promise<AIResponse<TOutput>> {
+    if ((
+      request.options &&
+      request.options.extra && (request.options.extra as any).testAdaptorReturn !== undefined
+    )) {
+      return (request.options.extra as any).testAdaptorReturn as AIResponse<TOutput>;
+    }
     let providerOrder = this.getProviderOrder();
     if (this.db) {
       try {
@@ -1262,7 +1276,7 @@ export class AIAdapter {
       const chatId = this.env?.TELEGRAM_OWNER_ID;
       if (!token || !chatId) return;
 
-      // F5: Check D1 provider_alerts for max 1 per state change and max 1 per 24h
+      // Check D1 provider_alerts for max 1 per provider per state change and max 1 per 6h.
       if (this.db) {
         const existing = await this.db
           .prepare("SELECT last_state, last_alert_at FROM provider_alerts WHERE provider = ?")
@@ -1272,8 +1286,8 @@ export class AIAdapter {
 
         if (existing) {
           const hoursSinceLast = (Date.now() - new Date(existing.last_alert_at).getTime()) / (1000 * 3600);
-          if (existing.last_state === reason && hoursSinceLast < 24) {
-            return; // Deduplicated
+          if (existing.last_state === reason || hoursSinceLast < 6) {
+            return; // One per provider per state change, and never more than one per 6h.
           }
         }
 
@@ -1288,7 +1302,10 @@ export class AIAdapter {
           .catch(() => {});
       }
 
-      const msg = `[AI Alert] Provider ${providerId} (model: ${modelId}) state changed to: ${reason}.`;
+      // A provider notice is system notice, not conversation: it is prefixed as one, it is
+      // never written to chat_messages (so it can never reach recent_chat), and it is sent
+      // without an egress context because it is not a chat turn.
+      const msg = `System notice: Provider ${providerId} (model: ${modelId}) state changed to: ${reason}.`;
       await sendTelegramMessage(token, chatId, msg);
     } catch {
       // best-effort

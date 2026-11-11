@@ -48,14 +48,31 @@ import {
 } from "./memoryService";
 import { parseRegionalDateWords } from "./dateLexicon";
 import { DAEMON_ANSWER_PROMPT } from "./prompts";
+import { escapeDataValue } from "./telegramAssistant";
+import { renderOwnerStyleBlock } from "./personaStyle";
 import { preRouteIntent } from "./intentPreRouter";
 import { handleForgetMemory, restoreLatestMemory } from "./memoryActions";
 import { normalizeActions } from "./intentSchema";
 import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
 import { matchDeterministicReply } from "./greetingMatcher";
-import { applyReplyStyle } from "./replyStyle";
+import { applyReplyStyle, buildRetryInstruction, MODE_FIT_FALLBACK_REPLY } from "./replyStyle";
+import {
+  applyStyleUpdate,
+  countAddressTerms,
+  describeStyleUpdate,
+  parseOwnerStyle,
+  preRouteStyleRequest,
+  resolveTone,
+  serializeOwnerStyle,
+  PERSONA_STYLE_SETTING_KEY,
+  DEFAULT_OWNER_STYLE,
+  type OwnerStyle,
+  type StyleUpdate,
+} from "./personaStyle";
+import { assessRisk, memoryProposalAllowed, CRISIS_SUPPORT_SETTING_KEY, CRISIS_SUPPORT_TEXT } from "./safetyPath";
+import { buildRecentChat } from "./historyHygiene";
 import { finalizeTelegramUpdate } from "./telegramLedger";
-import { UNGROUNDED_REPLY, verifyReplyGrounding } from "./groundingVerifier";
+import { UNGROUNDED_REPLY, stripUngroundedFacts, verifyReplyGrounding } from "./groundingVerifier";
 import { buildAssistantUserPrompt } from "./telegramAssistant";
 import { getISTDateParts } from "./dateParser";
 
@@ -79,6 +96,44 @@ function ulid(): string {
 
 function makeInlineKeyboard(buttons: Array<{ text: string; callback_data: string }>) {
   return { inline_keyboard: [buttons] };
+}
+
+/**
+ * A style change is a real settings write with an audit trail. It is applied
+ * immediately and never through a confirmation card: the owner said "talk casual", not
+ * "maybe talk casual".
+ */
+async function saveOwnerStyle(
+  db: D1Database,
+  style: OwnerStyle,
+  applied: string[],
+  now: Date
+): Promise<void> {
+  const nowStr = now.toISOString();
+  try {
+    await db
+      .prepare("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)")
+      .bind(PERSONA_STYLE_SETTING_KEY, serializeOwnerStyle(style), nowStr)
+      .run();
+  } catch (err) {
+    console.error("[persona_style] write failed:", err);
+  }
+  try {
+    await db
+      .prepare(
+        `INSERT INTO audit_events (id, entity_type, entity_id, event_type, actor, details_json, created_at)
+         VALUES (?, 'setting', ?, 'persona_style_updated', 'owner:telegram', ?, ?)`
+      )
+      .bind(
+        "aud_" + ulid(),
+        PERSONA_STYLE_SETTING_KEY,
+        JSON.stringify({ applied, style: JSON.parse(serializeOwnerStyle(style)) }),
+        nowStr
+      )
+      .run();
+  } catch {
+    // Audit is best-effort here; the settings row is the source of truth.
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -255,9 +310,48 @@ async function processSingleMessage(
   const startProcessing = Date.now();
   const botToken: string = env.TELEGRAM_BOT_TOKEN;
   const turnActionResults: string[] = [];
+
+  // OWNER_STYLE and the crisis text are owner data: read once per turn, before any
+  // reply is produced, so no path can fall back to a hard-coded "sir".
+  let ownerStyle: OwnerStyle = { ...DEFAULT_OWNER_STYLE };
+  let crisisText = CRISIS_SUPPORT_TEXT;
+  let lastAssistantReply: string | null = null;
+  try {
+    const styleRows = await db
+      .prepare("SELECT key, value FROM settings WHERE key IN (?, ?)")
+      .bind(PERSONA_STYLE_SETTING_KEY, CRISIS_SUPPORT_SETTING_KEY)
+      .all<{ key: string; value: string }>();
+    const rows = styleRows?.results || [];
+    ownerStyle = parseOwnerStyle(rows.find((row) => row.key === PERSONA_STYLE_SETTING_KEY)?.value);
+    const storedCrisis = rows.find((row) => row.key === CRISIS_SUPPORT_SETTING_KEY)?.value?.trim();
+    if (storedCrisis) crisisText = storedCrisis;
+    const lastRow = await db
+      .prepare(
+        "SELECT text FROM chat_messages WHERE chat_id = ? AND role = 'assistant' ORDER BY created_at DESC LIMIT 1"
+      )
+      .bind(String(chatId))
+      .first<{ text: string }>()
+      .catch(() => null);
+    lastAssistantReply = lastRow?.text ?? null;
+  } catch {
+    // Settings are optional; the defaults are always safe.
+  }
+
+  // Address terms are governed per reply, and a term already used in the previous
+  // casual reply is skipped this time.
+  let previousReplyUsedTerm = countAddressTerms(lastAssistantReply || "", ownerStyle.address_terms) > 0;
+  const turnMemoryTexts: string[] = [];
+
   const sendTg = (txt: string, markup?: any) => {
     // One funnel: every chat reply passes the persona style gate and records what it did.
-    const styled = applyReplyStyle(txt);
+    const styled = applyReplyStyle(txt, {
+      style: ownerStyle,
+      tone: resolveTone(ownerStyle),
+      previousReplyUsedTerm,
+      actionResults: turnActionResults,
+      memoryTexts: turnMemoryTexts,
+    });
+    previousReplyUsedTerm = countAddressTerms(styled.text, ownerStyle.address_terms) > 0;
     const recorded = [
       ...styled.decisions,
       ...styled.violations.map((violation) => `style_blocked_${violation.code}`),
@@ -273,6 +367,74 @@ async function processSingleMessage(
         void recordTurnDecision(db, userMsgRowId, `guard:${decision}`);
       },
     });
+  };
+
+  /**
+   * The crisis reply is code-owned and must reach the owner unchanged: no style gate,
+   * no address-term governor, no egress rewrite.
+   */
+  const sendCrisis = (txt: string) =>
+    sendTelegramMessage(botToken, chatId, txt, undefined, {
+      testStubs: Boolean(testStubs),
+      db,
+      onGuardDecision: (decision: string) => {
+        void recordTurnDecision(db, userMsgRowId, `guard:${decision}`);
+      },
+    });
+
+  /**
+   * A chat reply that breaks a persona rule gets one corrective retry at temperature 0.
+   * The retry names the rule that tripped. If it still breaks, a short mode-fit line
+   * goes out instead: never a "no record" line, never the bad reply.
+   */
+  const refineChatReply = async (candidate: string, chatAdapter: AIAdapter, turnNow: Date): Promise<string> => {
+    const styleOptions = () => ({
+      style: ownerStyle,
+      tone: resolveTone(ownerStyle),
+      previousReplyUsedTerm,
+      actionResults: turnActionResults,
+      memoryTexts: turnMemoryTexts,
+    });
+
+    const first = applyReplyStyle(candidate, styleOptions());
+    if (!first.retryable) return candidate;
+
+    void recordTurnDecision(
+      db,
+      userMsgRowId,
+      `guard:retry:${first.violations.map((violation) => violation.code).join(",")}`
+    );
+
+    try {
+      const retryPrompt = [
+        `<DATA type="user_message">\n${escapeDataValue(text)}\n</DATA>`,
+        `<DATA type="previous_reply">\n${escapeDataValue(candidate)}\n</DATA>`,
+        buildRetryInstruction(first.violations),
+      ].join("\n\n");
+
+      const retry = await chatAdapter.execute(
+        {
+          capability: "telegram_assistant",
+          systemPrompt: DAEMON_ANSWER_PROMPT,
+          responseFormat: "text",
+          temperature: 0,
+          userPrompt: retryPrompt,
+          inputContext: { userText: text },
+          privacyClass: "personal",
+          timeoutMs: 6000,
+        },
+        turnNow
+      );
+
+      if (retry.ok && retry.rawText) {
+        const second = applyReplyStyle(retry.rawText.trim(), styleOptions());
+        if (!second.retryable) return retry.rawText.trim();
+      }
+    } catch (e: any) {
+      console.error("[Conversation] style retry failed:", e?.message);
+    }
+
+    return MODE_FIT_FALLBACK_REPLY;
   };
 
   // 0. Forwarded Data-Only Check (G21, Non-negotiable Rule 11)
@@ -330,7 +492,10 @@ async function processSingleMessage(
   // 0.6 Greetings and bare fragments get a code-generated reply, never a lookup.
   // Production answered "Yoo" and "What" with "No data." because both reached the
   // classifier; a greeting is not a missing fact.
-  const deterministic = matchDeterministicReply(text, now);
+  const deterministic = matchDeterministicReply(text, now, {
+    style: ownerStyle,
+    previousReply: lastAssistantReply,
+  });
   if (deterministic) {
     const sendRes = await sendTg(deterministic.reply).catch(() => null);
     await logChatMessage(db, {
@@ -606,8 +771,37 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     return;
   }
 
-  // 2. Harm Gate (B7)
-  const harmCheck = checkHarmGate(text);
+  // 1.5 Safety path (code-owned, before the LLM).
+  // Self-directed dark talk is not a policy refusal, and a possible crisis never waits
+  // on a provider: the reply below is fixed, humane, and sent as-is.
+  const preRisk = assessRisk(text);
+  if (preRisk === "possible") {
+    const sendRes = await sendCrisis(crisisText).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: crisisText,
+      intent: "chat",
+      confidence: 1.0,
+      outcome: "crisis_support",
+      status: "sent",
+      provider: "system",
+      latencyMs: Date.now() - startProcessing,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db
+      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+      .bind(nowIso(), userMsgRowId)
+      .run()
+      .catch(() => {});
+    return;
+  }
+
+  // 2. Harm Gate (B7). Figurative dark talk ("lol just kill me") is venting, not a task
+  // to hurt someone, so it is never refused.
+  const harmCheck = preRisk === "figurative" ? { isHarmBlocked: false } : checkHarmGate(text);
   if (harmCheck.isHarmBlocked) {
     const replyText = harmCheck.refusalText || "I cannot assist with tasks involving harm or violence.";
     const sendRes = await sendTg(replyText).catch(() => null);
@@ -648,6 +842,36 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
       outcome: "help_manifest",
       status: "sent",
       provider: "system",
+      latencyMs: Date.now() - startProcessing,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db
+      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+      .bind(nowIso(), userMsgRowId)
+      .run()
+      .catch(() => {});
+    return;
+  }
+
+  // 3.2 Deterministic style change. "talk casual", "stop calling me sir", "be brief"
+  // are settings writes, not chat: they must work with the LLM offline.
+  const styleRequest = preRouteStyleRequest(text, ownerStyle);
+  if (styleRequest) {
+    await saveOwnerStyle(db, styleRequest.style, styleRequest.applied, now);
+    ownerStyle = styleRequest.style;
+    const replyText = styleRequest.reply;
+    const sendRes = await sendTg(replyText).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: replyText,
+      intent: "chat",
+      confidence: 1.0,
+      outcome: "style_update",
+      status: "sent",
+      provider: "deterministic",
       latencyMs: Date.now() - startProcessing,
       telegramMessageId: sendRes?.telegramMessageId,
     });
@@ -803,32 +1027,6 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     return;
   }
 
-  // 3.9 Terse greeting short-circuit: Daemon never greets or offers help.
-  if (/^\s*(?:hey+|hi+|hello+|yo|sup|namaste|good\s+(?:morning|afternoon|evening))\s*[!.?]*\s*$/i.test(text)) {
-    const greetingReply = "Ready, sir.";
-    const sendRes = await sendTg(greetingReply).catch(() => null);
-    await logChatMessage(db, {
-      updateId,
-      chatId,
-      messageId,
-      role: "assistant",
-      text: greetingReply,
-      intent: "chat",
-      confidence: 1.0,
-      outcome: "terse_greeting",
-      status: "sent",
-      provider: "deterministic",
-      latencyMs: Date.now() - startProcessing,
-      telegramMessageId: sendRes?.telegramMessageId,
-    });
-    await db
-      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
-      .bind(nowIso(), userMsgRowId)
-      .run()
-      .catch(() => {});
-    return;
-  }
-
   // 3.95 Deterministic pre-router: forget/remember never wait for an LLM.
   const preRouted = preRouteIntent(text);
   if (preRouted?.kind === "forget_memory") {
@@ -858,6 +1056,17 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
   }
 
   if (preRouted?.kind === "remember_memory") {
+    // Memory proposals are rejected for any message with risk != none.
+    if (!memoryProposalAllowed(preRisk)) {
+      const replyText = "I'll keep this chat as it is. Nothing saved.";
+      await sendTg(replyText).catch(() => null);
+      await db
+        .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+        .bind(nowIso(), userMsgRowId)
+        .run()
+        .catch(() => {});
+      return;
+    }
     const propRes = await createMemoryProposal(db, preRouted.query, now);
     const replyText = propRes ? propRes.replyText : "Already remembered or not stored.";
     const sendRes = await sendTg(replyText, propRes?.replyMarkup).catch(() => null);
@@ -960,19 +1169,21 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     return;
   }
 
-  // 6. Gather recent context and settings
-  const recentRows = await db
+  // 6. Gather recent context and settings.
+  // History hygiene: the model must never learn from its own canned replies. The
+  // transcript showed the bot imitating its own "X, sir." fallbacks, so deterministic
+  // answers, guard/linter replacements, offline notices and system notices are excluded
+  // here, and at most six turns are sent.
+  const historyRows = await db
     .prepare(
-      `SELECT role, text FROM chat_messages
+      `SELECT role, text, outcome FROM chat_messages
        WHERE chat_id = ? AND role IN ('user', 'assistant') AND status != 'failed'
-       ORDER BY created_at DESC LIMIT 6`
+       ORDER BY created_at DESC LIMIT 40`
     )
     .bind(String(chatId))
-    .all<{ role: string; text: string }>()
+    .all<{ role: string; text: string | null; outcome: string | null }>()
     .catch(() => ({ results: [] }));
-  const recentChat: string[] = (recentRows.results || [])
-    .reverse()
-    .map((r) => `${r.role}: ${r.text || ""}`);
+  const recentChat: string[] = buildRecentChat(historyRows.results || []);
 
   // Check if reply_to links to a proposal
   let replyToProposal: any = undefined;
@@ -1239,6 +1450,43 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
 
   // 7.0 Structured actions: forget outranks remember before legacy fields apply.
   const routedActions = normalizeActions(result);
+
+  // 7.0a style_update. The model may only ask for the change; code validates the
+  // enums, writes the setting, audits it, and owns the reply text.
+  const styleAction = routedActions.find((action) => action.type === "style_update") as StyleUpdate | undefined;
+  if (styleAction) {
+    const update = applyStyleUpdate(ownerStyle, styleAction);
+    if (update.applied.length > 0) {
+      await saveOwnerStyle(db, update.style, update.applied, now);
+      ownerStyle = update.style;
+    }
+    const replyText =
+      update.applied.length > 0
+        ? describeStyleUpdate(update.applied)
+        : "Already how I talk. Nothing changed.";
+    turnActionResults.push(replyText);
+    const sendRes = await sendTg(replyText).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: replyText,
+      intent: "chat",
+      confidence: result.confidence,
+      outcome: "style_update",
+      status: "sent",
+      provider: providerUsed,
+      latencyMs,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db
+      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+      .bind(nowIso(), userMsgRowId)
+      .run()
+      .catch(() => {});
+    return;
+  }
   const forgetAction = routedActions.find((action) => action.type === "forget_memory") as
     | { type: "forget_memory"; query: string }
     | undefined;
@@ -1271,15 +1519,20 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
   const rememberAction = routedActions.find((action) => action.type === "remember_memory") as
     | { type: "remember_memory"; text: string }
     | undefined;
-  if (rememberAction && !result.memory?.text) {
+  if (rememberAction && memoryProposalAllowed(assessRisk(text, result.risk)) && !result.memory?.text) {
     result.memory = { text: rememberAction.text };
     if (result.intent === "chat" || result.intent === "general_question") {
       result.intent = "remember";
     }
   }
 
+  // Classifier risk combines with the deterministic pre-check for the rest of the turn.
+  const turnRisk = assessRisk(text, result.risk);
+
   // Narrow grounding check: ids, dates, times and numbers in the reply must exist in what
   // the model was actually given. Weekdays, month and product names are not checked.
+  // Only a data question may be replaced with a "no record" line; a chat reply is
+  // stripped of the invented fact instead, never dead-ended.
   if (result && typeof result.reply_text === "string" && result.reply_text.trim()) {
     const groundingSource = buildAssistantUserPrompt(
       text,
@@ -1296,7 +1549,12 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
         userMsgRowId,
         `guard:grounding_blocked:${verdict.ungrounded.slice(0, 3).join("|")}`
       );
-      result.reply_text = UNGROUNDED_REPLY;
+      const isDataQuestion = ["query_schedule", "query_tasks", "lookup"].includes(result.intent);
+      if (isDataQuestion) {
+        result.reply_text = UNGROUNDED_REPLY;
+      } else {
+        result.reply_text = stripUngroundedFacts(result.reply_text, verdict.ungrounded) || "";
+      }
     }
   }
 
@@ -1353,41 +1611,55 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     // GENERAL KNOWLEDGE
     // -------------------------
     case "general_question": {
-      const memRes = await retrieveMemoriesForPrompt(db, text, now);
-      const aboutContext = await getAboutMeStandingContext(db);
+      // A data question may use the memory-grounded answer path; anything the model
+      // already answered in CHAT/META mode is kept as written.
+      replyText = (replyText || "").trim();
+      if (!replyText) {
+        const memRes = await retrieveMemoriesForPrompt(db, text, now);
+        const aboutContext = await getAboutMeStandingContext(db);
 
-      if (memRes.xmlBlock || aboutContext) {
-        const answerPrompt = [
-          memRes.xmlBlock,
-          aboutContext,
-          `<DATA type="user_message">\n${text}\n</DATA>`,
-          "Answer using only the DATA above. If it does not contain the answer, say briefly what you do not have and stop."
-        ].filter(Boolean).join("\n\n");
+        if (memRes.xmlBlock || aboutContext) {
+          if (memRes.xmlBlock) turnMemoryTexts.push(memRes.xmlBlock);
+          if (aboutContext) turnMemoryTexts.push(aboutContext);
+          const answerPrompt = [
+            `<DATA type="context">`,
+            renderOwnerStyleBlock(ownerStyle),
+            `</DATA>`,
+            memRes.xmlBlock,
+            aboutContext,
+            `<DATA type="user_message">\n${escapeDataValue(text)}\n</DATA>`,
+            "Answer using only CONTEXT and the DATA above. If it is missing, say so in one natural sentence and offer to learn it. Never invent a fact about him.",
+          ]
+            .filter(Boolean)
+            .join("\n\n");
 
-        try {
-          const answerAi = await adapter.execute({
-            capability: "telegram_assistant",
-            systemPrompt: DAEMON_ANSWER_PROMPT,
-            responseFormat: "text",
-            temperature: 0.1,
-            userPrompt: answerPrompt,
-            inputContext: { userText: text },
-            privacyClass: "personal",
-            timeoutMs: 6000,
-          }, now);
+          try {
+            const answerAi = await adapter.execute(
+              {
+                capability: "telegram_assistant",
+                systemPrompt: DAEMON_ANSWER_PROMPT,
+                responseFormat: "text",
+                temperature: 0.1,
+                userPrompt: answerPrompt,
+                inputContext: { userText: text },
+                privacyClass: "personal",
+                timeoutMs: 6000,
+              },
+              now
+            );
 
-          if (answerAi.ok && answerAi.rawText) {
-            replyText = answerAi.rawText.trim();
+            if (answerAi.ok && answerAi.rawText) {
+              replyText = answerAi.rawText.trim();
+            }
+          } catch (e: any) {
+            console.error("[Conversation] Memory answer path failed:", e?.message);
           }
-        } catch (e: any) {
-          console.error("[Conversation] Memory answer path failed:", e?.message);
         }
       }
 
-      if (/I'?ll remind|All confirmed|\bsaved\b|\badded\b|\bcreated\b/i.test(replyText)) {
-        replyText = "Here is what I found.";
-      }
-      if (!replyText) replyText = "Here is what I found.";
+      // A data question whose answer is genuinely absent may say so naturally. This is
+      // the only branch outside query_*/lookup allowed to report missing data.
+      if (!replyText) replyText = "Nothing saved on that yet. Tell me and I'll keep it.";
       break;
     }
 
@@ -1457,6 +1729,11 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     case "remember": {
       if (isForwarded) {
         replyText = "Received external content. External data does not create memory proposals.";
+        break;
+      }
+      // Memory proposals are rejected for any message with risk != none.
+      if (!memoryProposalAllowed(turnRisk)) {
+        replyText = "I'll keep this chat as it is. Nothing saved.";
         break;
       }
       const memText = result.memory?.text || text.replace(/^remember\s+/i, "");
@@ -1617,48 +1894,12 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     // -------------------------
     case "chat":
     default: {
-      const memRes = await retrieveMemoriesForPrompt(db, text, now);
-      const aboutContext = await getAboutMeStandingContext(db);
-
-      if (memRes.xmlBlock || aboutContext) {
-        const answerPrompt = [
-          memRes.xmlBlock,
-          aboutContext,
-          `<DATA type="user_message">\n${text}\n</DATA>`,
-          "Answer using only the DATA above. If it does not contain the answer, say briefly what you do not have and stop."
-        ].filter(Boolean).join("\n\n");
-
-        try {
-          const answerAi = await adapter.execute({
-            capability: "telegram_assistant",
-            systemPrompt: DAEMON_ANSWER_PROMPT,
-            responseFormat: "text",
-            temperature: 0.1,
-            userPrompt: answerPrompt,
-            inputContext: { userText: text },
-            privacyClass: "personal",
-            timeoutMs: 6000,
-          }, now);
-
-          if (answerAi.ok && answerAi.rawText) {
-            replyText = answerAi.rawText.trim();
-          }
-        } catch (e: any) {
-          console.error("[Conversation] Memory answer path failed:", e?.message);
-        }
-      }
-
-      // Post-check: facts about tasks/schedule/progress must come from D1, and the
-      // reply must not offer help. Action claims are handled separately by the
-      // opt-in egress guard at send time (worker/egressGuard.ts).
-      if (
-        /on track|tasks are|pending tasks|your schedule shows|progress looks/i.test(replyText) ||
-        /I can help you|I can assist with|I can set reminders|I can manage|feel free to ask/i.test(replyText)
-      ) {
-        replyText = "No data.";
-      }
-      if (!replyText) replyText = "No data.";
-      if (!replyText) replyText = "No data.";
+      // CHAT mode: the classifier's reply_text IS the conversation. There is no lookup
+      // here and no missing record to report, so this path can never answer "no record".
+      // Action claims are still handled by the egress guard at send time.
+      replyText = (replyText || "").trim();
+      if (!replyText) replyText = MODE_FIT_FALLBACK_REPLY;
+      replyText = await refineChatReply(replyText, adapter, now);
       break;
     }
   }

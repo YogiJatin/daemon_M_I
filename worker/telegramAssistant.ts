@@ -18,6 +18,7 @@ import { AICapabilityRegistry } from "./aiCapabilityRegistry";
 import { getCapabilityManifest, renderHelpResponse } from "./capabilityManifest";
 import { renderDaemonSystemPrompt, withSystemResults, assertSystemResultsEscaped } from "./prompts";
 import { resolveExtendedAnchor, ExtendedAnchor } from "./dailyRhythm";
+import { parseOwnerStyle, renderOwnerStyleBlock, PERSONA_STYLE_SETTING_KEY } from "./personaStyle";
 
 export type AssistantIntent =
   | "chat"
@@ -83,6 +84,8 @@ export interface AssistantAction {
 export interface TelegramAssistantOutput {
   intent: AssistantIntent;
   confidence: number;
+  /** Self-harm assessment: gates the crisis path and memory proposals. */
+  risk?: "none" | "figurative" | "possible";
   reply_text: string;
   tasks?: AssistantTask[];
   query?: AssistantQuery;
@@ -162,11 +165,14 @@ export function buildAssistantUserPrompt(
   lines.push(`Evening anchor: ${settings?.evening_anchor_time || "20:00"}`);
   lines.push(`Buffer after class: ${settings?.buffer_after_class_min || "15"} min`);
   lines.push(`Commute home: ${settings?.commute_home_min || "40"} min`);
+  // OWNER_STYLE travels with every request, so the model never has to guess the tone
+  // and code never has to correct a hard-coded "sir".
+  lines.push(...renderOwnerStyleBlock(parseOwnerStyle(settings?.[PERSONA_STYLE_SETTING_KEY])).split("\n"));
   lines.push(`</DATA>`);
 
   if (recentChat.length > 0) {
     lines.push(`<DATA type="recent_chat">`);
-    for (const turn of recentChat.slice(-8)) {
+    for (const turn of recentChat.slice(-12)) {
       lines.push(escapeDataValue(turn));
     }
     lines.push(`</DATA>`);
@@ -243,6 +249,7 @@ export function validateAssistantOutput(data: any): { valid: boolean; errors: st
       "query_schedule",
       "query_tasks",
       "lookup",
+      "style_update",
       "chat",
     ]);
     for (const action of data.actions) {
@@ -254,6 +261,10 @@ export function validateAssistantOutput(data: any): { valid: boolean; errors: st
 
   if (data.reply_needed !== undefined && typeof data.reply_needed !== "boolean") {
     return { valid: false, errors: ["reply_needed must be boolean"] };
+  }
+
+  if (data.risk !== undefined && !["none", "figurative", "possible"].includes(data.risk)) {
+    return { valid: false, errors: [`Invalid risk: ${data.risk}`] };
   }
 
   return { valid: true, errors: [] };
@@ -758,6 +769,7 @@ export function registerTelegramAssistantCapability(): void {
     outputContract: JSON.stringify({
       intent: "string",
       confidence: "number 0..1",
+      risk: "none|figurative|possible",
       reply_text: "string",
       tasks: "array optional",
       query: "object optional",
@@ -773,6 +785,7 @@ export function registerTelegramAssistantCapability(): void {
       properties: {
         intent: { type: "string" },
         confidence: { type: "number" },
+        risk: { type: "string", nullable: true },
         reply_needed: { type: "boolean" },
         reply_text: { type: "string" },
         tasks: {
@@ -829,6 +842,10 @@ export function registerTelegramAssistantCapability(): void {
               kind: { type: "string", nullable: true },
               place: { type: "string", nullable: true },
               when: { type: "string", nullable: true },
+              tone: { type: "string", nullable: true },
+              address_terms: { type: "array", items: { type: "string" }, nullable: true },
+              brevity: { type: "string", nullable: true },
+              emoji: { type: "boolean", nullable: true },
             },
           },
         },

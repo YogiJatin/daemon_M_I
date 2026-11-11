@@ -37,21 +37,25 @@ it("the observed production greetings get a greeting, not a lookup answer", () =
   assert.doesNotMatch(yoo!.reply, /no data/i);
 });
 
-it("a bare interrogative asks for a request instead of claiming missing data", () => {
-  const what = matchDeterministicReply("What", MORNING);
-  assert.ok(what, "What should match");
-  assert.strictEqual(what!.kind, "fragment");
-  assert.strictEqual(what!.reply, "I didn't catch that, sir. What do you need?");
+it("a bare interrogative is left to the LLM instead of a canned line", () => {
+  // Persona v3: only bare greetings, thanks and acks are deterministic. A question is
+  // conversation, and the old canned fragment read like a data-missing answer.
+  assert.strictEqual(matchDeterministicReply("What", MORNING), null);
+  assert.strictEqual(matchDeterministicReply("how are you", MORNING), null);
 });
 
 it("greetings are time aware in IST", () => {
-  assert.strictEqual(matchDeterministicReply("hi", MORNING)!.reply, "Morning, sir.");
-  assert.strictEqual(matchDeterministicReply("hello", EVENING)!.reply, "Evening, sir.");
+  assert.match(matchDeterministicReply("hi", MORNING)!.reply, /morning/i);
+  assert.match(matchDeterministicReply("hello", EVENING)!.reply, /evening/i);
 });
 
-it("acknowledgements are acknowledged tersely", () => {
-  assert.strictEqual(matchDeterministicReply("ok", MORNING)!.reply, "Noted.");
-  assert.strictEqual(matchDeterministicReply("Thank you!", MORNING)!.reply, "Noted.");
+it("acknowledgements never claim to have noted anything", () => {
+  const ack = matchDeterministicReply("ok", MORNING)!;
+  assert.strictEqual(ack.kind, "acknowledgement");
+  assert.doesNotMatch(ack.reply, /noted|got it|understood/i);
+  const thanks = matchDeterministicReply("Thank you!", MORNING)!;
+  assert.strictEqual(thanks.kind, "thanks");
+  assert.doesNotMatch(thanks.reply, /noted|got it|understood/i);
 });
 
 it("any message carrying a request is left to the classifier", () => {

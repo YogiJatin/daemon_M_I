@@ -10,6 +10,7 @@
 
 import { applyReplyStyle, checkReplyStyle, collapseDuplicateSir } from "../worker/replyStyle";
 import { matchDeterministicReply } from "../worker/greetingMatcher";
+import { countAddressTerms } from "../worker/personaStyle";
 
 let pass = 0;
 let fail = 0;
@@ -69,35 +70,35 @@ function runReplyStyleTests(): void {
 
   assert(checkReplyStyle("Specify the request, sir.")[0].code === "owner_directed_imperative", "checkReplyStyle reports the code");
 
-  console.log("--- 3. The old fragment text is gone ---");
-  const fragment = matchDeterministicReply("What", istAt(15, 0));
-  assert(fragment !== null && fragment.kind === "fragment", "a bare interrogative is still a fragment", fragment);
-  assert(
-    fragment!.reply === "I didn't catch that, sir. What do you need?",
-    "fragment reply is the new text",
-    fragment!.reply
-  );
-  assert(checkReplyStyle(fragment!.reply).length === 0, "the new fragment text passes the linter");
+  console.log("--- 3. Bare questions are conversation, not canned fragments ---");
+  // Persona v3 sends anything longer than a bare greeting/thanks/ack to the LLM in CHAT
+  // mode, so a one-word question must NOT get a canned line any more.
+  assert(matchDeterministicReply("What", istAt(15, 0)) === null, "a bare interrogative goes to the LLM");
+  assert(matchDeterministicReply("how are you", istAt(15, 0)) === null, "'how are you' goes to the LLM");
+  assert(matchDeterministicReply("what do you think about this?", istAt(15, 0)) === null, "a question mark opts out");
 
   console.log("--- 4. Greetings use IST, not the runtime timezone ---");
-  const cases: Array<{ hour: number; minute: number; expected: string; label: string }> = [
-    { hour: 5, minute: 0, expected: "Morning, sir.", label: "05:00 IST" },
-    { hour: 11, minute: 0, expected: "Morning, sir.", label: "11:00 IST" },
-    { hour: 15, minute: 0, expected: "Afternoon, sir.", label: "15:00 IST" },
-    { hour: 19, minute: 0, expected: "Evening, sir.", label: "19:00 IST" },
-    { hour: 23, minute: 30, expected: "Evening, sir.", label: "23:30 IST" },
+  const cases: Array<{ hour: number; minute: number; expected: RegExp; label: string }> = [
+    { hour: 5, minute: 0, expected: /morning/i, label: "05:00 IST" },
+    { hour: 11, minute: 0, expected: /morning/i, label: "11:00 IST" },
+    { hour: 15, minute: 0, expected: /afternoon/i, label: "15:00 IST" },
+    { hour: 19, minute: 0, expected: /evening/i, label: "19:00 IST" },
+    { hour: 23, minute: 30, expected: /night/i, label: "23:30 IST" },
   ];
 
   for (const testCase of cases) {
     const reply = matchDeterministicReply("Yoo", istAt(testCase.hour, testCase.minute));
-    assert(reply?.reply === testCase.expected, `${testCase.label} -> ${testCase.expected}`, reply?.reply);
+    assert(Boolean(reply && testCase.expected.test(reply.reply)), `${testCase.label} -> ${testCase.expected}`, reply?.reply);
+    assert(countAddressTerms(reply?.reply || "", ["sir", "boss", "master"]) <= 1, "at most one address term", reply?.reply);
   }
 
-  // Boundary checks: 12:00 flips to afternoon, 17:00 flips to evening.
-  assert(matchDeterministicReply("hello", istAt(11, 59))?.reply === "Morning, sir.", "11:59 IST is still morning");
-  assert(matchDeterministicReply("hello", istAt(12, 0))?.reply === "Afternoon, sir.", "12:00 IST is afternoon");
-  assert(matchDeterministicReply("hello", istAt(16, 59))?.reply === "Afternoon, sir.", "16:59 IST is still afternoon");
-  assert(matchDeterministicReply("hello", istAt(17, 0))?.reply === "Evening, sir.", "17:00 IST is evening");
+  // Boundary checks: 05:00 starts morning, 12:00 flips to afternoon, 17:00 to evening,
+  // 22:00 to night.
+  assert(/morning/i.test(matchDeterministicReply("hello", istAt(4, 59))?.reply || "") === false, "04:59 is night, not morning");
+  assert(/morning/i.test(matchDeterministicReply("hello", istAt(11, 59))?.reply || ""), "11:59 IST is still morning");
+  assert(/afternoon/i.test(matchDeterministicReply("hello", istAt(12, 0))?.reply || ""), "12:00 IST is afternoon");
+  assert(/afternoon/i.test(matchDeterministicReply("hello", istAt(16, 59))?.reply || ""), "16:59 IST is still afternoon");
+  assert(/evening/i.test(matchDeterministicReply("hello", istAt(17, 0))?.reply || ""), "17:00 IST is evening");
 
   console.log(`\nTOTAL: ${pass + fail} | PASSED: ${pass} | FAILED: ${fail}`);
   if (fail > 0) process.exit(1);

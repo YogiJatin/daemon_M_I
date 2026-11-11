@@ -11,6 +11,11 @@
  * correct answers ("Your class is at 09:00 on Monday").
  */
 
+/**
+ * The only reply this module may substitute, and only for a data question whose answer
+ * is genuinely missing. CHAT, SUPPORT and ADVISE replies are never replaced with it:
+ * "no record" as an answer to small talk is what broke the persona.
+ */
 export const UNGROUNDED_REPLY = "I don't have anything on that, sir.";
 
 /** Task/memory/notification style identifiers regardless of prefix case. */
@@ -110,4 +115,37 @@ export function verifyReplyGrounding(reply: string, sources: string[]): Groundin
 
   const ungrounded = facts.filter((fact) => !known.has(canonicalFact(fact)));
   return { grounded: ungrounded.length === 0, ungrounded };
+}
+
+/**
+ * Removes the ungrounded facts themselves and keeps the surrounding prose.
+ *
+ * Used for CHAT/SUPPORT/ADVISE, where the words matter but an invented number must not
+ * be sent. Deleting the whole sentence dead-ended real conversation ("You have 42 tasks
+ * due and I like your plan." lost the encouragement too), so the fact is lifted out and
+ * the sentence is kept. Returns an empty string only when nothing readable is left, so
+ * the caller can use a mode-fit line instead of a "no record" line.
+ */
+export function stripUngroundedFacts(reply: string, ungrounded: string[]): string {
+  const text = typeof reply === "string" ? reply : "";
+  if (!text) return "";
+  if (!ungrounded || ungrounded.length === 0) return text;
+
+  let out = text;
+  for (const fact of ungrounded) {
+    if (!fact) continue;
+    const escaped = fact.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(escaped, "g"), " ");
+  }
+
+  out = out
+    .replace(/\s+([,.!?;:])/g, "$1")
+    .replace(/([,.!?;:])\s*([,.!?;:])/g, "$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/^[\s,;:]+/, "")
+    .trim();
+
+  // Punctuation alone is not a reply.
+  if (!/[\p{L}\p{N}]/u.test(out)) return "";
+  return out;
 }

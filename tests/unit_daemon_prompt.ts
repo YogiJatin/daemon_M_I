@@ -87,18 +87,36 @@ async function runCapability(env: any, temperature: number): Promise<void> {
 async function main() {
   console.log("\n=== Daemon prompt contract ===");
 
-  await it("uses the Daemon identity and terse style rules", () => {
+  await it("uses the persona v3 identity and the OWNER_STYLE contract", () => {
     assert.match(DAEMON_SYSTEM_PROMPT, /You are Daemon/);
-    assert.match(DAEMON_SYSTEM_PROMPT, /Address him as "sir"/);
-    assert.match(DAEMON_SYSTEM_PROMPT, /No greetings, pleasantries, apologies, compliments, or offers of further help/);
-    assert.doesNotMatch(DAEMON_SYSTEM_PROMPT, /Friendly, dry humor/);
+    assert.match(DAEMON_SYSTEM_PROMPT, /right hand of Jatin/);
+    assert.match(DAEMON_SYSTEM_PROMPT, /OWNER_STYLE in CONTEXT sets address terms/);
+    assert.match(DAEMON_SYSTEM_PROMPT, /<modes>/);
+    // The old persona hard-coded the address term: that is exactly what broke.
+    assert.doesNotMatch(DAEMON_SYSTEM_PROMPT, /Address him as "sir"/);
+  });
+
+  await it("carries the conversation modes that stop small talk dead-ending", () => {
+    for (const mode of ["OPERATE:", "CHAT:", "LEARN:", "ADVISE:", "SUPPORT:", "META:"]) {
+      assert.ok(DAEMON_SYSTEM_PROMPT.includes(mode), `missing mode ${mode}`);
+    }
+    assert.match(DAEMON_SYSTEM_PROMPT, /Never answer chat with "no record"/);
+    assert.match(DAEMON_SYSTEM_PROMPT, /Venting is not a policy violation/);
+    assert.match(DAEMON_SYSTEM_PROMPT, /figurative/);
   });
 
   await it("forbids invented facts and action claims without a fixed dead-end", () => {
-    assert.match(DAEMON_SYSTEM_PROMPT, /Never guess and never invent a fact about the owner/);
-    assert.match(DAEMON_SYSTEM_PROMPT, /Never claim an action was done/);
-    assert.match(DAEMON_SYSTEM_PROMPT, /emit the structured action only/i);
+    assert.match(DAEMON_SYSTEM_PROMPT, /CONTEXT, SYSTEM RESULTS or/);
+    assert.match(DAEMON_SYSTEM_PROMPT, /Never claim removed, deleted, saved, set, scheduled/);
+    assert.match(DAEMON_SYSTEM_PROMPT, /Emit the action\./);
+    assert.match(DAEMON_SYSTEM_PROMPT, /Never "sir, sir"/);
     assert.doesNotMatch(DAEMON_SYSTEM_PROMPT, /reply "No data\."/);
+  });
+
+  await it("declares the risk field and the style_update action", () => {
+    assert.match(DAEMON_SYSTEM_PROMPT, /"risk": "none\|figurative\|possible"/);
+    assert.match(DAEMON_SYSTEM_PROMPT, /"type":"style_update"/);
+    assert.match(DAEMON_SYSTEM_PROMPT, /STYLE UPDATES \(style_update\)/);
   });
 
   await it("keeps language matching for English, Hinglish and Telugu", () => {
@@ -132,8 +150,13 @@ async function main() {
     assert.match(DAEMON_ANSWER_PROMPT, /You are Daemon/);
     assert.ok(DAEMON_ANSWER_PROMPT.startsWith(DAEMON_PERSONA), "persona block must lead the answer prompt");
     assert.doesNotMatch(DAEMON_ANSWER_PROMPT, /reply exactly: No data/i);
-    // The old adapter contract sniffed this phrase out of the prompt text.
-    assert.doesNotMatch(DAEMON_ANSWER_PROMPT, /plain text/i);
+    // The phrase that used to be quoted as the example answer must be gone: the model
+    // parroted it back to small talk.
+    assert.doesNotMatch(DAEMON_ANSWER_PROMPT, /No record of that/);
+    assert.match(DAEMON_ANSWER_PROMPT, /Follow OWNER_STYLE/);
+    // Format comes from responseFormat on the request; the prompt says plain text, and
+    // the adapter must not sniff that wording (covered by the Gemini case below).
+    assert.match(DAEMON_ANSWER_PROMPT, /Plain text only/);
   });
 
   await it("classifier prompt carries the persona instead of the old STYLE/TRUTH split", () => {

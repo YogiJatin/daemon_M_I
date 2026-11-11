@@ -16,6 +16,7 @@ export const ACTION_TYPES = [
   "query_schedule",
   "query_tasks",
   "lookup",
+  "style_update",
   "chat",
 ] as const;
 
@@ -60,6 +61,14 @@ export interface LookupAction {
   when?: string;
 }
 
+export interface StyleUpdateAction {
+  type: "style_update";
+  tone?: string;
+  address_terms?: string[];
+  brevity?: string;
+  emoji?: boolean;
+}
+
 export interface ChatAction {
   type: "chat";
 }
@@ -71,6 +80,7 @@ export type DaemonAction =
   | QueryScheduleAction
   | QueryTasksAction
   | LookupAction
+  | StyleUpdateAction
   | ChatAction;
 
 export interface DaemonIntentOutput {
@@ -145,6 +155,18 @@ export function normalizeActions(raw: any): DaemonAction[] {
           query: String(action.query || "").trim(),
           place: action.place ? String(action.place) : undefined,
           when: action.when ? String(action.when) : undefined,
+        });
+        break;
+      case "style_update":
+        // Field-level validation lives in personaStyle.applyStyleUpdate.
+        push({
+          type: "style_update",
+          tone: action.tone !== undefined ? String(action.tone) : undefined,
+          address_terms: Array.isArray(action.address_terms)
+            ? action.address_terms.map((term: any) => String(term))
+            : undefined,
+          brevity: action.brevity !== undefined ? String(action.brevity) : undefined,
+          emoji: typeof action.emoji === "boolean" ? action.emoji : undefined,
         });
         break;
       case "chat":
