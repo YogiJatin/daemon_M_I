@@ -26,11 +26,13 @@
 
   "vars": {
     "HEALTHCHECKS_PING_URL": "",
-    "AI_PROVIDER_ORDER": "groq_primary,groq_secondary,gemini_primary,workers_ai",
-    "GEMINI_ENABLED": "1",
+    // Gemini is disabled after its key was exposed; no Gemini call may run until the
+    // owner sets a new key and decides personal_ok. Keep it out of the provider order.
+    "AI_PROVIDER_ORDER": "groq_primary,groq_secondary,workers_ai",
+    "GEMINI_ENABLED": "0",
     "GROQ_MODEL": "openai/gpt-oss-120b",
     "GROQ_MODEL_SECONDARY": "openai/gpt-oss-20b",
-    "GEMINI_MODEL": "gemini-2.0-flash",
+    "GEMINI_MODEL": "gemini-3.8-flash",
     "WORKERS_AI_MODEL": "@cf/meta/llama-3.2-3b-instruct",
     "WEBHOOK_URL": "https://personal-ai-os.jatin-personal-ai.workers.dev/api/v1/telegram/webhook"
   },
