@@ -906,7 +906,9 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     const timeLines = detReminder.dueDifferentFromRemind
       ? `\n📅 Due: ${detReminder.dueAtFormatted}\n⏰ Remind: ${detReminder.remindAtFormatted}`
       : `\n⏰ Remind: ${detReminder.remindAtFormatted}`;
-    const replyText = `Proposal:\n• ${detReminder.title}${timeLines}\n\nConfirm?`;
+    const replyText = `I understood: "${detReminder.title}"${timeLines}
+
+Confirm?`;
     const markup = makeInlineKeyboard([
       { text: "Confirm", callback_data: `confirm_proposal:${propId}` },
       { text: "Change time", callback_data: `change_time:${propId}` },
@@ -946,7 +948,9 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
       .bind(propId, capturedTitle, todayIst, nowIso(), nowIso())
       .run()
       .catch(() => {});
-    const replyText = `Proposal:\n• ${capturedTitle}\n\nWhen should I remind you?`;
+    const replyText = `I understood: "${capturedTitle}". Save it?
+
+Pick when to remind you:`;
     const markup = makeInlineKeyboard([
       { text: "Tonight 8:00 PM", callback_data: `pick_time:${propId}:tonight` },
       { text: "Tomorrow 8:00 AM", callback_data: `pick_time:${propId}:tomorrow_morning` },

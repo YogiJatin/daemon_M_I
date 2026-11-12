@@ -250,9 +250,7 @@ export class AIAdapter {
         providerType: "gemini",
         keySlot: 1,
         apiKey: this.resolveApiKey("gemini", 1) || undefined,
-        // gemini-2.0-flash was shut down by Google on 2026-06-01; the deprecation page
-        // names gemini-3.8-flash as the current Flash model for new projects.
-        model: this.env?.GEMINI_MODEL || "gemini-3.8-flash",
+        model: this.env?.GEMINI_MODEL || "gemini-2.5-flash",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 15000,
       };
@@ -263,7 +261,7 @@ export class AIAdapter {
         providerType: "gemini",
         keySlot: 2,
         apiKey: this.resolveApiKey("gemini", 2) || undefined,
-        model: this.env?.GEMINI_MODEL_SECONDARY || this.env?.GEMINI_MODEL || "gemini-3.8-flash",
+        model: this.env?.GEMINI_MODEL_SECONDARY || this.env?.GEMINI_MODEL || "gemini-2.5-flash",
         allowedPrivacyClasses: ["synthetic_test", "low_sensitivity", "personal"],
         timeoutMs: 15000,
       };
