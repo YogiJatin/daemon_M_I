@@ -29,12 +29,10 @@ const EVENING = new Date("2026-11-08T15:00:00.000Z"); // 20:30 IST
 
 console.log("\n=== Chat fragments ===\n");
 
-it("the observed production greetings get a greeting, not a lookup answer", () => {
-  const yoo = matchDeterministicReply("Yoo", MORNING);
-  assert.ok(yoo, "Yoo should match");
-  assert.strictEqual(yoo!.kind, "greeting");
-  assert.match(yoo!.reply, /sir/i);
-  assert.doesNotMatch(yoo!.reply, /no data/i);
+it("FIX 7: greetings go to the model, never a canned line", () => {
+  assert.strictEqual(matchDeterministicReply("Yoo", MORNING), null);
+  assert.strictEqual(matchDeterministicReply("hi", MORNING), null);
+  assert.strictEqual(matchDeterministicReply("hello", MORNING), null);
 });
 
 it("a bare interrogative is left to the LLM instead of a canned line", () => {
@@ -44,18 +42,14 @@ it("a bare interrogative is left to the LLM instead of a canned line", () => {
   assert.strictEqual(matchDeterministicReply("how are you", MORNING), null);
 });
 
-it("greetings are time aware in IST", () => {
-  assert.match(matchDeterministicReply("hi", MORNING)!.reply, /morning/i);
-  assert.match(matchDeterministicReply("hello", EVENING)!.reply, /evening/i);
+it("FIX 7: greetings are not answered by code", () => {
+  assert.strictEqual(matchDeterministicReply("hi", MORNING), null);
+  assert.strictEqual(matchDeterministicReply("hello", EVENING), null);
 });
 
-it("acknowledgements never claim to have noted anything", () => {
-  const ack = matchDeterministicReply("ok", MORNING)!;
-  assert.strictEqual(ack.kind, "acknowledgement");
-  assert.doesNotMatch(ack.reply, /noted|got it|understood/i);
-  const thanks = matchDeterministicReply("Thank you!", MORNING)!;
-  assert.strictEqual(thanks.kind, "thanks");
-  assert.doesNotMatch(thanks.reply, /noted|got it|understood/i);
+it("FIX 7: acknowledgements go to the model", () => {
+  assert.strictEqual(matchDeterministicReply("ok", MORNING), null);
+  assert.strictEqual(matchDeterministicReply("Thank you!", MORNING), null);
 });
 
 it("any message carrying a request is left to the classifier", () => {

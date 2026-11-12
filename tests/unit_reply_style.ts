@@ -39,11 +39,13 @@ function runReplyStyleTests(): void {
   assert(collapseDuplicateSir("sir sir sir") === "sir", "a run of three collapses to one");
   assert(collapseDuplicateSir("Noted, sir.") === "Noted, sir.", "a single sir is untouched");
 
+  // FIX 7: applyReplyStyle is a passthrough; the model owns the reply.
+  // collapseDuplicateSir remains available as a utility.
   const callReply = applyReplyStyle("I will call you sir, sir.");
-  assert(callReply.text === "I will call you sir.", "applyReplyStyle returns the collapsed text", callReply.text);
-  assert(callReply.violations.length === 0, "collapsed text has no violations", callReply.violations);
-  assert(callReply.decisions.includes("style_collapsed_sir"), "the collapse is recorded as a decision", callReply.decisions);
-  assert(!/\bsir\b[\s,;]*\bsir\b/i.test(callReply.text), "no 'sir, sir' can survive");
+  assert(callReply.text === "I will call you sir, sir.", "applyReplyStyle is a passthrough", callReply.text);
+  assert(callReply.violations.length === 0, "no violations", callReply.violations);
+  assert(callReply.decisions.length === 0, "no decisions recorded", callReply.decisions);
+  assert(callReply.retryable === false, "not retryable", callReply.retryable);
 
   console.log("--- 2. Imperatives aimed at the owner are rejected ---");
   for (const banned of [
@@ -52,10 +54,10 @@ function runReplyStyleTests(): void {
     "State your task, sir.",
     "Noted. Specify what you need, sir.",
   ]) {
+    // FIX 7: applyReplyStyle is a passthrough; imperatives are not blocked by code.
     const result = applyReplyStyle(banned);
-    const codes = result.violations.map((violation) => violation.code);
-    assert(codes.includes("owner_directed_imperative"), `rejects: ${banned}`, codes);
-    assert(result.text === "Understood, sir.", "blocked replies fall back instead of sending", result.text);
+    assert(result.text === banned, "passthrough keeps the reply", result.text);
+    assert(result.retryable === false, "not retryable", result.retryable);
   }
 
   // Descriptive uses of the same words must not be blocked.
@@ -77,28 +79,9 @@ function runReplyStyleTests(): void {
   assert(matchDeterministicReply("how are you", istAt(15, 0)) === null, "'how are you' goes to the LLM");
   assert(matchDeterministicReply("what do you think about this?", istAt(15, 0)) === null, "a question mark opts out");
 
-  console.log("--- 4. Greetings use IST, not the runtime timezone ---");
-  const cases: Array<{ hour: number; minute: number; expected: RegExp; label: string }> = [
-    { hour: 5, minute: 0, expected: /morning/i, label: "05:00 IST" },
-    { hour: 11, minute: 0, expected: /morning/i, label: "11:00 IST" },
-    { hour: 15, minute: 0, expected: /afternoon/i, label: "15:00 IST" },
-    { hour: 19, minute: 0, expected: /evening/i, label: "19:00 IST" },
-    { hour: 23, minute: 30, expected: /night/i, label: "23:30 IST" },
-  ];
-
-  for (const testCase of cases) {
-    const reply = matchDeterministicReply("Yoo", istAt(testCase.hour, testCase.minute));
-    assert(Boolean(reply && testCase.expected.test(reply.reply)), `${testCase.label} -> ${testCase.expected}`, reply?.reply);
-    assert(countAddressTerms(reply?.reply || "", ["sir", "boss", "master"]) <= 1, "at most one address term", reply?.reply);
-  }
-
-  // Boundary checks: 05:00 starts morning, 12:00 flips to afternoon, 17:00 to evening,
-  // 22:00 to night.
-  assert(/morning/i.test(matchDeterministicReply("hello", istAt(4, 59))?.reply || "") === false, "04:59 is night, not morning");
-  assert(/morning/i.test(matchDeterministicReply("hello", istAt(11, 59))?.reply || ""), "11:59 IST is still morning");
-  assert(/afternoon/i.test(matchDeterministicReply("hello", istAt(12, 0))?.reply || ""), "12:00 IST is afternoon");
-  assert(/afternoon/i.test(matchDeterministicReply("hello", istAt(16, 59))?.reply || ""), "16:59 IST is still afternoon");
-  assert(/evening/i.test(matchDeterministicReply("hello", istAt(17, 0))?.reply || ""), "17:00 IST is evening");
+  console.log("--- 4. FIX 7: greetings go to the model, not canned lines ---");
+  assert(matchDeterministicReply("Yoo", istAt(5, 0)) === null, "greetings are not canned");
+  assert(matchDeterministicReply("hello", istAt(15, 0)) === null, "greetings are not canned");
 
   console.log(`\nTOTAL: ${pass + fail} | PASSED: ${pass} | FAILED: ${fail}`);
   if (fail > 0) process.exit(1);

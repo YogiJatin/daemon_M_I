@@ -25,7 +25,7 @@ import {
   type OwnerStyle,
 } from "../worker/personaStyle";
 import { matchDeterministicReply } from "../worker/greetingMatcher";
-import { applyReplyStyle, buildRetryInstruction, MODE_FIT_FALLBACK_REPLY } from "../worker/replyStyle";
+import { applyReplyStyle, buildRetryInstruction, MODE_FIT_FALLBACK_REPLY, checkReplyStyle } from "../worker/replyStyle";
 import { buildRecentChat, isExcludedFromHistory, HISTORY_TURN_LIMIT } from "../worker/historyHygiene";
 import { assessRisk, memoryProposalAllowed, CRISIS_SUPPORT_TEXT } from "../worker/safetyPath";
 import { stripUngroundedFacts, verifyReplyGrounding } from "../worker/groundingVerifier";
@@ -148,46 +148,20 @@ it("chat prompts no longer teach the no-record line", () => {
   assert.match(DAEMON_PERSONA, /Never answer chat with "no record"/);
 });
 
-it("only bare greetings, thanks and acks are deterministic", () => {
-  assert.strictEqual(matchDeterministicReply("hi", istAt(9, 0))?.kind, "greeting");
-  assert.strictEqual(matchDeterministicReply("thanks", istAt(9, 0))?.kind, "thanks");
-  assert.strictEqual(matchDeterministicReply("ok", istAt(9, 0))?.kind, "acknowledgement");
-  for (const chat of [
-    "How are you",
-    "Just talk to me kiddo I wanna just chat tdy",
-    "who am I",
-    "What",
-    "that's rude bro",
-  ]) {
-    assert.strictEqual(matchDeterministicReply(chat, istAt(9, 0)), null, `${chat} must reach the LLM`);
-  }
+it("FIX 7: all greetings go to the model, none are canned", () => {
+  assert.strictEqual(matchDeterministicReply("hi", istAt(9, 0)), null);
+  assert.strictEqual(matchDeterministicReply("thanks", istAt(9, 0)), null);
+  assert.strictEqual(matchDeterministicReply("ok", istAt(9, 0)), null);
+  assert.strictEqual(matchDeterministicReply("How are you", istAt(9, 0)), null);
 });
 
-it("deterministic replies offer at least four variants per tone and never repeat", () => {
-  for (const tone of ["casual", "formal"] as const) {
-    const style: OwnerStyle = { ...DEFAULTS, tone };
-    const seen = new Set<string>();
-    for (let day = 1; day <= 28; day++) {
-      const reply = matchDeterministicReply("hi", istAt(9, 30, day), { style });
-      assert.ok(reply, "greeting matched");
-      seen.add(reply!.reply);
-    }
-    assert.ok(seen.size >= 4, `${tone} greeting has ${seen.size} variants, expected >= 4`);
-  }
-
-  const style = CASUAL;
-  let previous = matchDeterministicReply("hello", istAt(9, 0), { style })!.reply;
-  for (let i = 0; i < 6; i++) {
-    const next = matchDeterministicReply("hello", istAt(9, 0), { style, previousReply: previous })!.reply;
-    assert.notStrictEqual(next, previous, "the same variant must not be sent twice in a row");
-    previous = next;
-  }
+it("FIX 7: no deterministic greeting variants (model owns them)", () => {
+  assert.strictEqual(matchDeterministicReply("hi", istAt(9, 30, 1)), null);
+  assert.strictEqual(matchDeterministicReply("hello", istAt(9, 0)), null);
 });
 
-it("an empty address-term list removes even a canned greeting's term", () => {
-  const style: OwnerStyle = { ...CASUAL, address_terms: [] };
-  const reply = matchDeterministicReply("hi", istAt(9, 0), { style })!;
-  assert.strictEqual(countAddressTerms(reply.reply, DEFAULTS.address_terms), 0, reply.reply);
+it("FIX 7: empty address-term list is irrelevant (no canned greetings)", () => {
+  assert.strictEqual(matchDeterministicReply("hi", istAt(9, 0)), null);
 });
 
 it("the grounding verifier strips rather than dead-ends a chat reply", () => {
@@ -287,48 +261,39 @@ it("a casual reply skips the term when the previous one used it", () => {
   assert.strictEqual(countAddressTerms(formal.text, CASUAL.address_terms), 1, formal.text);
 });
 
-it("'sir, sir' is collapsed", () => {
+it("FIX 7: applyReplyStyle is a passthrough (collapseDuplicateSir is separate)", () => {
   const styled = applyReplyStyle("I will call you sir, sir.", {
     style: CASUAL,
     tone: "casual",
     previousReplyUsedTerm: false,
     actionResults: [],
   });
-  assert.strictEqual(styled.text, "I will call you sir.");
+  assert.strictEqual(styled.text, "I will call you sir, sir.");
+  assert.strictEqual(styled.retryable, false);
 });
 
-it("emotion-parrot openers are rejected and retried", () => {
+it("FIX 7: applyReplyStyle passthrough (emotion-parrot no longer blocked by code)", () => {
   for (const bad of [
     "You seem upset, sir.",
     "You are expressing frustration.",
-    "You are feeling low today.",
-    "You sound angry.",
   ]) {
     const styled = applyReplyStyle(bad, { style: CASUAL, tone: "casual", previousReplyUsedTerm: false, actionResults: [] });
-    assert.strictEqual(styled.text, MODE_FIT_FALLBACK_REPLY, `${bad} was not replaced`);
-    assert.ok(
-      styled.violations.some((violation) => violation.code === "emotion_parrot"),
-      `${bad} not flagged`
-    );
-    assert.strictEqual(styled.retryable, true);
+    assert.strictEqual(styled.text, bad);
+    assert.strictEqual(styled.retryable, false);
   }
+  // checkReplyStyle still reports the code for callers that want it
+  const v = checkReplyStyle("You seem upset, sir.", { style: CASUAL, tone: "casual", previousReplyUsedTerm: false, actionResults: [] });
+  assert.ok(v.some((x) => x.code === "emotion_parrot"));
 });
 
-it("'noted' with nothing done is rejected, but allowed when code committed something", () => {
+it("FIX 7: applyReplyStyle passthrough for noted (checkReplyStyle still reports)", () => {
   const bare = applyReplyStyle("Noted, sir.", { style: CASUAL, tone: "casual", previousReplyUsedTerm: false, actionResults: [] });
-  assert.ok(bare.violations.some((violation) => violation.code === "unsupported_ack"));
-  assert.strictEqual(bare.text, MODE_FIT_FALLBACK_REPLY);
-
-  const committed = applyReplyStyle("Noted, sir.", {
-    style: CASUAL,
-    tone: "casual",
-    previousReplyUsedTerm: false,
-    actionResults: ["Task 'submit report' created for today 17:00."],
-  });
-  assert.strictEqual(committed.violations.length, 0);
+  assert.strictEqual(bare.text, "Noted, sir.");
+  const v = checkReplyStyle("Noted, sir.", { style: CASUAL, tone: "casual", previousReplyUsedTerm: false, actionResults: [] });
+  assert.ok(v.some((x) => x.code === "unsupported_ack"));
 });
 
-it("a stored memory sentence echoed word for word is rejected", () => {
+it("FIX 7: applyReplyStyle passthrough for memory echo (checkReplyStyle still reports)", () => {
   const memory = "I am a third-year ECE student at Vasavi College of Engineering in Hyderabad";
   const echo = "You are a third-year ECE student at Vasavi College, is that right?";
   const styled = applyReplyStyle(echo, {
@@ -338,8 +303,9 @@ it("a stored memory sentence echoed word for word is rejected", () => {
     actionResults: [],
     memoryTexts: [memory],
   });
-  assert.ok(styled.violations.some((violation) => violation.code === "memory_echo"), "echo not flagged");
-  assert.strictEqual(styled.text, MODE_FIT_FALLBACK_REPLY);
+  assert.strictEqual(styled.text, echo);
+  const v = checkReplyStyle(echo, { style: CASUAL, tone: "casual", previousReplyUsedTerm: false, actionResults: [], memoryTexts: [memory] });
+  assert.ok(v.some((x) => x.code === "memory_echo"), "echo flagged");
 });
 
 it("the retry instruction names the rule", () => {

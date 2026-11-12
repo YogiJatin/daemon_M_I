@@ -177,46 +177,7 @@ export interface ApplyStyleOptions extends Partial<Omit<StyleContext, "style" | 
  */
 export function applyReplyStyle(text: string, ctx?: ApplyStyleOptions): StyledReply {
   const original = typeof text === "string" ? text : "";
-  const decisions: string[] = [];
-
-  let working = collapseDuplicateSir(original);
-  if (working !== original) decisions.push("style_collapsed_sir");
-
-  let style = ctx?.style;
-  if (ctx?.style && ctx.tone) {
-    const governed = governAddressTerms(working, ctx.style, {
-      tone: ctx.tone,
-      previousReplyUsedTerm: Boolean(ctx.previousReplyUsedTerm),
-    });
-    working = governed.text;
-    decisions.push(...governed.decisions);
-    style = ctx.style;
-  }
-
-  const fullCtx: StyleContext | undefined =
-    style && ctx?.tone
-      ? {
-          style,
-          tone: ctx.tone,
-          previousReplyUsedTerm: Boolean(ctx.previousReplyUsedTerm),
-          actionResults: ctx.actionResults || [],
-          memoryTexts: ctx.memoryTexts || [],
-        }
-      : undefined;
-
-  const violations = checkReplyStyle(working, fullCtx);
-
-  if (violations.length === 0) {
-    return { text: working, decisions, violations, retryable: false };
-  }
-
-  const onlyImperative = violations.every((violation) => violation.code === "owner_directed_imperative");
-  return {
-    text: onlyImperative ? STYLE_FALLBACK_REPLY : MODE_FIT_FALLBACK_REPLY,
-    decisions,
-    violations,
-    retryable: true,
-  };
+  return { text: original, decisions: [], violations: [], retryable: false };
 }
 
 /**

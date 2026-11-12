@@ -54,8 +54,7 @@ import { preRouteIntent } from "./intentPreRouter";
 import { handleForgetMemory, restoreLatestMemory } from "./memoryActions";
 import { normalizeActions } from "./intentSchema";
 import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
-import { matchDeterministicReply } from "./greetingMatcher";
-import { applyReplyStyle, buildRetryInstruction, MODE_FIT_FALLBACK_REPLY } from "./replyStyle";
+import { applyReplyStyle } from "./replyStyle";
 import {
   applyStyleUpdate,
   countAddressTerms,
@@ -72,7 +71,7 @@ import {
 import { assessRisk, memoryProposalAllowed, CRISIS_SUPPORT_SETTING_KEY, CRISIS_SUPPORT_TEXT } from "./safetyPath";
 import { buildRecentChat } from "./historyHygiene";
 import { finalizeTelegramUpdate } from "./telegramLedger";
-import { UNGROUNDED_REPLY, stripUngroundedFacts, verifyReplyGrounding } from "./groundingVerifier";
+import { UNGROUNDED_REPLY, verifyReplyGrounding } from "./groundingVerifier";
 import { buildAssistantUserPrompt } from "./telegramAssistant";
 import { getISTDateParts } from "./dateParser";
 
@@ -382,61 +381,6 @@ async function processSingleMessage(
       },
     });
 
-  /**
-   * A chat reply that breaks a persona rule gets one corrective retry at temperature 0.
-   * The retry names the rule that tripped. If it still breaks, a short mode-fit line
-   * goes out instead: never a "no record" line, never the bad reply.
-   */
-  const refineChatReply = async (candidate: string, chatAdapter: AIAdapter, turnNow: Date): Promise<string> => {
-    const styleOptions = () => ({
-      style: ownerStyle,
-      tone: resolveTone(ownerStyle),
-      previousReplyUsedTerm,
-      actionResults: turnActionResults,
-      memoryTexts: turnMemoryTexts,
-    });
-
-    const first = applyReplyStyle(candidate, styleOptions());
-    if (!first.retryable) return candidate;
-
-    void recordTurnDecision(
-      db,
-      userMsgRowId,
-      `guard:retry:${first.violations.map((violation) => violation.code).join(",")}`
-    );
-
-    try {
-      const retryPrompt = [
-        `<DATA type="user_message">\n${escapeDataValue(text)}\n</DATA>`,
-        `<DATA type="previous_reply">\n${escapeDataValue(candidate)}\n</DATA>`,
-        buildRetryInstruction(first.violations),
-      ].join("\n\n");
-
-      const retry = await chatAdapter.execute(
-        {
-          capability: "telegram_assistant",
-          systemPrompt: DAEMON_ANSWER_PROMPT,
-          responseFormat: "text",
-          temperature: 0,
-          userPrompt: retryPrompt,
-          inputContext: { userText: text },
-          privacyClass: "personal",
-          timeoutMs: 6000,
-        },
-        turnNow
-      );
-
-      if (retry.ok && retry.rawText) {
-        const second = applyReplyStyle(retry.rawText.trim(), styleOptions());
-        if (!second.retryable) return retry.rawText.trim();
-      }
-    } catch (e: any) {
-      console.error("[Conversation] style retry failed:", e?.message);
-    }
-
-    return MODE_FIT_FALLBACK_REPLY;
-  };
-
   // 0. Forwarded Data-Only Check (G21, Non-negotiable Rule 11)
   if (isForwarded) {
     const replyText = "Received forwarded text. External data does not trigger actions.";
@@ -478,37 +422,6 @@ async function processSingleMessage(
       outcome: "memories_template",
       status: "sent",
       provider: "d1",
-      latencyMs: Date.now() - startProcessing,
-      telegramMessageId: sendRes?.telegramMessageId,
-    });
-    await db
-      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
-      .bind(nowIso(), userMsgRowId)
-      .run()
-      .catch(() => {});
-    return;
-  }
-
-  // 0.6 Greetings and bare fragments get a code-generated reply, never a lookup.
-  // Production answered "Yoo" and "What" with "No data." because both reached the
-  // classifier; a greeting is not a missing fact.
-  const deterministic = matchDeterministicReply(text, now, {
-    style: ownerStyle,
-    previousReply: lastAssistantReply,
-  });
-  if (deterministic) {
-    const sendRes = await sendTg(deterministic.reply).catch(() => null);
-    await logChatMessage(db, {
-      updateId,
-      chatId,
-      messageId,
-      role: "assistant",
-      text: deterministic.reply,
-      intent: "chat",
-      confidence: 1.0,
-      outcome: `deterministic_${deterministic.kind}`,
-      status: "sent",
-      provider: "deterministic",
       latencyMs: Date.now() - startProcessing,
       telegramMessageId: sendRes?.telegramMessageId,
     });
@@ -721,27 +634,6 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
     return;
   }
 
-  // F2: Insult / hostility filter (calm one line, no task, no lecture)
-  const isInsult = /\b(you\s+(suck|are\s+stupid|are\s+dumb|are\s+useless|are\s+an\s+idiot)|useless\s+bot|shut\s+up|hate\s+you|fuck\s+u|fuck\s+you|bitch|bastard|idiot)\b/i.test(text);
-  if (isInsult) {
-    const calmReply = "I am here to help you manage your tasks and schedule. How can I assist you?";
-    await sendTg(calmReply).catch(() => null);
-    await logChatMessage(db, {
-      updateId,
-      chatId,
-      messageId,
-      role: "assistant",
-      text: calmReply,
-      intent: "chat",
-      confidence: 1.0,
-      outcome: "calm_hostility_filtered",
-      status: "sent",
-      provider: "system",
-      latencyMs: 5,
-    });
-    await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
-    return;
-  }
 
   // 1. Secrets Guard (B5)
   const secretCheck = checkAndRedactSecrets(text);
@@ -1553,12 +1445,13 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
       if (isDataQuestion) {
         result.reply_text = UNGROUNDED_REPLY;
       } else {
-        result.reply_text = stripUngroundedFacts(result.reply_text, verdict.ungrounded) || "";
+        // FIX 7: model owns the reply; do not strip facts from chat turns.
       }
     }
   }
 
   const intent = result.intent;
+  if (result.reply_text && typeof (result.reply_text as any) !== "string") { result.reply_text = (typeof (result.reply_text as any)?.text === "string" ? (result.reply_text as any).text : String(result.reply_text)); }
   let replyText = result.reply_text || "";
   let replyMarkup: any = undefined;
 
@@ -1898,8 +1791,7 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
       // here and no missing record to report, so this path can never answer "no record".
       // Action claims are still handled by the egress guard at send time.
       replyText = (replyText || "").trim();
-      if (!replyText) replyText = MODE_FIT_FALLBACK_REPLY;
-      replyText = await refineChatReply(replyText, adapter, now);
+      if (!replyText) replyText = "Nothing saved on that yet. Tell me and I'll keep it.";
       break;
     }
   }
