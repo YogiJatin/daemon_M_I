@@ -408,3 +408,22 @@ export function splitMessageClauses(text: string): string[] {
   // Return at most 3 clauses
   return clauses.slice(0, 3);
 }
+
+/**
+ * "note down ...", "jot down ...", "write this down ...", "add a task ...".
+ * Returns the task title with the command wrapper removed, or null when the message
+ * is not a capture command.
+ */
+export function parseCaptureCommand(text: string): string | null {
+  const match = /^\s*(?:please\s+)?(?:note\s+(?:down|this)|jot\s+(?:down|this)|write\s+(?:this|that)\s+down|add\s+(?:a\s+)?task|capture)\b[:\s-]*(.+)$/i.exec(
+    (text || "").trim()
+  );
+  if (!match) return null;
+  const title = match[1]
+    .replace(/^\s*(?:a|an|the)\s+/i, "")
+    .replace(/\s+/g, " ")
+    .replace(/[.!?]+$/, "")
+    .trim()
+    .slice(0, 200);
+  return title.length >= 3 ? title : null;
+}

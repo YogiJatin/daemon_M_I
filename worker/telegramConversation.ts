@@ -53,7 +53,7 @@ import { renderOwnerStyleBlock } from "./personaStyle";
 import { preRouteIntent } from "./intentPreRouter";
 import { handleForgetMemory, restoreLatestMemory } from "./memoryActions";
 import { normalizeActions } from "./intentSchema";
-import { parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
+import { parseCaptureCommand, parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
 import { applyReplyStyle } from "./replyStyle";
 import {
   applyStyleUpdate,
@@ -420,7 +420,7 @@ async function processSingleMessage(
   }
 
   // 0.5 What do you know about me? (1.8, M08 - Pure D1 template, identical with AI down)
-  if (/what\s+do\s+you\s+know\s+about\s+me/i.test(text.trim())) {
+  if (/(?:what\s+do\s+you\s+know\s+about\s+me|who\s+am\s+i|do\s+you\s+know\s+me|what\s+do\s+you\s+remember)/i.test(text.trim())) {
     const memRes = await handleMemoriesCommand(db, now);
     const sendRes = await sendTg(memRes.response).catch(() => null);
     await logChatMessage(db, {
@@ -928,6 +928,51 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
       telegramMessageId: sendRes?.telegramMessageId,
     });
     await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+    return;
+  }
+
+  // 3.8 Capture verbs: "note down ...", "jot down ...". Code owns the write, so the model
+  // can never answer with a claim that the egress guard then replaces with "Nothing was saved."
+  const capturedTitle = parseCaptureCommand(text);
+  if (capturedTitle) {
+    const propId = "prop_" + ulid();
+    const todayIst = getISTDateParts(now).localDate;
+    await db
+      .prepare(
+        `INSERT INTO task_proposals (id, title, priority, date_role, proposed_local_date, proposed_local_time, status, created_at, updated_at)
+         VALUES (?, ?, 'normal', 'unknown', ?, NULL, 'pending', ?, ?)`
+      )
+      .bind(propId, capturedTitle, todayIst, nowIso(), nowIso())
+      .run()
+      .catch(() => {});
+    const replyText = `Proposal:\n• ${capturedTitle}\n\nWhen should I remind you?`;
+    const markup = makeInlineKeyboard([
+      { text: "Tonight 8:00 PM", callback_data: `pick_time:${propId}:tonight` },
+      { text: "Tomorrow 8:00 AM", callback_data: `pick_time:${propId}:tomorrow_morning` },
+      { text: "Pick time", callback_data: `change_time:${propId}` },
+      { text: "Cancel", callback_data: `reject_proposal:${propId}` },
+    ]);
+    const sendRes = await sendTg(replyText, markup).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: replyText,
+      intent: "explicit_task",
+      confidence: 1.0,
+      outcome: "proposal_created",
+      status: "sent",
+      replyMarkup: markup,
+      provider: "deterministic",
+      latencyMs: Date.now() - startProcessing,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db
+      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+      .bind(nowIso(), userMsgRowId)
+      .run()
+      .catch(() => {});
     return;
   }
 

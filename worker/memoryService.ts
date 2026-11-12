@@ -152,11 +152,12 @@ export async function handleMemoriesCommand(
     };
   }
 
-  const lines = ["🧠 Your Saved Memories:"];
+  // The owner asked for what is remembered, not how it is stored: no ids, sources,
+  // trust labels or dates in the default listing.
+  const lines = ["Here is what I remember:"];
   for (const m of rows.results) {
-    const dateStr = m.created_at.slice(0, 10);
-    const privTag = m.sensitivity === "private" ? " [private]" : "";
-    lines.push(`• [${m.id}] (${m.source}, ${m.trust} trust, ${dateStr}${privTag}): "${m.canonical_text}"`);
+    const privTag = m.sensitivity === "private" ? " (private)" : "";
+    lines.push(`• ${m.canonical_text}${privTag}`);
   }
 
   return {

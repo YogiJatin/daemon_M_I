@@ -26,7 +26,7 @@ export interface EgressVerdict {
   reason?: "action_claim_without_commit";
 }
 
-export const NO_ACTION_TEXT = "No action taken.";
+export const NO_ACTION_TEXT = "Nothing was saved.";
 
 const COMMITTED_VERBS =
   "removed|deleted|saved|set|scheduled|completed|added|updated|marked|cleared|archived|created|cancelled|canceled|rescheduled|logged|recorded|pinned|wiped|purged";
