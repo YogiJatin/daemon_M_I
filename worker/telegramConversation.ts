@@ -353,7 +353,15 @@ async function processSingleMessage(
     });
     // The owner's address rule is a mechanical rail, so it holds even on casual/easy mode:
     // a plain chat reply (no buttons) gets the term in every sentence. Cards keep their wording.
-    const outgoing = markup ? styled.text : enforceAddressTerms(styled.text, ownerStyle);
+    // Last line of defence: a provider that hands back a serialised object must never
+    // reach the owner as "[object Object]".
+    const cleaned = String(styled.text || "")
+      .replace(/\[object Object\]\s*/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[\s,.:;-]+/, "")
+      .trim();
+    const base = cleaned || "I could not answer that just now. Try again in a moment.";
+    const outgoing = markup ? base : enforceAddressTerms(base, ownerStyle);
     previousReplyUsedTerm = countAddressTerms(outgoing, ownerStyle.address_terms) > 0;
     const recorded = [
       ...styled.decisions,

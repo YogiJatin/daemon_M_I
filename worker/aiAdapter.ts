@@ -1006,6 +1006,12 @@ export class AIAdapter {
       const resJson = (await response.json()) as any;
       const rawText = resJson.choices?.[0]?.message?.content || (isPlainText ? "" : "{}");
       const data = isPlainText ? ((rawText as any) as TOutput) : this.extractJsonPayload<TOutput>(rawText);
+      if (!isPlainText && data && typeof data === "object") {
+        const record = data as any;
+        if ("reply_text" in record && typeof record.reply_text !== "string") {
+          record.reply_text = this.replyTextOf(record.reply_text);
+        }
+      }
       return { data, rawText };
     } finally {
       clearTimeout(timeout);
@@ -1016,6 +1022,23 @@ export class AIAdapter {
    */
   private parseProviderOutput<T>(rawText: string, isPlainText: boolean): T {
     return (isPlainText ? (rawText as any) : this.extractJsonPayload<T>(rawText)) as T;
+  }
+
+  /**
+   * A provider can answer with reply_text as an object ({"text": "..."}) or leave it
+   * undefined. Pull out the string, and never let String() produce "[object Object]".
+   */
+  private replyTextOf(value: unknown): string {
+    if (typeof value === "string") return value.trim();
+    if (value && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      for (const key of ["text", "reply", "message", "content", "reply_text"]) {
+        const nested = record[key];
+        if (typeof nested === "string" && nested.trim()) return nested.trim();
+      }
+      return "";
+    }
+    return "";
   }
 
   private extractJsonPayload<T = any>(rawText: any): T {
@@ -1083,6 +1106,9 @@ export class AIAdapter {
 
       if (request.capability === "telegram_assistant") {
         if (parsed && typeof parsed === "object" && parsed.intent && typeof parsed.confidence === "number") {
+          if ("reply_text" in parsed && typeof parsed.reply_text !== "string") {
+            parsed.reply_text = this.replyTextOf(parsed.reply_text);
+          }
           waiData = parsed as TOutput;
         } else {
           // Normalize Workers AI output (which may be {response: "..."}, plain text, or partial JSON)
