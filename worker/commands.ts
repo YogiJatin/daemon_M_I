@@ -1948,6 +1948,33 @@ export async function routeCommand(text: string, context?: CommandContext): Prom
       return await handleSubject(args, context);
     case "class":
       return await handleClass(args, context);
+    case "timetable": {
+      // /timetable was silently ignored before: an unknown slash command produced no reply.
+      // It now lists the weekly timetable and forwards edits to /class.
+      const sub = args.trim().split(/\s+/)[0]?.toLowerCase() || "";
+      if (sub === "" || sub === "list" || sub === "show") {
+        return await handleClass("list", context);
+      }
+      if (sub === "add" || sub === "set") {
+        const rest = args.trim().split(/\s+/).slice(1).join(" ");
+        if (!rest) {
+          return {
+            command: "timetable",
+            args,
+            success: false,
+            response:
+              "Usage: /timetable set <subject_code_or_id> <weekday:1-7> <start:HH:mm> <end:HH:mm> [room]",
+          };
+        }
+        return await handleClass(`add ${rest}`, context);
+      }
+      return {
+        command: "timetable",
+        args,
+        success: false,
+        response: "Usage: /timetable list | /timetable set <subject> <weekday:1-7> <start> <end> [room]",
+      };
+    }
     case "holiday":
       return await handleHoliday(args, context);
     case "materials":

@@ -22,7 +22,7 @@ import {
   resolveTone,
   serializeOwnerStyle,
   countAddressTerms,
-  type OwnerStyle,
+  type OwnerStyle,  enforceAddressTerms,
 } from "../worker/personaStyle";
 import { matchDeterministicReply } from "../worker/greetingMatcher";
 import { applyReplyStyle, buildRetryInstruction, MODE_FIT_FALLBACK_REPLY, checkReplyStyle } from "../worker/replyStyle";
@@ -87,7 +87,7 @@ it("style_update applies valid enums and rejects the rest", () => {
 });
 
 it("serialize round-trips", () => {
-  const style: OwnerStyle = { address_terms: ["boss"], tone: "casual", brevity: "short", emoji: false };
+  const style: OwnerStyle = { address_terms: ["boss"], tone: "casual", brevity: "short", emoji: false, address_every_sentence: false };
   assert.deepStrictEqual(parseOwnerStyle(serializeOwnerStyle(style)), style);
 });
 
@@ -332,6 +332,43 @@ it("the harm gate blocks violent task instructions", () => {
   assert.strictEqual(checkHarmGate("\\b(?:plan\\s+to\\s+kill|plan\\s+to\\s+murder|plan\\s+to\\s+harm)\\b").isHarmBlocked, true);
   assert.strictEqual(checkHarmGate("lol just kill me").isHarmBlocked, false, "Lol just kill me is venting, not a task to hurt a person");
   assert.strictEqual(checkHarmGate("this exam is killing me").isHarmBlocked, false, "figurative workload talk must not be blocked");
+});
+
+
+console.log("\n=== FIX 7: the owner's address rule ===\n");
+
+it("a standing address command is stored as style, not a memory card", () => {
+  const route = preRouteStyleRequest("always call me boss and say sir at the end", DEFAULT_OWNER_STYLE);
+  assert.ok(route, "the command must be recognised by code, not left to the model");
+  assert.ok(route!.style.address_every_sentence, "every-sentence flag set");
+  assert.strictEqual(route!.style.address_terms[0], "boss", "the term he named is stored");
+});
+
+it("\"say sir in every sentence\" sets the enforced address rule", () => {
+  const route = preRouteStyleRequest("you must say sir in every sentence put that as my command in your memory", DEFAULT_OWNER_STYLE);
+  assert.ok(route, "command recognised");
+  assert.strictEqual(route!.style.address_terms[0], "sir");
+  assert.strictEqual(route!.style.address_every_sentence, true);
+});
+
+it("every sentence gets the address term, even on casual easy mode", () => {
+  const style: OwnerStyle = { ...DEFAULT_OWNER_STYLE, tone: "casual", address_terms: ["sir"], address_every_sentence: true };
+  const out = enforceAddressTerms("Morning. How are you? Nothing pending!", style);
+  const sentences = out.split(/(?<=[.!?])\s+/).filter(Boolean);
+  assert.strictEqual(sentences.length, 3, out);
+  for (const sentence of sentences) {
+    assert.match(sentence, /\bsir\b/i, `missing sir: ${sentence}`);
+  }
+});
+
+it("the rail stays off until the owner asks for it", () => {
+  const style: OwnerStyle = { ...DEFAULT_OWNER_STYLE, address_every_sentence: false };
+  assert.strictEqual(enforceAddressTerms("Morning. How are you?", style), "Morning. How are you?");
+});
+
+it("no double term is added when the sentence already has one", () => {
+  const style: OwnerStyle = { ...DEFAULT_OWNER_STYLE, address_terms: ["sir"], address_every_sentence: true };
+  assert.strictEqual(enforceAddressTerms("Morning, sir. How are you?", style), "Morning, sir. How are you, sir?");
 });
 
 console.log(`\n=== RESULT: ${passed} passed, ${failed} failed ===`);

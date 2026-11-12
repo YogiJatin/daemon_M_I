@@ -1695,6 +1695,18 @@ export default {
           });
         }
 
+        // Unknown slash command: never leave the owner with silence.
+        if (!isVoice && !isPhoto && !isDocument && routed === null && messageText.trim().startsWith("/")) {
+          const unknown = messageText.trim().split(/\s+/)[0];
+          const hint = `I do not know ${unknown}. Try /help, /schedule, /class, /timetable, /add, /today or /remember.`;
+          if (chatId !== undefined) {
+            await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, chatId, hint, undefined, {
+              testStubs,
+              db: env.DB,
+            }).catch(() => null);
+          }
+        }
+
         // Slash command: durable write committed inside handler; send reply after commit.
         // If send fails, still return HTTP 200 - do NOT repeat mutation (AGENTS.md Rule 9).
         if (routed?.response && chatId !== undefined) {

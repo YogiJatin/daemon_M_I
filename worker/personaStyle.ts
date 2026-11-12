@@ -18,6 +18,8 @@ export interface OwnerStyle {
   tone: Tone;
   brevity: Brevity;
   emoji: boolean;
+  /** True when the owner asked to be addressed in every sentence, not just some replies. */
+  address_every_sentence: boolean;
 }
 
 export const PERSONA_STYLE_SETTING_KEY = "persona_style";
@@ -27,6 +29,7 @@ export const DEFAULT_OWNER_STYLE: OwnerStyle = {
   tone: "auto",
   brevity: "normal",
   emoji: false,
+  address_every_sentence: false,
 };
 
 const VALID_TONES: Tone[] = ["auto", "casual", "formal"];
@@ -95,6 +98,7 @@ export function parseOwnerStyle(raw: unknown): OwnerStyle {
       tone: DEFAULT_OWNER_STYLE.tone,
       brevity: DEFAULT_OWNER_STYLE.brevity,
       emoji: DEFAULT_OWNER_STYLE.emoji,
+      address_every_sentence: DEFAULT_OWNER_STYLE.address_every_sentence,
     };
   }
 
@@ -111,6 +115,10 @@ export function parseOwnerStyle(raw: unknown): OwnerStyle {
     tone: isTone(parsed.tone) ? parsed.tone : DEFAULT_OWNER_STYLE.tone,
     brevity: isBrevity(parsed.brevity) ? parsed.brevity : DEFAULT_OWNER_STYLE.brevity,
     emoji: typeof parsed.emoji === "boolean" ? parsed.emoji : DEFAULT_OWNER_STYLE.emoji,
+    address_every_sentence:
+      typeof parsed.address_every_sentence === "boolean"
+        ? parsed.address_every_sentence
+        : DEFAULT_OWNER_STYLE.address_every_sentence,
   };
 }
 
@@ -121,6 +129,7 @@ export interface StylePatch {
   address_terms?: unknown;
   add_terms?: unknown;
   remove_terms?: unknown;
+  address_every_sentence?: unknown;
 }
 
 export interface StyleUpdateResult {
@@ -139,6 +148,7 @@ export interface StyleUpdate {
   brevity?: string;
   emoji?: boolean;
   address_terms?: string[];
+  address_every_sentence?: boolean;
 }
 
 /**
@@ -153,6 +163,7 @@ export function applyStyleUpdate(current: OwnerStyle, patch: StylePatch): StyleU
     tone: current.tone,
     brevity: current.brevity,
     emoji: current.emoji,
+    address_every_sentence: current.address_every_sentence,
   };
 
   if (patch.tone !== undefined) {
@@ -230,6 +241,15 @@ export function applyStyleUpdate(current: OwnerStyle, patch: StylePatch): StyleU
     }
   }
 
+  if (patch.address_every_sentence !== undefined) {
+    if (typeof patch.address_every_sentence === "boolean") {
+      style.address_every_sentence = patch.address_every_sentence;
+      applied.push(`address_every_sentence=${patch.address_every_sentence}`);
+    } else {
+      rejected.push("address_every_sentence");
+    }
+  }
+
   return { style, applied, rejected };
 }
 
@@ -262,6 +282,10 @@ export function describeStyleUpdate(applied: string[]): string {
     if (entry.startsWith("address_terms=[") || entry.startsWith("add_terms=[")) {
       const inner = entry.slice(entry.indexOf("[") + 1, entry.lastIndexOf("]"));
       if (inner) parts.push(`Address term: ${inner}`);
+      continue;
+    }
+    if (entry.startsWith("address_every_sentence=")) {
+      parts.push(entry.endsWith("true") ? "Address term in every sentence" : "Address term optional again");
       continue;
     }
     if (entry.startsWith("remove_terms=[")) {
@@ -377,6 +401,19 @@ export function preRouteStyleRequest(text: string, current: OwnerStyle): StyleRo
     return finish({ address_terms: [renameMatch[1]] });
   }
 
+  // A standing address rule anywhere in the sentence:
+  // "always call me boss and say sir at the end", "you must say sir in every sentence",
+  // "always address me as sir", "put that as my command".
+  const addressRule = matchAddressRule(normalized);
+  if (addressRule) {
+    const patch: StylePatch = {};
+    if (addressRule.term) patch.address_terms = [addressRule.term];
+    if (addressRule.everySentence) patch.address_every_sentence = true;
+    if (patch.address_terms !== undefined || patch.address_every_sentence !== undefined) {
+      return finish(patch);
+    }
+  }
+
   if (
     /(?:talk|speak|chat)\s+(?:to\s+me\s+)?casual|be\s+casual|don'?t\s+be\s+so\s+uptight|just\s+be\s+casual|casual\s+ga\s+(?:matladu|matlad|maatladu)|casual\s+ga\s+batlu|casual\s+tone/.test(
       normalized,
@@ -429,7 +466,9 @@ export function renderOwnerStyleBlock(style: OwnerStyle): string {
     `Emoji: ${emoji}`,
     style.address_terms.length === 0
       ? "The owner removed every address term: do not use any address term."
-      : "Use an address term at most once per reply, and not in every reply.",
+      : style.address_every_sentence
+        ? "The owner requires an address term in EVERY sentence of every reply. Code enforces this; never drop it."
+        : "Use an address term at most once per reply, and not in every reply.",
   ].join("\n");
 }
 
@@ -538,5 +577,70 @@ export function serializeOwnerStyle(style: OwnerStyle): string {
     tone: style.tone,
     brevity: style.brevity,
     emoji: style.emoji,
+    address_every_sentence: style.address_every_sentence,
   });
 }
+
+
+/**
+ * Recognises a standing address rule and pulls the term out of it. The owner writes these
+ * as sentences ("always call me boss and say sir at the end"), so the term is the word
+ * after "call me" or after "say", never a guess from the whole message.
+ */
+function matchAddressRule(normalized: string): { term: string | null; everySentence: boolean } | null {
+  const everySentence =
+    /\b(?:in\s+every\s+sentence|every\s+sentence|in\s+every\s+reply|always\s+say|at\s+the\s+end)\b/.test(
+      normalized,
+    );
+  const callMe = normalized.match(/\bcall\s+me\s+([a-z][a-z'\-]{0,20})/);
+  const addressMe = normalized.match(/\baddress\s+me\s+(?:as\s+)?([a-z][a-z'\-]{0,20})/);
+  // "say sir ..." - but not "say that", "say something", "say it".
+  const sayMatch = normalized.match(/\b(?:say|use)\s+(sir|boss|master|madam|chief|dude|bro)\b/);
+  const requiresRule =
+    everySentence ||
+    /\b(?:always|must|from\s+now\s+on|every\s+time)\b/.test(normalized) ||
+    /\b(?:put\s+(?:that|this)\s+(?:as|in)\s+my\s+(?:command|memory))\b/.test(normalized);
+
+  if (!requiresRule) return null;
+
+  const term = callMe?.[1] || addressMe?.[1] || sayMatch?.[1] || null;
+  if (!term && !everySentence) return null;
+  return { term: term ? term : null, everySentence };
+}
+
+/**
+ * Code-side guarantee for the owner's address rule. When he asked for an address term in
+ * every sentence, any sentence without one gets ", <term>" before its final punctuation.
+ * This is a mechanical style rail, not conversation: the model still writes the words.
+ */
+export function enforceAddressTerms(text: string, style: OwnerStyle): string {
+  const body = (text || "").trim();
+  if (!body) return text;
+  if (!style.address_every_sentence) return text;
+  const terms = style.address_terms.filter(Boolean);
+  if (terms.length === 0) return text;
+  const term = terms[0];
+
+  // Keep paragraphs and line breaks; only rewrite sentences that lack the term.
+  return body
+    .split(/(\n+)/)
+    .map((chunk) => {
+      if (!chunk.trim() || /^\n+$/.test(chunk)) return chunk;
+      return chunk
+        .split(/(?<=[.!?])\s+/)
+        .map((sentence) => {
+          if (!sentence.trim()) return sentence;
+          if (countAddressTerms(sentence, terms) > 0) return sentence;
+          // Buttons, bullets and single words stay untouched.
+          if (sentence.trim().length < 3) return sentence;
+          const match = sentence.match(/^(.*?)([.!?]*)\s*$/s);
+          if (!match) return sentence;
+          const core = match[1].replace(/\s+$/, "");
+          const punctuation = match[2] || ".";
+          return `${core}, ${term}${punctuation}`;
+        })
+        .join(" ");
+    })
+    .join("");
+}
+

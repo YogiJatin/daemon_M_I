@@ -58,6 +58,7 @@ import { applyReplyStyle } from "./replyStyle";
 import {
   applyStyleUpdate,
   countAddressTerms,
+  enforceAddressTerms,
   describeStyleUpdate,
   parseOwnerStyle,
   preRouteStyleRequest,
@@ -350,7 +351,10 @@ async function processSingleMessage(
       actionResults: turnActionResults,
       memoryTexts: turnMemoryTexts,
     });
-    previousReplyUsedTerm = countAddressTerms(styled.text, ownerStyle.address_terms) > 0;
+    // The owner's address rule is a mechanical rail, so it holds even on casual/easy mode:
+    // a plain chat reply (no buttons) gets the term in every sentence. Cards keep their wording.
+    const outgoing = markup ? styled.text : enforceAddressTerms(styled.text, ownerStyle);
+    previousReplyUsedTerm = countAddressTerms(outgoing, ownerStyle.address_terms) > 0;
     const recorded = [
       ...styled.decisions,
       ...styled.violations.map((violation) => `style_blocked_${violation.code}`),
@@ -358,7 +362,7 @@ async function processSingleMessage(
     if (recorded.length > 0) {
       void recordTurnDecision(db, userMsgRowId, `guard:${recorded.join(",")}`);
     }
-    return sendTelegramMessage(botToken, chatId, styled.text, markup, {
+    return sendTelegramMessage(botToken, chatId, outgoing, markup, {
       testStubs: Boolean(testStubs),
       db,
       egress: { actionResults: turnActionResults },
@@ -1451,7 +1455,13 @@ Confirm ${isBulkComplete ? `completing ${targetCount} overdue task(s)` : `stoppi
   }
 
   const intent = result.intent;
-  if (result.reply_text && typeof (result.reply_text as any) !== "string") { result.reply_text = (typeof (result.reply_text as any)?.text === "string" ? (result.reply_text as any).text : String(result.reply_text)); }
+  // A provider can answer with an object (reply_text: {text: "..."}); stringify only the
+  // text field so a chat turn can never print "[object Object]" at the owner.
+  if (result.reply_text && typeof (result.reply_text as any) !== "string") {
+    const raw: any = result.reply_text;
+    const candidate = [raw.text, raw.reply, raw.message, raw.content].find((value) => typeof value === "string");
+    result.reply_text = typeof candidate === "string" ? candidate : "";
+  }
   let replyText = result.reply_text || "";
   let replyMarkup: any = undefined;
 
