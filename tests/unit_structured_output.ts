@@ -175,7 +175,7 @@ async function runStructuredOutputTests() {
       }
       return new Response(
         JSON.stringify({
-          choices: [{ message: { content: JSON.stringify({ intent: "chat", confidence: 0.9 }) } }],
+          choices: [{ message: { content: JSON.stringify({ intent: "chat", confidence: 0.9, reply_text: "pong" }) } }],
         }),
         { status: 200, headers: { "Content-Type": "application/json" } }
       );

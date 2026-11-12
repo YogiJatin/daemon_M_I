@@ -664,6 +664,17 @@ export class AIAdapter {
         const result = await this.callProvider<TOutput>(config, request, now);
         const durationMs = Date.now() - startTime;
 
+        // A provider that answers with nothing usable is not a success: fall through to
+        // the next model instead of sending an empty reply to the owner.
+        const data: any = result?.data;
+        if (request.capability === "telegram_assistant" && data && typeof data === "object") {
+          if (data.intent === "chat" && !this.replyTextOf(data.reply_text)) {
+            throw new Error(`Provider ${config.id} returned an empty chat reply`);
+          }
+        } else if (request.responseFormat === "text" && !this.replyTextOf((result as any)?.rawText)) {
+          throw new Error(`Provider ${config.id} returned empty text`);
+        }
+
         circuit.consecutiveFailures = 0;
         circuit.cooldownUntil = 0;
         circuit.avgLatencyMs = Math.round((circuit.avgLatencyMs + durationMs) / 2);
@@ -1029,7 +1040,11 @@ export class AIAdapter {
    * undefined. Pull out the string, and never let String() produce "[object Object]".
    */
   private replyTextOf(value: unknown): string {
-    if (typeof value === "string") return value.trim();
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      // A provider that already stringified an object is a failed answer, not text.
+      return trimmed === "[object Object]" ? "" : trimmed;
+    }
     if (value && typeof value === "object") {
       const record = value as Record<string, unknown>;
       for (const key of ["text", "reply", "message", "content", "reply_text"]) {
@@ -1112,10 +1127,15 @@ export class AIAdapter {
           waiData = parsed as TOutput;
         } else {
           // Normalize Workers AI output (which may be {response: "..."}, plain text, or partial JSON)
+          // reply_text can arrive as an object ({"text": "..."}); pull the string out
+          // instead of String()-ing the object into "[object Object]".
           const textCandidate = (parsed && typeof parsed === "object")
-            ? (parsed.reply_text || parsed.response || parsed.message || parsed.text || JSON.stringify(parsed))
-            : rawText;
-          const cleanText = String(textCandidate || "Hey! How can I help you today?").trim().replace(/^[\s{"}]+/, "").slice(0, 500);
+            ? (this.replyTextOf(parsed.reply_text) ||
+               this.replyTextOf(parsed.response) ||
+               this.replyTextOf(parsed.message) ||
+               this.replyTextOf(parsed.text))
+            : this.replyTextOf(rawText);
+          const cleanText = textCandidate.trim().replace(/^[\s{"]+/, "").slice(0, 500);
           waiData = {
             intent: "chat",
             confidence: 0.85,

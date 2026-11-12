@@ -75,6 +75,7 @@ import { finalizeTelegramUpdate } from "./telegramLedger";
 import { UNGROUNDED_REPLY, verifyReplyGrounding } from "./groundingVerifier";
 import { buildAssistantUserPrompt } from "./telegramAssistant";
 import { getISTDateParts } from "./dateParser";
+import { renderIdentityAnswer } from "./identity";
 
 // ---------------------------------------------------------------------------
 // Budget & timing constants
@@ -420,8 +421,8 @@ async function processSingleMessage(
   }
 
   // 0.5 What do you know about me? (1.8, M08 - Pure D1 template, identical with AI down)
-  if (/(?:what\s+do\s+you\s+know\s+about\s+me|who\s+am\s+i|do\s+you\s+know\s+me|what\s+do\s+you\s+remember)/i.test(text.trim())) {
-    const memRes = await handleMemoriesCommand(db, now);
+  if (/(?:what\s+do\s+you\s+know\s+about\s+me|who\s+am\s+i|do\s+you\s+know\s+me)/i.test(text.trim())) {
+    const memRes = { success: true, response: await renderIdentityAnswer(db) };
     const sendRes = await sendTg(memRes.response).catch(() => null);
     await logChatMessage(db, {
       updateId,

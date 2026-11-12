@@ -21,7 +21,8 @@ const FORGET_PATTERNS: RegExp[] = [
   /\bfrom\s+(?:your|my)\s+memory\b/i,
 ];
 
-const REMEMBER_PATTERN = /^\s*(?:please\s+)?remember\s+(?:that\s+)?(.{3,})$/i;
+const REMEMBER_PATTERN =
+  /^\s*(?:please\s+)?(?:remember|note\s+(?:that|this|these)|put\s+(?:that|this)|keep\s+(?:that|this))\s+(?:that\s+|down\s+)?(.{3,})$/i;
 
 function looksLikeForget(text: string): boolean {
   return FORGET_PATTERNS.some((pattern) => pattern.test(text));
