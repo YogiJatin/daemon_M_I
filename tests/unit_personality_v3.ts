@@ -341,7 +341,8 @@ it("a standing address command is stored as style, not a memory card", () => {
   const route = preRouteStyleRequest("always call me boss and say sir at the end", DEFAULT_OWNER_STYLE);
   assert.ok(route, "the command must be recognised by code, not left to the model");
   assert.ok(route!.style.address_every_sentence, "every-sentence flag set");
-  assert.strictEqual(route!.style.address_terms[0], "boss", "the term he named is stored");
+  assert.strictEqual(route!.style.address_terms[0], "sir", "the spoken term leads");
+  assert.ok(route!.style.address_terms.includes("boss"), "the called term is kept");
 });
 
 it("\"say sir in every sentence\" sets the enforced address rule", () => {

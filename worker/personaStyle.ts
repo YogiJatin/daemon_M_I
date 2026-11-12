@@ -407,7 +407,11 @@ export function preRouteStyleRequest(text: string, current: OwnerStyle): StyleRo
   const addressRule = matchAddressRule(normalized);
   if (addressRule) {
     const patch: StylePatch = {};
-    if (addressRule.term) patch.address_terms = [addressRule.term];
+    if (addressRule.term) {
+      patch.address_terms = addressRule.secondary
+        ? [addressRule.term, addressRule.secondary]
+        : [addressRule.term];
+    }
     if (addressRule.everySentence) patch.address_every_sentence = true;
     if (patch.address_terms !== undefined || patch.address_every_sentence !== undefined) {
       return finish(patch);
@@ -587,7 +591,7 @@ export function serializeOwnerStyle(style: OwnerStyle): string {
  * as sentences ("always call me boss and say sir at the end"), so the term is the word
  * after "call me" or after "say", never a guess from the whole message.
  */
-function matchAddressRule(normalized: string): { term: string | null; everySentence: boolean } | null {
+function matchAddressRule(normalized: string): { term: string | null; secondary: string | null; everySentence: boolean } | null {
   const everySentence =
     /\b(?:in\s+every\s+sentence|every\s+sentence|in\s+every\s+reply|always\s+say|at\s+the\s+end)\b/.test(
       normalized,
@@ -603,9 +607,14 @@ function matchAddressRule(normalized: string): { term: string | null; everySente
 
   if (!requiresRule) return null;
 
-  const term = callMe?.[1] || addressMe?.[1] || sayMatch?.[1] || null;
+  const callTerm = callMe?.[1] || addressMe?.[1] || null;
+  const sayTerm = sayMatch?.[1] || null;
+  // "call me boss and say sir" keeps both, with the spoken term first so it is the one
+  // the every-sentence rail uses.
+  const term = sayTerm || callTerm;
+  const secondary = sayTerm && callTerm && sayTerm !== callTerm ? callTerm : null;
   if (!term && !everySentence) return null;
-  return { term: term ? term : null, everySentence };
+  return { term, secondary, everySentence };
 }
 
 /**
