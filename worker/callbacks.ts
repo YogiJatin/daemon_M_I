@@ -15,6 +15,7 @@
 
 import { materializeRecurringOccurrences } from "./recurrenceEngine";
 import { confirmProposal, rejectProposal } from "./inboxService";
+import { runBulk, type BulkKind } from "./bulkOps";
 import { recordRejectionFeedback } from "./captureEngine";
 import { setProfileKey } from "./dailyRhythm";
 import { applyReminderShifts, findRemindersToShift } from "./dailyRhythm";
@@ -32,6 +33,18 @@ export interface CallbackResult {
 // ---------------------------------------------------------------------------
 // Utility: strip inline keyboard from an already-sent message
 // ---------------------------------------------------------------------------
+async function sendChatMessage(botToken: string, chatId: any, text: string): Promise<void> {
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+  } catch {
+    // best-effort
+  }
+}
+
 async function clearKeyboard(botToken: string, chatId: any, messageId: number): Promise<void> {
   try {
     await fetch(
@@ -98,6 +111,25 @@ export async function handleCallbackQuery(
 
   const now = new Date();
   const nowIso = now.toISOString();
+
+  // ---------------------------------------------------------------------------
+  // Bulk: bulk:<kind> / bulk:cancel  (owner tapped Confirm on a bulk card)
+  // ---------------------------------------------------------------------------
+  if (action === "bulk") {
+    await clearKeyboard(botToken, chatId, messageId);
+    if (payload === "cancel") {
+      return { success: true, action, message: "Cancelled. Nothing was changed." };
+    }
+    const allowed: BulkKind[] = ["complete_tasks", "delete_tasks", "delete_classes", "delete_all"];
+    if (!allowed.includes(payload as BulkKind)) {
+      return { success: false, action, message: "Unknown bulk action." };
+    }
+    const bulkResult = await runBulk(env.DB, payload as BulkKind, nowIso);
+    await sendTelegramMessage(env.TELEGRAM_BOT_TOKEN, chatId, bulkResult.message).catch(() => {});
+    await env.DB.prepare("UPDATE telegram_updates SET status = 'processed', processed_at = ? WHERE update_id = ?")
+      .bind(nowIso, updateId).run().catch(() => {});
+    return { success: true, action, message: bulkResult.message };
+  }
 
   // ---------------------------------------------------------------------------
   // A. Proposal: confirm_proposal / p_conf / p_confirm

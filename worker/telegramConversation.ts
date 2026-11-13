@@ -54,6 +54,7 @@ import { preRouteIntent } from "./intentPreRouter";
 import { handleForgetMemory, restoreLatestMemory } from "./memoryActions";
 import { normalizeActions } from "./intentSchema";
 import { parseCaptureCommand, parseExplicitReminderDeterministic, splitMessageClauses } from "./deterministicParser";
+import { matchBulkCommand } from "./bulkOps";
 import { applyReplyStyle } from "./replyStyle";
 import {
   applyStyleUpdate,
@@ -931,6 +932,38 @@ Confirm?`;
       telegramMessageId: sendRes?.telegramMessageId,
     });
     await db.prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?").bind(nowIso(), userMsgRowId).run().catch(() => {});
+    return;
+  }
+
+  // 3.7 Bulk commands: "delete all tasks", "remove all classes", "mark all done".
+  const bulkMatch = matchBulkCommand(text);
+  if (bulkMatch) {
+    const markup = makeInlineKeyboard([
+      { text: "Confirm", callback_data: `bulk:${bulkMatch.kind}` },
+      { text: "Cancel", callback_data: "bulk:cancel" },
+    ]);
+    const replyText = `${bulkMatch.label}? This cannot be undone.`;
+    const sendRes = await sendTg(replyText, markup).catch(() => null);
+    await logChatMessage(db, {
+      updateId,
+      chatId,
+      messageId,
+      role: "assistant",
+      text: replyText,
+      intent: "bulk_confirm",
+      confidence: 1.0,
+      outcome: "awaiting_confirmation",
+      status: "sent",
+      replyMarkup: markup,
+      provider: "deterministic",
+      latencyMs: Date.now() - startProcessing,
+      telegramMessageId: sendRes?.telegramMessageId,
+    });
+    await db
+      .prepare("UPDATE chat_messages SET status = 'done', updated_at = ? WHERE id = ?")
+      .bind(nowIso(), userMsgRowId)
+      .run()
+      .catch(() => {});
     return;
   }
 
