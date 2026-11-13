@@ -23,8 +23,7 @@ INSERT OR REPLACE INTO timetable_subjects (id, semester_id, code, name, faculty,
   ('subj_dbmslab',  'sem_csm_a_2026_ii_ii', '25CS309PC', 'Database Management Systems Lab',         'Mrs. D. Aparna',          '304', 'CSM-A', datetime('now'), datetime('now')),
   ('subj_msf',      'sem_csm_a_2026_ii_ii', '25MA401BS', 'Mathematical and Statistical Foundations', 'Mrs. M. Mounika',         '304', 'CSM-A', datetime('now'), datetime('now')),
   ('subj_cmlab',    'sem_csm_a_2026_ii_ii', '25MA306PC', 'Computational Mathematics Lab',           'Mrs. M. Mounika',         '304', 'CSM-A', datetime('now'), datetime('now')),
-  ('subj_react',    'sem_csm_a_2026_ii_ii', '25CS310SD', 'Node JS / React JS / Django',             'Mrs. V. Swapna Teja',     '304', 'CSM-A', datetime('now'), datetime('now')),
-  ('subj_si',       'sem_csm_a_2026_ii_ii', NULL,       'SI (name not yet confirmed)',              NULL,                      '304', 'CSM-A', datetime('now'), datetime('now'));
+  ('subj_react',    'sem_csm_a_2026_ii_ii', '25CS310SD', 'Node JS / React JS / Django',             'Mrs. V. Swapna Teja',     '304', 'CSM-A', datetime('now'), datetime('now'));
 
 -- Monday (weekday 1)
 INSERT OR REPLACE INTO timetable_slots (id, semester_id, subject_id, weekday, start_time, end_time, room, active, created_at, updated_at) VALUES
@@ -55,7 +54,7 @@ INSERT OR REPLACE INTO timetable_slots (id, semester_id, subject_id, weekday, st
   ('slot_thu_se',    'sem_csm_a_2026_ii_ii', 'subj_se',    4, '11:15', '12:15', '304', 1, datetime('now'), datetime('now')),
   ('slot_thu_coa',   'sem_csm_a_2026_ii_ii', 'subj_coa',   4, '12:15', '13:15', '304', 1, datetime('now'), datetime('now')),
   ('slot_thu_msf',   'sem_csm_a_2026_ii_ii', 'subj_msf',   4, '14:00', '15:00', '304', 1, datetime('now'), datetime('now')),
-  ('slot_thu_si',    'sem_csm_a_2026_ii_ii', 'subj_si',    4, '15:00', '16:00', '304', 1, datetime('now'), datetime('now'));
+  ('slot_thu_se2',  'sem_csm_a_2026_ii_ii', 'subj_se',    4, '15:00', '16:00', '304', 1, datetime('now'), datetime('now'));
 
 -- Friday (weekday 5)
 INSERT OR REPLACE INTO timetable_slots (id, semester_id, subject_id, weekday, start_time, end_time, room, active, created_at, updated_at) VALUES
